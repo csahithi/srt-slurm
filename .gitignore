@@ -12,6 +12,11 @@ __pycache__/
 venv/
 env/
 ENV/
+.venv/
+
+# uv
+.uv/
+uv.lock
 
 # IDE
 .vscode/

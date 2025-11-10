@@ -6,8 +6,8 @@ Provides functions to compare two benchmark runs in detail:
 - Performance metric deltas
 - Visual comparison helpers
 """
+
 import pandas as pd
-from typing import Dict, List, Tuple, Optional
 
 
 def categorize_flag(flag_name: str) -> str:
@@ -17,25 +17,28 @@ def categorize_flag(flag_name: str) -> str:
     """
     flag_lower = flag_name.lower()
 
-    if any(x in flag_lower for x in ['tp', 'dp', 'pp', 'ep', 'parallel', 'nnodes', 'node_rank']):
+    if any(x in flag_lower for x in ["tp", "dp", "pp", "ep", "parallel", "nnodes", "node_rank"]):
         return "Parallelism"
-    elif any(x in flag_lower for x in ['attention', 'backend', 'sampling', 'moe']):
+    elif any(x in flag_lower for x in ["attention", "backend", "sampling", "moe"]):
         return "Attention & Backend"
-    elif any(x in flag_lower for x in ['kv_cache', 'memory', 'mem_', 'max_total_tokens', 'chunked_prefill']):
+    elif any(
+        x in flag_lower
+        for x in ["kv_cache", "memory", "mem_", "max_total_tokens", "chunked_prefill"]
+    ):
         return "Memory & Cache"
-    elif any(x in flag_lower for x in ['schedule', 'max_running', 'priority']):
+    elif any(x in flag_lower for x in ["schedule", "max_running", "priority"]):
         return "Scheduling"
-    elif any(x in flag_lower for x in ['enable_', 'disable_', 'cuda_graph', 'radix']):
+    elif any(x in flag_lower for x in ["enable_", "disable_", "cuda_graph", "radix"]):
         return "Optimization"
-    elif any(x in flag_lower for x in ['disaggregation', 'transfer', 'decode_', 'prefill_']):
+    elif any(x in flag_lower for x in ["disaggregation", "transfer", "decode_", "prefill_"]):
         return "Disaggregation"
-    elif any(x in flag_lower for x in ['model', 'context_length', 'served_model']):
+    elif any(x in flag_lower for x in ["model", "context_length", "served_model"]):
         return "Model"
     else:
         return "Other"
 
 
-def compare_configs(config_a: Dict, config_b: Dict) -> Dict:
+def compare_configs(config_a: dict, config_b: dict) -> dict:
     """Compare configuration flags between two runs.
 
     Args:
@@ -51,15 +54,18 @@ def compare_configs(config_a: Dict, config_b: Dict) -> Dict:
         }
     """
     # Extract server_args from config structure
-    server_args_a = config_a.get('config', {}).get('server_args', {})
-    server_args_b = config_b.get('config', {}).get('server_args', {})
+    server_args_a = config_a.get("config", {}).get("server_args", {})
+    server_args_b = config_b.get("config", {}).get("server_args", {})
 
     # Compare topology summary
     topology_summary = {
-        'prefill_tp': (server_args_a.get('tp_size'), server_args_b.get('tp_size')),
-        'prefill_dp': (server_args_a.get('dp_size'), server_args_b.get('dp_size')),
-        'model': (server_args_a.get('served_model_name'), server_args_b.get('served_model_name')),
-        'context_length': (server_args_a.get('context_length'), server_args_b.get('context_length')),
+        "prefill_tp": (server_args_a.get("tp_size"), server_args_b.get("tp_size")),
+        "prefill_dp": (server_args_a.get("dp_size"), server_args_b.get("dp_size")),
+        "model": (server_args_a.get("served_model_name"), server_args_b.get("served_model_name")),
+        "context_length": (
+            server_args_a.get("context_length"),
+            server_args_b.get("context_length"),
+        ),
     }
 
     # Get all unique flags from both runs
@@ -73,30 +79,29 @@ def compare_configs(config_a: Dict, config_b: Dict) -> Dict:
         value_b = server_args_b.get(flag)
 
         if value_a != value_b:
-            flag_differences.append({
-                'flag': flag,
-                'category': categorize_flag(flag),
-                'run_a_value': value_a if value_a is not None else "Not set",
-                'run_b_value': value_b if value_b is not None else "Not set"
-            })
+            flag_differences.append(
+                {
+                    "flag": flag,
+                    "category": categorize_flag(flag),
+                    "run_a_value": value_a if value_a is not None else "Not set",
+                    "run_b_value": value_b if value_b is not None else "Not set",
+                }
+            )
         else:
-            identical_flags.append({
-                'flag': flag,
-                'value': value_a
-            })
+            identical_flags.append({"flag": flag, "value": value_a})
 
     # Sort differences by category, then by flag name
-    flag_differences.sort(key=lambda x: (x['category'], x['flag']))
+    flag_differences.sort(key=lambda x: (x["category"], x["flag"]))
 
     return {
-        'topology_summary': topology_summary,
-        'flag_differences': flag_differences,
-        'identical_flags': identical_flags,
-        'num_differences': len(flag_differences)
+        "topology_summary": topology_summary,
+        "flag_differences": flag_differences,
+        "identical_flags": identical_flags,
+        "num_differences": len(flag_differences),
     }
 
 
-def compare_metrics(run_a: Dict, run_b: Dict) -> pd.DataFrame:
+def compare_metrics(run_a: dict, run_b: dict) -> pd.DataFrame:
     """Compare performance metrics between two runs at matching concurrency levels.
 
     Args:
@@ -106,26 +111,25 @@ def compare_metrics(run_a: Dict, run_b: Dict) -> pd.DataFrame:
     Returns:
         DataFrame with columns: Concurrency, Metric, Run A, Run B, Delta, % Change
     """
+
     # Calculate derived metrics if not already present
-    def ensure_derived_metrics(run: Dict) -> Dict:
+    def ensure_derived_metrics(run: dict) -> dict:
         """Ensure run has output_tps_per_gpu and output_tps_per_user calculated."""
-        if 'output_tps_per_gpu' not in run or 'output_tps_per_user' not in run:
+        if "output_tps_per_gpu" not in run or "output_tps_per_user" not in run:
             # Calculate total GPUs
-            total_gpus = (run.get('prefill_tp', 0) * run.get('prefill_dp', 0) +
-                         run.get('decode_tp', 0) * run.get('decode_dp', 0))
+            total_gpus = run.get("prefill_tp", 0) * run.get("prefill_dp", 0) + run.get(
+                "decode_tp", 0
+            ) * run.get("decode_dp", 0)
             if total_gpus == 0:
                 total_gpus = 1  # Avoid division by zero
 
             # Calculate Output TPS/GPU
-            output_tps = run.get('output_tps', [])
-            run['output_tps_per_gpu'] = [tps / total_gpus for tps in output_tps]
+            output_tps = run.get("output_tps", [])
+            run["output_tps_per_gpu"] = [tps / total_gpus for tps in output_tps]
 
             # Calculate Output TPS/User as 1000 / TPOT
-            mean_tpot = run.get('mean_tpot_ms', [])
-            run['output_tps_per_user'] = [
-                1000 / tpot if tpot > 0 else 0
-                for tpot in mean_tpot
-            ]
+            mean_tpot = run.get("mean_tpot_ms", [])
+            run["output_tps_per_user"] = [1000 / tpot if tpot > 0 else 0 for tpot in mean_tpot]
 
         return run
 
@@ -134,20 +138,20 @@ def compare_metrics(run_a: Dict, run_b: Dict) -> pd.DataFrame:
 
     # Extract metrics that we want to compare
     metrics_to_compare = [
-        ('Output TPS', 'output_tps'),
-        ('Output TPS/GPU', 'output_tps_per_gpu'),
-        ('Output TPS/User', 'output_tps_per_user'),
-        ('Mean TTFT (ms)', 'mean_ttft_ms'),
-        ('P99 TTFT (ms)', 'p99_ttft_ms'),
-        ('Mean TPOT (ms)', 'mean_tpot_ms'),
-        ('P99 TPOT (ms)', 'p99_tpot_ms'),
-        ('Mean ITL (ms)', 'mean_itl_ms'),
-        ('P99 ITL (ms)', 'p99_itl_ms'),
-        ('Mean E2EL (ms)', 'mean_e2el_ms'),
+        ("Output TPS", "output_tps"),
+        ("Output TPS/GPU", "output_tps_per_gpu"),
+        ("Output TPS/User", "output_tps_per_user"),
+        ("Mean TTFT (ms)", "mean_ttft_ms"),
+        ("P99 TTFT (ms)", "p99_ttft_ms"),
+        ("Mean TPOT (ms)", "mean_tpot_ms"),
+        ("P99 TPOT (ms)", "p99_tpot_ms"),
+        ("Mean ITL (ms)", "mean_itl_ms"),
+        ("P99 ITL (ms)", "p99_itl_ms"),
+        ("Mean E2EL (ms)", "mean_e2el_ms"),
     ]
 
-    concurrencies_a = run_a.get('concurrencies', [])
-    concurrencies_b = run_b.get('concurrencies', [])
+    concurrencies_a = run_a.get("concurrencies", [])
+    concurrencies_b = run_b.get("concurrencies", [])
 
     # Find common concurrency levels
     common_concurrencies = set(concurrencies_a) & set(concurrencies_b)
@@ -177,23 +181,25 @@ def compare_metrics(run_a: Dict, run_b: Dict) -> pd.DataFrame:
                     # Determine if this is an improvement
                     # For latency metrics (lower is better), negative delta is good
                     # For throughput metrics (higher is better), positive delta is good
-                    is_latency = 'ms' in metric_name
+                    is_latency = "ms" in metric_name
                     is_improvement = (delta < 0) if is_latency else (delta > 0)
 
-                    comparison_rows.append({
-                        'Concurrency': concurrency,
-                        'Metric': metric_name,
-                        'Run A': value_a,
-                        'Run B': value_b,
-                        'Delta': delta,
-                        '% Change': pct_change,
-                        'Improved': is_improvement
-                    })
+                    comparison_rows.append(
+                        {
+                            "Concurrency": concurrency,
+                            "Metric": metric_name,
+                            "Run A": value_a,
+                            "Run B": value_b,
+                            "Delta": delta,
+                            "% Change": pct_change,
+                            "Improved": is_improvement,
+                        }
+                    )
 
     return pd.DataFrame(comparison_rows)
 
 
-def calculate_summary_scorecard(comparison_df: pd.DataFrame) -> Dict:
+def calculate_summary_scorecard(comparison_df: pd.DataFrame) -> dict:
     """Calculate summary statistics for the comparison.
 
     Args:
@@ -211,32 +217,38 @@ def calculate_summary_scorecard(comparison_df: pd.DataFrame) -> Dict:
     """
     if comparison_df.empty:
         return {
-            'num_improved': 0,
-            'num_regressed': 0,
-            'num_unchanged': 0,
-            'avg_improvement_pct': 0.0,
-            'biggest_improvement': None,
-            'biggest_regression': None
+            "num_improved": 0,
+            "num_regressed": 0,
+            "num_unchanged": 0,
+            "avg_improvement_pct": 0.0,
+            "biggest_improvement": None,
+            "biggest_regression": None,
         }
 
     # Count improvements/regressions across all concurrency levels
     # Group by metric to avoid counting same metric multiple times
-    metric_summary = comparison_df.groupby('Metric').agg({
-        'Improved': 'mean',  # If mostly improved across concurrencies
-        '% Change': 'mean'
-    })
+    metric_summary = comparison_df.groupby("Metric").agg(
+        {
+            "Improved": "mean",  # If mostly improved across concurrencies
+            "% Change": "mean",
+        }
+    )
 
-    num_improved = (metric_summary['Improved'] > 0.5).sum()
-    num_regressed = (metric_summary['Improved'] < 0.5).sum()
-    num_unchanged = (metric_summary['Improved'] == 0.5).sum()
+    num_improved = (metric_summary["Improved"] > 0.5).sum()
+    num_regressed = (metric_summary["Improved"] < 0.5).sum()
+    num_unchanged = (metric_summary["Improved"] == 0.5).sum()
 
     # Find biggest changes
     abs_changes = comparison_df.copy()
-    abs_changes['Abs % Change'] = abs_changes['% Change'].abs()
+    abs_changes["Abs % Change"] = abs_changes["% Change"].abs()
 
     if not abs_changes.empty:
-        biggest_improvement_row = abs_changes[abs_changes['Improved'] == True].nlargest(1, 'Abs % Change', keep='first')
-        biggest_regression_row = abs_changes[abs_changes['Improved'] == False].nlargest(1, 'Abs % Change', keep='first')
+        biggest_improvement_row = abs_changes[abs_changes["Improved"]].nlargest(
+            1, "Abs % Change", keep="first"
+        )
+        biggest_regression_row = abs_changes[not abs_changes["Improved"]].nlargest(
+            1, "Abs % Change", keep="first"
+        )
 
         biggest_improvement = None
         biggest_regression = None
@@ -253,20 +265,20 @@ def calculate_summary_scorecard(comparison_df: pd.DataFrame) -> Dict:
         biggest_regression = None
 
     # Average improvement percentage (across improved metrics only)
-    improved_metrics = comparison_df[comparison_df['Improved'] == True]
-    avg_improvement_pct = improved_metrics['% Change'].mean() if not improved_metrics.empty else 0.0
+    improved_metrics = comparison_df[comparison_df["Improved"]]
+    avg_improvement_pct = improved_metrics["% Change"].mean() if not improved_metrics.empty else 0.0
 
     return {
-        'num_improved': int(num_improved),
-        'num_regressed': int(num_regressed),
-        'num_unchanged': int(num_unchanged),
-        'avg_improvement_pct': float(avg_improvement_pct),
-        'biggest_improvement': biggest_improvement,
-        'biggest_regression': biggest_regression
+        "num_improved": int(num_improved),
+        "num_regressed": int(num_regressed),
+        "num_unchanged": int(num_unchanged),
+        "avg_improvement_pct": float(avg_improvement_pct),
+        "biggest_improvement": biggest_improvement,
+        "biggest_regression": biggest_regression,
     }
 
 
-def get_delta_data_for_graphs(run_a: Dict, run_b: Dict) -> pd.DataFrame:
+def get_delta_data_for_graphs(run_a: dict, run_b: dict) -> pd.DataFrame:
     """Prepare delta data for visualization graphs.
 
     Args:
@@ -276,8 +288,8 @@ def get_delta_data_for_graphs(run_a: Dict, run_b: Dict) -> pd.DataFrame:
     Returns:
         DataFrame with columns: Concurrency, TTFT Delta, TPOT Delta, ITL Delta, Throughput Delta
     """
-    concurrencies_a = run_a.get('concurrencies', [])
-    concurrencies_b = run_b.get('concurrencies', [])
+    concurrencies_a = run_a.get("concurrencies", [])
+    concurrencies_b = run_b.get("concurrencies", [])
 
     common_concurrencies = set(concurrencies_a) & set(concurrencies_b)
 
@@ -287,14 +299,14 @@ def get_delta_data_for_graphs(run_a: Dict, run_b: Dict) -> pd.DataFrame:
         idx_a = concurrencies_a.index(concurrency)
         idx_b = concurrencies_b.index(concurrency)
 
-        row = {'Concurrency': concurrency}
+        row = {"Concurrency": concurrency}
 
         # Calculate deltas for key metrics
         metrics = {
-            'TTFT Delta (ms)': ('mean_ttft_ms', idx_a, idx_b),
-            'TPOT Delta (ms)': ('mean_tpot_ms', idx_a, idx_b),
-            'ITL Delta (ms)': ('mean_itl_ms', idx_a, idx_b),
-            'Throughput Delta (TPS)': ('output_tps', idx_a, idx_b)
+            "TTFT Delta (ms)": ("mean_ttft_ms", idx_a, idx_b),
+            "TPOT Delta (ms)": ("mean_tpot_ms", idx_a, idx_b),
+            "ITL Delta (ms)": ("mean_itl_ms", idx_a, idx_b),
+            "Throughput Delta (TPS)": ("output_tps", idx_a, idx_b),
         }
 
         for delta_name, (metric_key, idx_a, idx_b) in metrics.items():

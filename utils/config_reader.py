@@ -1,10 +1,11 @@
 """
 Configuration reader module for parsing node config files
 """
+
 import json
-import os
 import logging
-from typing import Dict, List, Optional, TypedDict, Any
+import os
+from typing import Any, TypedDict
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -13,8 +14,9 @@ logger = logging.getLogger(__name__)
 # Type definitions for expected JSON structures
 class GPUInfo(TypedDict, total=False):
     """Expected structure of GPU info in config."""
+
     count: int
-    gpus: List[Dict[str, Any]]
+    gpus: list[dict[str, Any]]
     name: str
     memory_total: str
     driver_version: str
@@ -26,6 +28,7 @@ class ServerArgs(TypedDict, total=False):
     Note: This is partial - actual configs may have many more fields.
     Use total=False to allow missing keys.
     """
+
     tp_size: int
     dp_size: int
     pp_size: int
@@ -41,18 +44,19 @@ class ServerArgs(TypedDict, total=False):
 
 class NodeConfig(TypedDict, total=False):
     """Expected structure of a node config JSON file."""
+
     filename: str
     gpu_info: GPUInfo
-    config: Dict[str, Any]  # Contains 'server_args' and other fields
-    environment: Dict[str, str]
+    config: dict[str, Any]  # Contains 'server_args' and other fields
+    environment: dict[str, str]
 
 
-def validate_config_structure(config: Dict[str, Any], config_path: str) -> None:
+def validate_config_structure(config: dict[str, Any], config_path: str) -> None:
     """Validate config structure and log warnings if format changed.
 
     This helps debug when log structure changes in the future.
     """
-    expected_keys = ['config', 'gpu_info', 'environment']
+    expected_keys = ["config", "gpu_info", "environment"]
     missing_keys = [key for key in expected_keys if key not in config]
 
     if missing_keys:
@@ -63,25 +67,25 @@ def validate_config_structure(config: Dict[str, Any], config_path: str) -> None:
         )
 
     # Validate nested structure
-    if 'config' in config:
-        if 'server_args' not in config['config']:
+    if "config" in config:
+        if "server_args" not in config["config"]:
             logger.warning(
                 f"Config at {config_path} missing 'server_args' in 'config'. "
                 f"Available keys in config: {list(config['config'].keys())}"
             )
 
-    if 'gpu_info' in config:
-        if 'gpus' not in config['gpu_info']:
+    if "gpu_info" in config:
+        if "gpus" not in config["gpu_info"]:
             logger.warning(
                 f"Config at {config_path} missing 'gpus' in 'gpu_info'. "
                 f"Available keys: {list(config['gpu_info'].keys())}"
             )
 
 
-def read_config_file(config_path: str) -> Optional[NodeConfig]:
+def read_config_file(config_path: str) -> NodeConfig | None:
     """Read a single config JSON file and validate structure."""
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path) as f:
             config = json.load(f)
             validate_config_structure(config, config_path)
             return config
@@ -93,7 +97,7 @@ def read_config_file(config_path: str) -> Optional[NodeConfig]:
         return None
 
 
-def get_all_configs(run_path: str) -> List[NodeConfig]:
+def get_all_configs(run_path: str) -> list[NodeConfig]:
     """Get all config files from a run directory.
 
     Args:
@@ -112,7 +116,7 @@ def get_all_configs(run_path: str) -> List[NodeConfig]:
             config_path = os.path.join(run_path, file)
             config = read_config_file(config_path)
             if config:
-                config['filename'] = file
+                config["filename"] = file
                 configs.append(config)
 
     if not configs:
@@ -121,7 +125,7 @@ def get_all_configs(run_path: str) -> List[NodeConfig]:
     return configs
 
 
-def extract_node_info(config: Dict) -> Dict:
+def extract_node_info(config: dict) -> dict:
     """Extract relevant node information from config."""
     info = {
         "node_name": config.get("filename", "Unknown").replace("_config.json", ""),
@@ -157,17 +161,14 @@ def extract_node_info(config: Dict) -> Dict:
     return info
 
 
-def get_run_summary(run_path: str) -> Dict:
+def get_run_summary(run_path: str) -> dict:
     """Get a comprehensive summary of a run's configuration."""
     configs = get_all_configs(run_path)
 
     if not configs:
         return {"error": "No config files found"}
 
-    summary = {
-        "num_nodes": len(configs),
-        "nodes": []
-    }
+    summary: dict[str, Any] = {"num_nodes": len(configs), "nodes": []}
 
     # Extract info from each node
     for config in configs:
@@ -183,13 +184,17 @@ def get_run_summary(run_path: str) -> Dict:
             summary["attention_backend"] = server_args.get("attention_backend", "N/A")
             summary["kv_cache_dtype"] = server_args.get("kv_cache_dtype", "N/A")
 
-        if "gpu_info" in first_config and "gpus" in first_config["gpu_info"] and len(first_config["gpu_info"]["gpus"]) > 0:
+        if (
+            "gpu_info" in first_config
+            and "gpus" in first_config["gpu_info"]
+            and len(first_config["gpu_info"]["gpus"]) > 0
+        ):
             summary["gpu_type"] = first_config["gpu_info"]["gpus"][0].get("name", "N/A")
 
     return summary
 
 
-def format_config_for_display(run_path: str) -> Dict:
+def format_config_for_display(run_path: str) -> dict:
     """Format configuration information for display in Streamlit.
 
     Returns a dictionary with structured data for better display.
@@ -206,32 +211,32 @@ def format_config_for_display(run_path: str) -> Dict:
     other_nodes = []
 
     for node in summary.get("nodes", []):
-        node_name = node.get('node_name', 'Unknown')
-        if 'prefill' in node_name.lower():
+        node_name = node.get("node_name", "Unknown")
+        if "prefill" in node_name.lower():
             prefill_nodes.append(node)
-        elif 'decode' in node_name.lower():
+        elif "decode" in node_name.lower():
             decode_nodes.append(node)
-        elif 'frontend' in node_name.lower() or 'nginx' in node_name.lower():
+        elif "frontend" in node_name.lower() or "nginx" in node_name.lower():
             frontend_nodes.append(node)
         else:
             other_nodes.append(node)
 
     return {
         "summary": {
-            "num_nodes": summary.get('num_nodes', 'N/A'),
-            "model": summary.get('model', 'N/A'),
-            "gpu_type": summary.get('gpu_type', 'N/A'),
-            "attention_backend": summary.get('attention_backend', 'N/A'),
-            "kv_cache_dtype": summary.get('kv_cache_dtype', 'N/A'),
+            "num_nodes": summary.get("num_nodes", "N/A"),
+            "model": summary.get("model", "N/A"),
+            "gpu_type": summary.get("gpu_type", "N/A"),
+            "attention_backend": summary.get("attention_backend", "N/A"),
+            "kv_cache_dtype": summary.get("kv_cache_dtype", "N/A"),
         },
         "prefill_nodes": prefill_nodes,
         "decode_nodes": decode_nodes,
         "frontend_nodes": frontend_nodes,
-        "other_nodes": other_nodes
+        "other_nodes": other_nodes,
     }
 
 
-def get_environment_variables(config: Dict) -> Dict:
+def get_environment_variables(config: dict) -> dict:
     """Extract and categorize environment variables.
 
     Returns dict organized by category: NCCL, SGLANG, CUDA, MC (Mooncake), etc.
@@ -241,19 +246,16 @@ def get_environment_variables(config: Dict) -> Dict:
 
     env = config["environment"]
 
-    categories = {
-        "NCCL": {},
-        "SGLANG": {},
-        "CUDA": {},
-        "Mooncake": {},
-        "OMPI": {},
-        "Other": {}
-    }
+    categories = {"NCCL": {}, "SGLANG": {}, "CUDA": {}, "Mooncake": {}, "OMPI": {}, "Other": {}}
 
     for key, value in env.items():
         if key.startswith("NCCL_"):
             categories["NCCL"][key] = value
-        elif key.startswith("SGLANG_") or key == "DYN_SKIP_SGLANG_LOG_FORMATTING" or key == "SGL_FORCE_SHUTDOWN":
+        elif (
+            key.startswith("SGLANG_")
+            or key == "DYN_SKIP_SGLANG_LOG_FORMATTING"
+            or key == "SGL_FORCE_SHUTDOWN"
+        ):
             categories["SGLANG"][key] = value
         elif key.startswith("CUDA_"):
             categories["CUDA"][key] = value
@@ -268,7 +270,7 @@ def get_environment_variables(config: Dict) -> Dict:
     return {k: v for k, v in categories.items() if v}
 
 
-def get_disaggregation_config(config: Dict) -> Dict:
+def get_disaggregation_config(config: dict) -> dict:
     """Extract disaggregation-specific configuration."""
     if "config" not in config or "server_args" not in config["config"]:
         return {}
@@ -282,13 +284,15 @@ def get_disaggregation_config(config: Dict) -> Dict:
         "decode_tp": server_args.get("disaggregation_decode_tp", "N/A"),
         "decode_dp": server_args.get("disaggregation_decode_dp", "N/A"),
         "prefill_pp": server_args.get("disaggregation_prefill_pp", "N/A"),
-        "decode_enable_offload_kvcache": server_args.get("disaggregation_decode_enable_offload_kvcache", "N/A"),
+        "decode_enable_offload_kvcache": server_args.get(
+            "disaggregation_decode_enable_offload_kvcache", "N/A"
+        ),
         "num_reserved_decode_tokens": server_args.get("num_reserved_decode_tokens", "N/A"),
         "decode_polling_interval": server_args.get("disaggregation_decode_polling_interval", "N/A"),
     }
 
 
-def get_server_config_details(config: Dict) -> Dict:
+def get_server_config_details(config: dict) -> dict:
     """Extract all server configuration dynamically from JSON."""
     if "config" not in config or "server_args" not in config["config"]:
         return {}
@@ -300,8 +304,9 @@ def get_server_config_details(config: Dict) -> Dict:
 
 class ParsedCommandInfo(TypedDict):
     """Expected return structure from parse_command_line_from_err."""
+
     explicit_flags: set
-    services: Dict[str, List[str]]
+    services: dict[str, list[str]]
 
 
 def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
@@ -320,29 +325,29 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
             'services': {node_name: [service_types]}
         }
     """
-    import re
     import os
+    import re
 
     explicit_flags: set = set()
-    services: Dict[str, List[str]] = {}
+    services: dict[str, list[str]] = {}
     err_files_found = 0
     commands_found = 0
 
     if not os.path.exists(run_path):
         logger.error(f"Run path does not exist: {run_path}")
-        return {'explicit_flags': explicit_flags, 'services': services}
+        return {"explicit_flags": explicit_flags, "services": services}
 
     # Scan all .err files
     for filename in os.listdir(run_path):
-        if filename.endswith('.err'):
+        if filename.endswith(".err"):
             err_files_found += 1
             filepath = os.path.join(run_path, filename)
 
             # Extract node name and service type from filename
             # Pattern: watchtower-navy-cn01_prefill_w0.err -> cn01, prefill
-            match = re.match(r'(.+?)_(prefill|decode|frontend|nginx|nats|etcd)', filename)
+            match = re.match(r"(.+?)_(prefill|decode|frontend|nginx|nats|etcd)", filename)
             if match:
-                node_name = match.group(1).replace('watchtower-navy-', '')
+                node_name = match.group(1).replace("watchtower-navy-", "")
                 service_type = match.group(2)
 
                 if node_name not in services:
@@ -356,11 +361,11 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
 
             # Look for command line to extract explicit flags
             try:
-                with open(filepath, 'r') as f:
+                with open(filepath) as f:
                     for line in f:
-                        if 'python' in line and 'sglang' in line and '--' in line:
+                        if "python" in line and "sglang" in line and "--" in line:
                             # Extract all --flag-name patterns
-                            flags = re.findall(r'--([a-z0-9-]+)', line)
+                            flags = re.findall(r"--([a-z0-9-]+)", line)
                             explicit_flags.update(flags)
                             commands_found += 1
                             break  # Only need to find the command once per file
@@ -384,4 +389,4 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
         f"{len(explicit_flags)} unique flags, {len(services)} nodes"
     )
 
-    return {'explicit_flags': explicit_flags, 'services': services}
+    return {"explicit_flags": explicit_flags, "services": services}

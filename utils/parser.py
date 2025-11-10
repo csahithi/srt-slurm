@@ -1,10 +1,10 @@
 """
 Parser module for benchmark logs - adapted from parse.py
 """
+
 import json
 import os
 import re
-from typing import Dict, List, Optional, Tuple
 
 
 def extract_job_id(dirname: str) -> int:
@@ -16,17 +16,17 @@ def extract_job_id(dirname: str) -> int:
     - 12345 (legacy format)
     """
     try:
-        return int(dirname.split('_')[0])
+        return int(dirname.split("_")[0])
     except (ValueError, IndexError):
         return -1
 
 
-def analyze_sgl_out(folder: str) -> Dict:
+def analyze_sgl_out(folder: str) -> dict:
     """Analyze SGLang/vLLM benchmark output files."""
     result = []
     for file in os.listdir(folder):
         filepath = os.path.join(folder, file)
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             content = json.load(f)
             res = [
                 content["max_concurrency"],
@@ -63,12 +63,12 @@ def analyze_sgl_out(folder: str) -> Dict:
     return out
 
 
-def analyze_gap_out(folder: str) -> Dict:
+def analyze_gap_out(folder: str) -> dict:
     """Analyze GAP benchmark output files."""
     result = []
     for file in os.listdir(folder):
         filepath = os.path.join(folder, file)
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             content = json.load(f)
             result.append(
                 (
@@ -78,11 +78,7 @@ def analyze_gap_out(folder: str) -> Dict:
                 )
             )
 
-    out = {
-        "concurrencies": [],
-        "output_tps": [],
-        "output_tps_per_user": []
-    }
+    out = {"concurrencies": [], "output_tps": [], "output_tps_per_user": []}
 
     for con, tpspuser, tps in sorted(result, key=lambda x: x[0]):
         out["concurrencies"].append(con)
@@ -92,7 +88,7 @@ def analyze_gap_out(folder: str) -> Dict:
     return out
 
 
-def count_nodes_and_gpus(path: str) -> Tuple[Dict, Dict, List]:
+def count_nodes_and_gpus(path: str) -> tuple[dict, dict, list]:
     """Count prefill nodes, decode nodes, and frontends from log files."""
     files = os.listdir(path)
 
@@ -120,7 +116,7 @@ def count_nodes_and_gpus(path: str) -> Tuple[Dict, Dict, List]:
     return prefill_nodes, decode_nodes, frontends
 
 
-def parse_run_date(dirname: str) -> Optional[str]:
+def parse_run_date(dirname: str) -> str | None:
     """Parse date from run directory name.
 
     Expected format: <jobid>_<config>_YYYYMMDD_HHMMSS
@@ -130,14 +126,16 @@ def parse_run_date(dirname: str) -> Optional[str]:
         Formatted date string like "2025-11-04 05:17:14" or None
     """
     try:
-        parts = dirname.split('_')
+        parts = dirname.split("_")
         if len(parts) >= 2:
             # Look for date pattern (8 digits)
             for i, part in enumerate(parts):
                 if len(part) == 8 and part.isdigit():
                     # Found date, check if next part is time
                     date_str = part
-                    time_str = parts[i + 1] if i + 1 < len(parts) and len(parts[i + 1]) == 6 else "000000"
+                    time_str = (
+                        parts[i + 1] if i + 1 < len(parts) and len(parts[i + 1]) == 6 else "000000"
+                    )
 
                     # Parse YYYYMMDD
                     year = date_str[0:4]
@@ -150,33 +148,33 @@ def parse_run_date(dirname: str) -> Optional[str]:
                     second = time_str[4:6]
 
                     return f"{year}-{month}-{day} {hour}:{minute}:{second}"
-    except:
+    except Exception:
         pass
     return None
 
 
-def parse_topology_from_dirname(dirname: str) -> Tuple[Optional[int], Optional[int]]:
+def parse_topology_from_dirname(dirname: str) -> tuple[int | None, int | None]:
     """Parse topology (XP_YD) from run directory name.
-    
+
     Expected format: <jobid>_XP_YD_YYYYMMDD_HHMMSS
     Example: 3274_1P_4D_20251104_065031 -> (1, 4)
-    
+
     Returns:
         Tuple of (prefill_workers, decode_workers) or (None, None) if not found
     """
     try:
         # Match pattern like 1P_4D or 3P_1D
-        match = re.search(r'_(\d+)P_(\d+)D_', dirname)
+        match = re.search(r"_(\d+)P_(\d+)D_", dirname)
         if match:
             prefill_workers = int(match.group(1))
             decode_workers = int(match.group(2))
             return (prefill_workers, decode_workers)
-    except:
+    except Exception:
         pass
     return (None, None)
 
 
-def parse_container_image(run_path: str) -> Optional[str]:
+def parse_container_image(run_path: str) -> str | None:
     """Parse container image from log.err or log.out files.
 
     Looks for patterns like:
@@ -190,20 +188,20 @@ def parse_container_image(run_path: str) -> Optional[str]:
         Cleaned container name like "sglang+v0.5.4.post2-dyn" or None
     """
     # Check log.err first, then log.out
-    for log_file in ['log.err', 'log.out']:
+    for log_file in ["log.err", "log.out"]:
         log_path = os.path.join(run_path, log_file)
         if not os.path.exists(log_path):
             continue
 
         try:
-            with open(log_path, 'r') as f:
+            with open(log_path) as f:
                 # Read first 100 lines (container info is usually at the top)
                 for i, line in enumerate(f):
                     if i > 100:
                         break
 
                     # Look for CONTAINER_IMAGE= or --container-image=
-                    match = re.search(r'(?:CONTAINER_IMAGE=|--container-image=)(.+\.sqsh)', line)
+                    match = re.search(r"(?:CONTAINER_IMAGE=|--container-image=)(.+\.sqsh)", line)
                     if match:
                         container_path = match.group(1)
 
@@ -211,23 +209,23 @@ def parse_container_image(run_path: str) -> Optional[str]:
                         container_filename = os.path.basename(container_path)
 
                         # Remove .sqsh extension
-                        container_name = container_filename.replace('.sqsh', '')
+                        container_name = container_filename.replace(".sqsh", "")
 
                         # Clean up: remove username prefix if present
                         # e.g., "ishandhanani+sglang+v0.5.4.post2-dyn" -> "sglang+v0.5.4.post2-dyn"
-                        if '+' in container_name:
-                            parts = container_name.split('+', 1)
+                        if "+" in container_name:
+                            parts = container_name.split("+", 1)
                             if len(parts) > 1:
                                 container_name = parts[1]
 
                         return container_name
-        except:
+        except Exception:
             pass
 
     return None
 
 
-def analyze_run(path: str) -> Dict:
+def analyze_run(path: str) -> dict:
     """Analyze a single benchmark run directory."""
     files = os.listdir(path)
 
@@ -260,19 +258,14 @@ def analyze_run(path: str) -> Dict:
     # Extract container image from log files
     container = parse_container_image(path)
 
-    config = {
-        "slurm_job_id": dirname,
-        "path": path,
-        "run_date": run_date,
-        "container": container
-    }
+    config = {"slurm_job_id": dirname, "path": path, "run_date": run_date, "container": container}
 
     # Use topology from folder name if available, otherwise fall back to counting files
     if prefill_workers is not None:
         config["prefill_dp"] = prefill_workers
     elif len(prefill_nodes.values()) != 0:
         config["prefill_dp"] = len(prefill_nodes.keys())
-    
+
     if decode_workers is not None:
         config["decode_dp"] = decode_workers
     elif len(decode_nodes.values()) != 0:
@@ -292,7 +285,7 @@ def analyze_run(path: str) -> Dict:
     return result
 
 
-def find_all_runs(logs_dir: str) -> List[Dict]:
+def find_all_runs(logs_dir: str) -> list[dict]:
     """Find and analyze all benchmark runs in the logs directory."""
     paths = [
         os.path.join(logs_dir, x)

@@ -1,11 +1,11 @@
 """
 Log file parser for extracting node-level metrics from .err files
 """
-import re
-import os
+
 import logging
-from typing import Dict, List, Tuple, Optional, TypedDict
-from datetime import datetime
+import os
+import re
+from typing import TypedDict
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 # Type definitions for parsed metrics
 class BatchMetrics(TypedDict, total=False):
     """Metrics from a prefill or decode batch log line."""
+
     timestamp: str
     dp: int
     tp: int
@@ -38,6 +39,7 @@ class BatchMetrics(TypedDict, total=False):
 
 class MemoryMetrics(TypedDict, total=False):
     """Memory metrics from log lines."""
+
     timestamp: str
     dp: int
     tp: int
@@ -55,13 +57,14 @@ class ParsedErrFile(TypedDict, total=False):
     Contains runtime metrics from .err log files.
     Relevant for both prefill and decode nodes.
     """
-    node_info: Dict[str, str]  # Node name, worker type, worker ID
-    prefill_batches: List[BatchMetrics]  # Batch processing metrics (primarily prefill)
-    memory_snapshots: List[MemoryMetrics]  # Memory usage over time
-    config: Dict[str, int]  # TP/DP/EP configuration extracted from command line
+
+    node_info: dict[str, str]  # Node name, worker type, worker ID
+    prefill_batches: list[BatchMetrics]  # Batch processing metrics (primarily prefill)
+    memory_snapshots: list[MemoryMetrics]  # Memory usage over time
+    config: dict[str, int]  # TP/DP/EP configuration extracted from command line
 
 
-def parse_dp_tp_ep_tag(line: str) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[str]]:
+def parse_dp_tp_ep_tag(line: str) -> tuple[int | None, int | None, int | None, str | None]:
     """Extract DP, TP, EP indices and timestamp from log line.
 
     Supports two formats:
@@ -75,13 +78,13 @@ def parse_dp_tp_ep_tag(line: str) -> Tuple[Optional[int], Optional[int], Optiona
         (dp, tp, ep, timestamp) or (None, None, None, None) if pattern not found
     """
     # Try full format first: DP0 TP0 EP0
-    match = re.search(r'\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) DP(\d+) TP(\d+) EP(\d+)\]', line)
+    match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) DP(\d+) TP(\d+) EP(\d+)\]", line)
     if match:
         timestamp, dp, tp, ep = match.groups()
         return int(dp), int(tp), int(ep), timestamp
 
     # Try simple format: TP0 only (1P4D style)
-    match = re.search(r'\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) TP(\d+)\]', line)
+    match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) TP(\d+)\]", line)
     if match:
         timestamp, tp = match.groups()
         return 0, int(tp), 0, timestamp  # Default DP=0, EP=0
@@ -89,7 +92,7 @@ def parse_dp_tp_ep_tag(line: str) -> Tuple[Optional[int], Optional[int], Optiona
     return None, None, None, None
 
 
-def parse_prefill_batch_line(line: str) -> Dict:
+def parse_prefill_batch_line(line: str) -> dict | None:
     """Parse prefill batch log line for metrics.
 
     Example line:
@@ -101,37 +104,31 @@ def parse_prefill_batch_line(line: str) -> Dict:
     if dp is None or "Prefill batch" not in line:
         return None
 
-    metrics = {
-        'timestamp': timestamp,
-        'dp': dp,
-        'tp': tp,
-        'ep': ep,
-        'type': 'prefill'
-    }
+    metrics = {"timestamp": timestamp, "dp": dp, "tp": tp, "ep": ep, "type": "prefill"}
 
     # Extract metrics using regex
     patterns = {
-        'new_seq': r'#new-seq:\s*(\d+)',
-        'new_token': r'#new-token:\s*(\d+)',
-        'cached_token': r'#cached-token:\s*(\d+)',
-        'token_usage': r'token usage:\s*([\d.]+)',
-        'running_req': r'#running-req:\s*(\d+)',
-        'queue_req': r'#queue-req:\s*(\d+)',
-        'prealloc_req': r'#prealloc-req:\s*(\d+)',
-        'inflight_req': r'#inflight-req:\s*(\d+)',
-        'input_throughput': r'input throughput \(token/s\):\s*([\d.]+)',
+        "new_seq": r"#new-seq:\s*(\d+)",
+        "new_token": r"#new-token:\s*(\d+)",
+        "cached_token": r"#cached-token:\s*(\d+)",
+        "token_usage": r"token usage:\s*([\d.]+)",
+        "running_req": r"#running-req:\s*(\d+)",
+        "queue_req": r"#queue-req:\s*(\d+)",
+        "prealloc_req": r"#prealloc-req:\s*(\d+)",
+        "inflight_req": r"#inflight-req:\s*(\d+)",
+        "input_throughput": r"input throughput \(token/s\):\s*([\d.]+)",
     }
 
     for key, pattern in patterns.items():
         match = re.search(pattern, line)
         if match:
             value = match.group(1)
-            metrics[key] = float(value) if '.' in value else int(value)
+            metrics[key] = float(value) if "." in value else int(value)
 
     return metrics
 
 
-def parse_decode_batch_line(line: str) -> Dict:
+def parse_decode_batch_line(line: str) -> dict | None:
     """Parse decode batch log line for metrics.
 
     Example line:
@@ -143,36 +140,30 @@ def parse_decode_batch_line(line: str) -> Dict:
     if dp is None or "Decode batch" not in line:
         return None
 
-    metrics = {
-        'timestamp': timestamp,
-        'dp': dp,
-        'tp': tp,
-        'ep': ep,
-        'type': 'decode'
-    }
+    metrics = {"timestamp": timestamp, "dp": dp, "tp": tp, "ep": ep, "type": "decode"}
 
     # Extract metrics using regex
     patterns = {
-        'running_req': r'#running-req:\s*(\d+)',
-        'num_tokens': r'#token:\s*(\d+)',
-        'token_usage': r'token usage:\s*([\d.]+)',
-        'preallocated_usage': r'pre-allocated usage:\s*([\d.]+)',
-        'prealloc_req': r'#prealloc-req:\s*(\d+)',
-        'transfer_req': r'#transfer-req:\s*(\d+)',
-        'queue_req': r'#queue-req:\s*(\d+)',
-        'gen_throughput': r'gen throughput \(token/s\):\s*([\d.]+)',
+        "running_req": r"#running-req:\s*(\d+)",
+        "num_tokens": r"#token:\s*(\d+)",
+        "token_usage": r"token usage:\s*([\d.]+)",
+        "preallocated_usage": r"pre-allocated usage:\s*([\d.]+)",
+        "prealloc_req": r"#prealloc-req:\s*(\d+)",
+        "transfer_req": r"#transfer-req:\s*(\d+)",
+        "queue_req": r"#queue-req:\s*(\d+)",
+        "gen_throughput": r"gen throughput \(token/s\):\s*([\d.]+)",
     }
 
     for key, pattern in patterns.items():
         match = re.search(pattern, line)
         if match:
             value = match.group(1)
-            metrics[key] = float(value) if '.' in value else int(value)
+            metrics[key] = float(value) if "." in value else int(value)
 
     return metrics
 
 
-def parse_memory_line(line: str) -> Dict:
+def parse_memory_line(line: str) -> dict | None:
     """Parse memory-related log lines.
 
     Examples:
@@ -186,55 +177,51 @@ def parse_memory_line(line: str) -> Dict:
         return None
 
     metrics = {
-        'timestamp': timestamp,
-        'dp': dp,
-        'tp': tp,
-        'ep': ep,
+        "timestamp": timestamp,
+        "dp": dp,
+        "tp": tp,
+        "ep": ep,
     }
 
     # Parse available memory
-    avail_match = re.search(r'avail mem=([\d.]+)\s*GB', line)
+    avail_match = re.search(r"avail mem=([\d.]+)\s*GB", line)
     if avail_match:
-        metrics['avail_mem_gb'] = float(avail_match.group(1))
-        metrics['type'] = 'memory'
+        metrics["avail_mem_gb"] = float(avail_match.group(1))
+        metrics["type"] = "memory"
 
     # Parse memory usage
-    usage_match = re.search(r'mem usage=([\d.]+)\s*GB', line)
+    usage_match = re.search(r"mem usage=([\d.]+)\s*GB", line)
     if usage_match:
-        metrics['mem_usage_gb'] = float(usage_match.group(1))
-        metrics['type'] = 'memory'
+        metrics["mem_usage_gb"] = float(usage_match.group(1))
+        metrics["type"] = "memory"
 
     # Parse KV cache size
-    kv_match = re.search(r'KV size:\s*([\d.]+)\s*GB', line)
+    kv_match = re.search(r"KV size:\s*([\d.]+)\s*GB", line)
     if kv_match:
-        metrics['kv_cache_gb'] = float(kv_match.group(1))
-        metrics['type'] = 'kv_cache'
+        metrics["kv_cache_gb"] = float(kv_match.group(1))
+        metrics["type"] = "kv_cache"
 
     # Parse token count for KV cache
-    token_match = re.search(r'#tokens:\s*(\d+)', line)
+    token_match = re.search(r"#tokens:\s*(\d+)", line)
     if token_match:
-        metrics['kv_tokens'] = int(token_match.group(1))
+        metrics["kv_tokens"] = int(token_match.group(1))
 
-    return metrics if 'type' in metrics else None
+    return metrics if "type" in metrics else None
 
 
-def extract_node_info_from_filename(filename: str) -> Dict:
+def extract_node_info_from_filename(filename: str) -> dict | None:
     """Extract node name and worker info from filename.
 
     Example: watchtower-navy-cn01_prefill_w0.err
     Returns: {'node': 'watchtower-navy-cn01', 'worker_type': 'prefill', 'worker_id': 'w0'}
     """
-    match = re.match(r'([^_]+)_(prefill|decode|frontend)_([^.]+)\.err', os.path.basename(filename))
+    match = re.match(r"([^_]+)_(prefill|decode|frontend)_([^.]+)\.err", os.path.basename(filename))
     if match:
-        return {
-            'node': match.group(1),
-            'worker_type': match.group(2),
-            'worker_id': match.group(3)
-        }
+        return {"node": match.group(1), "worker_type": match.group(2), "worker_id": match.group(3)}
     return None
 
 
-def parse_err_file(filepath: str) -> Optional[ParsedErrFile]:
+def parse_err_file(filepath: str) -> ParsedErrFile | None:
     """Parse a single .err file and extract all metrics.
 
     Expected filename format: <node>_<service>_<id>.err
@@ -267,7 +254,7 @@ def parse_err_file(filepath: str) -> Optional[ParsedErrFile]:
     config = {}
 
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath) as f:
             for line in f:
                 # Parse prefill batch metrics
                 batch_metrics = parse_prefill_batch_line(line)
@@ -285,17 +272,17 @@ def parse_err_file(filepath: str) -> Optional[ParsedErrFile]:
                     memory_snapshots.append(mem_metrics)
 
                 # Extract TP/DP/EP configuration from command line
-                if '--tp-size' in line:
-                    tp_match = re.search(r'--tp-size\s+(\d+)', line)
-                    dp_match = re.search(r'--dp-size\s+(\d+)', line)
-                    ep_match = re.search(r'--ep-size\s+(\d+)', line)
+                if "--tp-size" in line:
+                    tp_match = re.search(r"--tp-size\s+(\d+)", line)
+                    dp_match = re.search(r"--dp-size\s+(\d+)", line)
+                    ep_match = re.search(r"--ep-size\s+(\d+)", line)
 
                     if tp_match:
-                        config['tp_size'] = int(tp_match.group(1))
+                        config["tp_size"] = int(tp_match.group(1))
                     if dp_match:
-                        config['dp_size'] = int(dp_match.group(1))
+                        config["dp_size"] = int(dp_match.group(1))
                     if ep_match:
-                        config['ep_size'] = int(ep_match.group(1))
+                        config["ep_size"] = int(ep_match.group(1))
 
     except Exception as e:
         logger.error(f"Error parsing {filepath}: {e}")
@@ -317,14 +304,14 @@ def parse_err_file(filepath: str) -> Optional[ParsedErrFile]:
     )
 
     return {
-        'node_info': node_info,
-        'prefill_batches': prefill_batches,
-        'memory_snapshots': memory_snapshots,
-        'config': config
+        "node_info": node_info,
+        "prefill_batches": prefill_batches,
+        "memory_snapshots": memory_snapshots,
+        "config": config,
     }
 
 
-def parse_all_err_files(run_path: str) -> List[ParsedErrFile]:
+def parse_all_err_files(run_path: str) -> list[ParsedErrFile]:
     """Parse all .err files in a run directory.
 
     Args:
@@ -333,7 +320,7 @@ def parse_all_err_files(run_path: str) -> List[ParsedErrFile]:
     Returns:
         List of parsed node metrics
     """
-    err_files: List[ParsedErrFile] = []
+    err_files: list[ParsedErrFile] = []
 
     if not os.path.exists(run_path):
         logger.error(f"Run path does not exist: {run_path}")
@@ -343,7 +330,7 @@ def parse_all_err_files(run_path: str) -> List[ParsedErrFile]:
     parsed_successfully = 0
 
     for file in os.listdir(run_path):
-        if file.endswith('.err') and ('prefill' in file or 'decode' in file):
+        if file.endswith(".err") and ("prefill" in file or "decode" in file):
             total_err_files += 1
             filepath = os.path.join(run_path, file)
             parsed = parse_err_file(filepath)
@@ -361,23 +348,23 @@ def parse_all_err_files(run_path: str) -> List[ParsedErrFile]:
     return err_files
 
 
-def get_node_label(node_data: Dict) -> str:
+def get_node_label(node_data: dict) -> str:
     """Generate a display label for a node with its configuration.
 
     Example: "[3320] cn01-prefill-w0 (DP0-3, TP8, EP8)"
     """
-    node_info = node_data['node_info']
-    config = node_data['config']
-    run_id = node_data.get('run_id', '')
+    node_info = node_data["node_info"]
+    config = node_data["config"]
+    run_id = node_data.get("run_id", "")
 
-    node_name = node_info['node'].replace('watchtower-navy-', '')
+    node_name = node_info["node"].replace("watchtower-navy-", "")
     worker = f"{node_info['worker_type']}-{node_info['worker_id']}"
 
     # Get DP range if we have batch data
     dp_indices = set()
-    for batch in node_data.get('prefill_batches', []):
-        if 'dp' in batch:
-            dp_indices.add(batch['dp'])
+    for batch in node_data.get("prefill_batches", []):
+        if "dp" in batch:
+            dp_indices.add(batch["dp"])
 
     if dp_indices:
         dp_min, dp_max = min(dp_indices), max(dp_indices)
@@ -394,7 +381,7 @@ def get_node_label(node_data: Dict) -> str:
     # Include run_id prefix if available (for multi-run comparisons)
     if run_id:
         # Extract just the job number from directory name like "3320_1P_4D_20251104_231843"
-        run_prefix = run_id.split('_')[0] if '_' in run_id else run_id
+        run_prefix = run_id.split("_")[0] if "_" in run_id else run_id
         return f"[{run_prefix}] {node_name}-{worker} ({dp_str}, {tp_str}, {ep_str})"
     else:
         return f"{node_name}-{worker} ({dp_str}, {tp_str}, {ep_str})"

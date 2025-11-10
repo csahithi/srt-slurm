@@ -31,15 +31,33 @@ The dashboard will open at http://localhost:8501 and scan the current directory 
 - **TPOT** - Time per output token (lower = faster generation)
 - **ITL** - Inter-token latency (lower = smoother streaming)
 
-## Installation Options
+## Installation
+
+**With uv (recommended):**
 
 ```bash
-# Recommended: uses uv (fast package manager)
-./run_dashboard.sh
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Alternative: traditional pip install
-pip install -r requirements.txt
-streamlit run app.py
+# Run the dashboard (uv handles dependencies automatically)
+./run_dashboard.sh
+```
+
+## Development
+
+```bash
+# Install with dev dependencies
+uv sync --extra dev
+
+# Setup pre-commit hooks
+pre-commit install
+
+# Run ruff manually
+pre-commit run --all-files
+
+# Or run ruff directly
+uv run ruff check .
+uv run ruff format .
 ```
 
 ## Directory Structure
