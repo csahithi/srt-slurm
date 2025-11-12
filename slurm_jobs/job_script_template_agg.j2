@@ -5,8 +5,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --account={{ account }}
 #SBATCH --time={{ time_limit }}
-#SBATCH --output=logs/%j_{{ agg_workers }}A_{{ timestamp }}/log.out
-#SBATCH --error=logs/%j_{{ agg_workers }}A_{{ timestamp }}/log.err
+#SBATCH --output={{ log_dir_prefix }}/%j_{{ agg_workers }}A_{{ timestamp }}/log.out
+#SBATCH --error={{ log_dir_prefix }}/%j_{{ agg_workers }}A_{{ timestamp }}/log.err
 #SBATCH --partition={{ partition }}
 
 # Constants
@@ -19,7 +19,7 @@ TOTAL_GPUS=$((AGG_NODES * GPUS_PER_NODE))
 PREFILL_GPUS=0
 DECODE_GPUS=$TOTAL_GPUS
 AGG_NODES_PER_WORKER=$((AGG_NODES / AGG_WORKERS))
-LOG_DIR="${SLURM_SUBMIT_DIR}/logs/${SLURM_JOB_ID}_{{ agg_workers }}A_{{ timestamp }}"
+LOG_DIR="${SLURM_SUBMIT_DIR}/{{ log_dir_prefix }}/${SLURM_JOB_ID}_{{ agg_workers }}A_{{ timestamp }}"
 SCRIPT_DIR="${SLURM_SUBMIT_DIR}/scripts"
 OUTPUT_DIR="${SLURM_SUBMIT_DIR}/outputs"
 MODEL_DIR="{{ model_dir }}"

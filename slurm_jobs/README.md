@@ -29,7 +29,13 @@ For this example, we will make some assumptions about your SLURM cluster:
 
 ## Logs Folder Structure
 
-Each SLURM job creates a unique log directory under `logs/` using the job ID. For example, job ID `3062824` creates the directory `logs/3062824/`.
+Each SLURM job creates a unique log directory in the repo root using the job ID, worker configuration, and timestamp. For example, a job creates a directory like `3062824_1P_4D_20251110_192145/`.
+
+You can customize the log directory location using the `--log-dir` argument:
+
+- **Default**: Logs saved to repo root (parent of `slurm_jobs/`)
+- **Relative path**: `--log-dir logs/` saves to `slurm_jobs/logs/`
+- **Absolute path**: `--log-dir /path/to/logs` saves to that absolute path
 
 ## Usage
 
@@ -84,7 +90,7 @@ Each SLURM job creates a unique log directory under `logs/` using the job ID. Fo
 2. **Check logs in real-time**:
 
    ```bash
-   cd logs/{JOB_ID}
+   cd {JOB_ID}_*
    tail -f *_prefill_*.err *_decode_*.err
    ```
 

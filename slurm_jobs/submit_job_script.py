@@ -37,10 +37,10 @@ def print_welcome_message(job_ids: list[str], log_dir_name: str):
         f"""
 🚀 Welcome! We hope you enjoy your time on our GB200 NVL72.
 
-Your logs for this submitted job will be available in logs/{log_dir_name}
+Your logs for this submitted job will be available in {log_dir_name}
 You can access them by running:
 
-    cd logs/{log_dir_name}
+    cd {log_dir_name}
 
 You can view all of the prefill/decode worker logs by running:
 
@@ -141,6 +141,7 @@ def create_job_metadata(
             "use_init_location": args.use_init_location,
             "enable_config_dump": args.enable_config_dump,
             "run_in_ci": args.run_in_ci,
+            "log_dir": args.log_dir if args.log_dir else "repo_root",
         },
         "profiler_metadata": profiler_config,
     }
@@ -302,6 +303,13 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
         help="Run in CI mode - use binaries from /configs/ for nats/etcd and install dynamo wheel",
     )
 
+    parser.add_argument(
+        "--log-dir",
+        type=str,
+        default=None,
+        help="Directory to save logs (default: repo root). Path relative to slurm_jobs/ or absolute.",
+    )
+
     return parser.parse_args(args)
 
 
@@ -454,6 +462,25 @@ def main(input_args: list[str] | None = None):
     # Generate timestamp for log directory naming
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # Determine base log directory (default: repo root)
+    # This is used by the template to set SBATCH output/error paths
+    if args.log_dir:
+        base_log_dir = pathlib.Path(args.log_dir)
+        if not base_log_dir.is_absolute():
+            # Relative to slurm_jobs directory - use as-is in template
+            log_dir_prefix = args.log_dir
+        else:
+            # Absolute path - compute relative from slurm_jobs/
+            slurm_jobs_dir = pathlib.Path(__file__).parent
+            try:
+                log_dir_prefix = str(base_log_dir.relative_to(slurm_jobs_dir))
+            except ValueError:
+                # Not relative to slurm_jobs, use absolute
+                log_dir_prefix = str(base_log_dir)
+    else:
+        # Default: repo root (parent of slurm_jobs/) = "../" from slurm_jobs/
+        log_dir_prefix = ".."
+
     # Select template based on mode
     if is_aggregated:
         template_path = "job_script_template_agg.j2"
@@ -489,6 +516,7 @@ def main(input_args: list[str] | None = None):
         "timestamp": timestamp,
         "enable_config_dump": args.enable_config_dump,
         "run_in_ci": args.run_in_ci,
+        "log_dir_prefix": log_dir_prefix,
     }
 
     # Create temporary file for sbatch script
@@ -511,7 +539,18 @@ def main(input_args: list[str] | None = None):
             log_dir_name = f"{job_id}_{agg_workers}A_{timestamp}"
         else:
             log_dir_name = f"{job_id}_{prefill_workers}P_{decode_workers}D_{timestamp}"
-        log_dir_path = os.path.join("logs", log_dir_name)
+        
+        # Determine base log directory (default: repo root)
+        if args.log_dir:
+            base_log_dir = pathlib.Path(args.log_dir)
+            if not base_log_dir.is_absolute():
+                # Relative to slurm_jobs directory
+                base_log_dir = pathlib.Path(__file__).parent / base_log_dir
+        else:
+            # Default: repo root (parent directory of slurm_jobs/)
+            base_log_dir = pathlib.Path(__file__).parent.parent
+        
+        log_dir_path = base_log_dir / log_dir_name
         os.makedirs(log_dir_path, exist_ok=True)
 
         # Save rendered sbatch script
@@ -554,7 +593,7 @@ def main(input_args: list[str] | None = None):
                     retry_log_dir_name = (
                         f"{job_id}_{prefill_workers}P_{decode_workers}D_{timestamp}"
                     )
-                retry_log_dir_path = os.path.join("logs", retry_log_dir_name)
+                retry_log_dir_path = base_log_dir / retry_log_dir_name
                 os.makedirs(retry_log_dir_path, exist_ok=True)
                 retry_sbatch_script_path = os.path.join(
                     retry_log_dir_path, "sbatch_script.sh"
