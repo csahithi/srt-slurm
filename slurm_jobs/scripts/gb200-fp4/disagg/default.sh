@@ -121,13 +121,13 @@ if [ "$mode" = "prefill" ]; then
         --attention-backend trtllm_mla \
         --kv-cache-dtype fp8_e4m3 \
         --enable-single-batch-overlap \
-        --chunked-prefill-size 65536 \
+        --chunked-prefill-size 131072 \
         --eplb-algorithm deepseek \
         --trust-remote-code \
         --disable-cuda-graph \
         --mem-fraction-static 0.84 \
         --max-total-tokens 131072 \
-        --max-prefill-tokens 16384 \
+        --max-prefill-tokens 32768 \
         --load-balance-method round_robin \
         --quantization modelopt_fp4 \
         --moe-runner-backend flashinfer_cutlass \
