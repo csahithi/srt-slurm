@@ -43,7 +43,7 @@ curl http://${head_node}:${head_port}/v1/chat/completions   -H "Content-Type: ap
       }
     ],
     "stream": false,
-    "max_tokens": 300
+    "max_tokens": 500
   }'
 
 set -e
