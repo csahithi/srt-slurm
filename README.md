@@ -25,7 +25,7 @@ python3 submit_job_script.py \
   --time-limit 4:00:00 \
   --enable-multiple-frontends \
   --num-additional-frontends 9 \
-  --profiler "type=vllm; isl=1024; osl=1024; concurrencies=1x8x32x128x512x1024x2048x4096x8192; req-rate=inf" \
+  --benchmark "type=sa-bench; isl=1024; osl=1024; concurrencies=1x8x32x128x512x1024x2048x4096x8192; req-rate=inf" \
   --script-variant max-tpt \
   --use-dynamo-whls \
   --log-dir /mnt/lustre01/users-public/slurm-shared/joblogs
