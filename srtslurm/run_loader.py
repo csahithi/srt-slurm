@@ -165,7 +165,7 @@ class RunLoader:
     def _load_benchmark_results(self, run: BenchmarkRun) -> None:
         """Load benchmark results from profiler output files.
 
-        Looks for directories like "vllm_isl_1024_osl_1024/" and parses JSON files.
+        Looks for directories like "sa-bench_isl_1024_osl_1024/" or "vllm_isl_1024_osl_1024/" and parses JSON files.
         Uses parquet caching to avoid re-parsing on subsequent loads.
 
         Args:
@@ -176,11 +176,20 @@ class RunLoader:
         # Initialize cache manager
         cache_mgr = CacheManager(run_path)
 
-        # Define source patterns for cache validation
-        profiler_pattern_str = (
-            f"{run.profiler.profiler_type}_isl_{run.profiler.isl}_osl_{run.profiler.osl}"
-        )
-        source_patterns = [f"{profiler_pattern_str}/*.json"]
+        # Support both new naming (sa-bench) and old naming (vllm) for backward compatibility
+        profiler_type = run.profiler.profiler_type
+        if profiler_type == "sa-bench":
+            # Try sa-bench first, fall back to vllm for old runs
+            pattern_strs = [
+                f"sa-bench_isl_{run.profiler.isl}_osl_{run.profiler.osl}",
+                f"vllm_isl_{run.profiler.isl}_osl_{run.profiler.osl}",
+            ]
+        else:
+            # For other types (sglang, gap, manual), use exact match
+            pattern_strs = [f"{profiler_type}_isl_{run.profiler.isl}_osl_{run.profiler.osl}"]
+
+        # Define source patterns for cache validation (check all possible patterns)
+        source_patterns = [f"{pattern}/*.json" for pattern in pattern_strs]
 
         # Try to load from cache first
         if cache_mgr.is_cache_valid("benchmark_results", source_patterns):
@@ -203,32 +212,32 @@ class RunLoader:
                 return
 
         # Cache miss or invalid - parse from JSON files
-        profiler_pattern = re.compile(profiler_pattern_str)
+        for pattern_str in pattern_strs:
+            profiler_pattern = re.compile(pattern_str)
+            for entry in os.listdir(run_path):
+                if profiler_pattern.match(entry):
+                    result_dir = os.path.join(run_path, entry)
+                    if os.path.isdir(result_dir):
+                        results = self._parse_profiler_results(result_dir)
+                        run.profiler.add_benchmark_results(results)
 
-        for entry in os.listdir(run_path):
-            if profiler_pattern.match(entry):
-                result_dir = os.path.join(run_path, entry)
-                if os.path.isdir(result_dir):
-                    results = self._parse_profiler_results(result_dir)
-                    run.profiler.add_benchmark_results(results)
+                        # Save to cache
+                        if results["concurrencies"]:
+                            # Convert to DataFrame for caching
+                            cache_data = {
+                                "concurrency": results["concurrencies"],
+                                "output_tps": results["output_tps"],
+                                "mean_itl_ms": results["mean_itl_ms"],
+                                "mean_ttft_ms": results["mean_ttft_ms"],
+                                "request_rate": results["request_rate"],
+                            }
+                            if results["mean_tpot_ms"]:
+                                cache_data["mean_tpot_ms"] = results["mean_tpot_ms"]
 
-                    # Save to cache
-                    if results["concurrencies"]:
-                        # Convert to DataFrame for caching
-                        cache_data = {
-                            "concurrency": results["concurrencies"],
-                            "output_tps": results["output_tps"],
-                            "mean_itl_ms": results["mean_itl_ms"],
-                            "mean_ttft_ms": results["mean_ttft_ms"],
-                            "request_rate": results["request_rate"],
-                        }
-                        if results["mean_tpot_ms"]:
-                            cache_data["mean_tpot_ms"] = results["mean_tpot_ms"]
+                            cache_df = pd.DataFrame(cache_data)
+                            cache_mgr.save_to_cache("benchmark_results", cache_df, source_patterns)
 
-                        cache_df = pd.DataFrame(cache_data)
-                        cache_mgr.save_to_cache("benchmark_results", cache_df, source_patterns)
-
-                    break
+                        return  # Found results, stop searching
 
     def _parse_profiler_results(self, result_dir: str) -> dict:
         """Parse profiler result JSON files.

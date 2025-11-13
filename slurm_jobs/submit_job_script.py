@@ -460,7 +460,19 @@ def main(input_args: list[str] | None = None):
             assert benchmark_config["num-examples"].isnumeric()
             parsable_config = f"{parsable_config} {benchmark_config['num-examples']}"
         else:
-            parsable_config = f"{parsable_config} 250"  # default
+            parsable_config = f"{parsable_config} 198"  # default
+
+        if "max-tokens" in benchmark_config:
+            assert benchmark_config["max-tokens"].isnumeric()
+            parsable_config = f"{parsable_config} {benchmark_config['max-tokens']}"
+        else:
+            parsable_config = f"{parsable_config} 512"  # default
+
+        if "repeat" in benchmark_config:
+            assert benchmark_config["repeat"].isnumeric()
+            parsable_config = f"{parsable_config} {benchmark_config['repeat']}"
+        else:
+            parsable_config = f"{parsable_config} 8"  # default
 
         if "num-threads" in benchmark_config:
             assert benchmark_config["num-threads"].isnumeric()

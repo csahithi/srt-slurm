@@ -79,13 +79,6 @@ if [ "$mode" = "prefill" ]; then
     # we have to install pre-release cutedsl for a integer overflow fix
     python3 -m pip install --no-cache-dir --upgrade --pre nvidia-cutlass-dsl
 
-    python3 -m pip install sgl-kernel --force-reinstall
-
-    # tmp working branch for pipecleaning
-    cd /sgl-workspace/sglang
-    git fetch --depth 1 origin ishan/fp4-fixes
-    git checkout -B ishan/fp4-fixes FETCH_HEAD
-
     # set your own cache variables here
     export TORCH_DISTRIBUTED_DEFAULT_TIMEOUT=1800
     export SGLANG_DG_CACHE_DIR="/configs/dg-10212025"
@@ -161,19 +154,12 @@ elif [ "$mode" = "decode" ]; then
     if [[ "${USE_INIT_LOCATIONS,,}" == "true" ]]; then command_suffix=" "; fi
     if [[ -n "${DUMP_CONFIG_PATH}" ]]; then command_suffix="${command_suffix} --dump-config-to ${DUMP_CONFIG_PATH}"; fi
 
-    # tmp working branch for pipecleaning
-    cd /sgl-workspace/sglang
-    git fetch --depth 1 origin ishan/fp4-fixes
-    git checkout -B ishan/fp4-fixes FETCH_HEAD
-
     # set your own cache variables here
     export TORCH_DISTRIBUTED_DEFAULT_TIMEOUT=1800
     export SGLANG_DG_CACHE_DIR="/configs/dg-10212025"
 
     # we have to install pre-release cutedsl for a integer overflow fix
     python3 -m pip install --no-cache-dir --upgrade --pre nvidia-cutlass-dsl
-
-    python3 -m pip install sgl-kernel --force-reinstall
 
     SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN=1 \
     SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2=1 \
