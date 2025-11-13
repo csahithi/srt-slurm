@@ -79,16 +79,16 @@ if [ "$mode" = "prefill" ]; then
     # we have to install pre-release cutedsl for a integer overflow fix
     python3 -m pip install --no-cache-dir --upgrade --pre nvidia-cutlass-dsl
 
-    python3 -m pip install sgl-kernel --force-reinstall
+    # python3 -m pip install sgl-kernel --force-reinstall
 
     # tmp working branch for pipecleaning
     cd /sgl-workspace/sglang
-    git fetch --depth 1 origin ishan/fp4-fixes
-    git checkout -B ishan/fp4-fixes FETCH_HEAD
+    # git fetch --depth 1 origin ishan/fp4-fixes
+    # git checkout -B ishan/fp4-fixes FETCH_HEAD
 
     # set your own cache variables here
     export TORCH_DISTRIBUTED_DEFAULT_TIMEOUT=1800
-    export SGLANG_DG_CACHE_DIR="/configs/dg-10212025"
+    export SGLANG_DG_CACHE_DIR="/configs/deepgemm_cache"
 
     DYN_SKIP_SGLANG_LOG_FORMATTING=1 \
     SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN=1 \
@@ -112,7 +112,7 @@ if [ "$mode" = "prefill" ]; then
         --skip-tokenizer-init \
         --disaggregation-mode prefill \
         --decode-log-interval 1000 \
-        --max-running-requests 5632 \
+        --max-running-requests 30000 \
         --context-length 2176 \
         --disable-radix-cache \
         --disable-shared-experts-fusion \
@@ -121,7 +121,7 @@ if [ "$mode" = "prefill" ]; then
         --attention-backend trtllm_mla \
         --kv-cache-dtype fp8_e4m3 \
         --enable-single-batch-overlap \
-        --chunked-prefill-size 131072 \
+        --chunked-prefill-size 65536 \
         --eplb-algorithm deepseek \
         --trust-remote-code \
         --disable-cuda-graph \
@@ -163,8 +163,8 @@ elif [ "$mode" = "decode" ]; then
 
     # tmp working branch for pipecleaning
     cd /sgl-workspace/sglang
-    git fetch --depth 1 origin ishan/fp4-fixes
-    git checkout -B ishan/fp4-fixes FETCH_HEAD
+    # git fetch --depth 1 origin ishan/fp4-fixes
+    # git checkout -B ishan/fp4-fixes FETCH_HEAD
 
     # set your own cache variables here
     export TORCH_DISTRIBUTED_DEFAULT_TIMEOUT=1800
@@ -173,7 +173,7 @@ elif [ "$mode" = "decode" ]; then
     # we have to install pre-release cutedsl for a integer overflow fix
     python3 -m pip install --no-cache-dir --upgrade --pre nvidia-cutlass-dsl
 
-    python3 -m pip install sgl-kernel --force-reinstall
+    # python3 -m pip install sgl-kernel --force-reinstall
 
     SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN=1 \
     SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2=1 \
@@ -189,7 +189,7 @@ elif [ "$mode" = "decode" ]; then
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL=True \
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK=1024 \
     SGLANG_CUTEDSL_MOE_NVFP4_DISPATCH=1 \
-    SGLANG_FP4_GEMM_BACKEND=cutlass \
+    SGLANG_FLASHINFER_FP4_GEMM_BACKEND=cutlass \
     DYN_SKIP_SGLANG_LOG_FORMATTING=1 \
     PYTHONUNBUFFERED=1 \
     python3 -m dynamo.sglang \
@@ -214,7 +214,7 @@ elif [ "$mode" = "decode" ]; then
         --moe-a2a-backend deepep \
         --deepep-mode low_latency \
         --ep-dispatch-algorithm static \
-        --cuda-graph-bs 1024 \
+        --cuda-graph-bs 1 2 4 8 16 24 32 40 48 56 64 72 80 88 96 104 112 120 128 136 144 152 160 168 176 184 192 200 208 216 224 232 240 248 256 264 272 280 288 296 304 312 320 328 336 344 352 360 368 376 384 416 448 480 512 544 576 608 640 672 704 736 768 800 832 864 896 928 960 992 1024 \
         --num-reserved-decode-tokens 112 \
         --ep-num-redundant-experts 32 \
         --eplb-algorithm deepseek \
