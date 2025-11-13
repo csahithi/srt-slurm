@@ -47,10 +47,10 @@ class RunLoader:
                 if run is not None:
                     # Load benchmark results from profiler output files
                     self._load_benchmark_results(run)
-                    
+
                     # Check if all expected results are present
                     run.check_completeness()
-                    
+
                     # Warn if job is incomplete
                     if not run.is_complete:
                         logger.warning(

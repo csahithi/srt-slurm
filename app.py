@@ -227,7 +227,7 @@ def _runs_to_dataframe(run_dicts: list[dict]):
         for i in range(len(output_tps)):
             tps = output_tps[i]
             output_tps_per_gpu = tps / total_gpus
-            
+
             # Get total TPS for this concurrency level
             total_token_tps = total_tps[i] if i < len(total_tps) else None
             total_tps_per_gpu = total_token_tps / total_gpus if total_token_tps else None
@@ -712,7 +712,7 @@ def main():
 
     # Filter runs based on selected labels
     filtered_runs = [label_to_run[label] for label in selected_labels]
-    
+
     # Check for incomplete runs and warn user
     incomplete_runs = [run for run in filtered_runs if not run.get("is_complete", True)]
     if incomplete_runs:
@@ -812,7 +812,7 @@ def main():
 
     with tab1:
         st.subheader("Pareto Frontier Analysis")
-        
+
         if y_axis_metric == "Total TPS/GPU":
             st.markdown("""
             This graph shows the trade-off between **Total TPS/GPU** (input + output tokens/s per GPU) and
@@ -1237,7 +1237,7 @@ def main():
                                     y=total_gen_tps,
                                     mode="lines+markers",
                                     name=f"Decode Gen (tok/s) × {num_decode} nodes",
-                                    line=dict(color="green", width=2),
+                                    line={"color": "green", "width": 2},
                                 )
                             )
 
@@ -1594,7 +1594,7 @@ def main():
                     "decode_tp", 0
                 ) * run_a.get("decode_dp", 0)
                 st.caption(f"🎯 Total GPUs: {total_gpus_a}")
-                
+
                 # Warn if job is incomplete
                 if not run_a.get("is_complete", True):
                     missing = run_a.get("missing_concurrencies", [])
@@ -1618,7 +1618,7 @@ def main():
                     "decode_tp", 0
                 ) * run_b.get("decode_dp", 0)
                 st.caption(f"🎯 Total GPUs: {total_gpus_b}")
-                
+
                 # Warn if job is incomplete
                 if not run_b.get("is_complete", True):
                     missing = run_b.get("missing_concurrencies", [])

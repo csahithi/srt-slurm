@@ -87,9 +87,9 @@ class RunMetadata:
 @dataclass
 class ProfilerResults:
     """Results from profiler benchmarks.
-    
+
     Parses 32 out of 39 fields from benchmark JSON output.
-    
+
     NOT PARSED (7 fields):
     - input_lens, output_lens, ttfts, itls: Per-request arrays (too large for in-memory storage)
     - errors, generated_texts: Per-request data (not needed for aggregate analysis)
@@ -101,7 +101,7 @@ class ProfilerResults:
     osl: str
     concurrencies: str = ""
     req_rate: str = ""
-    
+
     # Primary throughput metrics (per concurrency level)
     output_tps: list[float] = field(default_factory=list)
     total_tps: list[float] = field(default_factory=list)
@@ -109,35 +109,35 @@ class ProfilerResults:
     request_goodput: list[float | None] = field(default_factory=list)
     concurrency_values: list[int] = field(default_factory=list)
     request_rate: list[float] = field(default_factory=list)
-    
+
     # Latency metrics - mean (per concurrency level)
     mean_ttft_ms: list[float] = field(default_factory=list)
     mean_tpot_ms: list[float] = field(default_factory=list)
     mean_itl_ms: list[float] = field(default_factory=list)
     mean_e2el_ms: list[float] = field(default_factory=list)
-    
+
     # Latency metrics - median (per concurrency level)
     median_ttft_ms: list[float] = field(default_factory=list)
     median_tpot_ms: list[float] = field(default_factory=list)
     median_itl_ms: list[float] = field(default_factory=list)
     median_e2el_ms: list[float] = field(default_factory=list)
-    
+
     # Latency metrics - p99 (per concurrency level)
     p99_ttft_ms: list[float] = field(default_factory=list)
     p99_tpot_ms: list[float] = field(default_factory=list)
     p99_itl_ms: list[float] = field(default_factory=list)
     p99_e2el_ms: list[float] = field(default_factory=list)
-    
+
     # Latency metrics - std dev (per concurrency level)
     std_ttft_ms: list[float] = field(default_factory=list)
     std_tpot_ms: list[float] = field(default_factory=list)
     std_itl_ms: list[float] = field(default_factory=list)
     std_e2el_ms: list[float] = field(default_factory=list)
-    
+
     # Token counts (per concurrency level)
     total_input_tokens: list[int] = field(default_factory=list)
     total_output_tokens: list[int] = field(default_factory=list)
-    
+
     # Run metadata (per concurrency level)
     backend: list[str] = field(default_factory=list)
     model_id: list[str] = field(default_factory=list)
@@ -179,35 +179,35 @@ class ProfilerResults:
         self.request_throughput = results.get("request_throughput", [])
         self.request_goodput = results.get("request_goodput", [])
         self.request_rate = results.get("request_rate", [])
-        
+
         # Mean latencies
         self.mean_ttft_ms = results.get("mean_ttft_ms", [])
         self.mean_tpot_ms = results.get("mean_tpot_ms", [])
         self.mean_itl_ms = results.get("mean_itl_ms", [])
         self.mean_e2el_ms = results.get("mean_e2el_ms", [])
-        
+
         # Median latencies
         self.median_ttft_ms = results.get("median_ttft_ms", [])
         self.median_tpot_ms = results.get("median_tpot_ms", [])
         self.median_itl_ms = results.get("median_itl_ms", [])
         self.median_e2el_ms = results.get("median_e2el_ms", [])
-        
+
         # P99 latencies
         self.p99_ttft_ms = results.get("p99_ttft_ms", [])
         self.p99_tpot_ms = results.get("p99_tpot_ms", [])
         self.p99_itl_ms = results.get("p99_itl_ms", [])
         self.p99_e2el_ms = results.get("p99_e2el_ms", [])
-        
+
         # Std dev latencies
         self.std_ttft_ms = results.get("std_ttft_ms", [])
         self.std_tpot_ms = results.get("std_tpot_ms", [])
         self.std_itl_ms = results.get("std_itl_ms", [])
         self.std_e2el_ms = results.get("std_e2el_ms", [])
-        
+
         # Token counts
         self.total_input_tokens = results.get("total_input_tokens", [])
         self.total_output_tokens = results.get("total_output_tokens", [])
-        
+
         # Metadata
         self.backend = results.get("backend", [])
         self.model_id = results.get("model_id", [])
@@ -270,7 +270,7 @@ class BenchmarkRun:
 
     def check_completeness(self) -> None:
         """Check if all expected benchmark results are present.
-        
+
         Compares expected concurrencies from profiler metadata with actual results.
         Updates is_complete and missing_concurrencies fields.
         """
@@ -280,22 +280,22 @@ class BenchmarkRun:
             self.is_complete = True
             self.missing_concurrencies = []
             return
-        
+
         expected = set()
         for val in self.profiler.concurrencies.split("x"):
             try:
                 expected.add(int(val.strip()))
             except ValueError:
                 continue
-        
+
         # Get actual concurrencies from results
         actual = set(self.profiler.concurrency_values)
-        
+
         # Find missing ones
         missing = expected - actual
-        
+
         self.is_complete = len(missing) == 0
-        self.missing_concurrencies = sorted(list(missing))
+        self.missing_concurrencies = sorted(missing)
 
 
 @dataclass
