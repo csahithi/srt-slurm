@@ -96,15 +96,16 @@ def _run_to_dict(run) -> dict:
         formatted_date = run.metadata.run_date
 
     return {
-        "slurm_job_id": f"{run.job_id}_{run.metadata.prefill_nodes}P_{run.metadata.decode_nodes}D_{run.metadata.run_date}",
+        "slurm_job_id": f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}",
         "path": run.metadata.path,
         "run_date": formatted_date,
         "container": run.metadata.container,
-        "prefill_dp": run.metadata.prefill_nodes,
-        "decode_dp": run.metadata.decode_nodes,
+        "prefill_dp": run.metadata.prefill_workers,
+        "decode_dp": run.metadata.decode_workers,
         "prefill_tp": run.metadata.gpus_per_node,
         "decode_tp": run.metadata.gpus_per_node,
         "frontends": run.metadata.num_additional_frontends,
+        "gpu_type": run.metadata.gpu_type,
         "profiler_type": run.profiler.profiler_type,
         "isl": run.profiler.isl,
         "osl": run.profiler.osl,
@@ -487,84 +488,47 @@ def main():
     # Add filtering options
     st.sidebar.subheader("Filters")
 
-    # 1. Date Range Filter
-    with st.sidebar.expander("📅 Date Range", expanded=False):
-        # Get min/max dates from runs
-        dates_with_data = [
-            r.get("run_date")
-            for r in sorted_runs
-            if r.get("run_date") and r.get("run_date") != "N/A"
-        ]
+    # 1. GPU Type Filter
+    with st.sidebar.expander("🎮 GPU Type", expanded=False):
+        # Extract unique GPU types from run metadata
+        gpu_types = set()
+        for run in runs:
+            gpu_type = run.get("gpu_type", "")
+            if gpu_type and gpu_type != "N/A":
+                gpu_types.add(gpu_type)
 
-        if dates_with_data:
-            from datetime import datetime, timedelta
+        if gpu_types:
+            gpu_type_options = sorted(gpu_types)
+            selected_gpu_types = st.multiselect(
+                "Select GPU types",
+                options=gpu_type_options,
+                default=gpu_type_options,
+                key="gpu_type_filter",
+            )
 
-            date_objects = []
-            for date_str in dates_with_data:
-                try:
-                    date_objects.append(datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S"))
-                except Exception:
-                    pass
-
-            if date_objects:
-                min_date = min(date_objects).date()
-                max_date = max(date_objects).date()
-
-                date_filter_option = st.radio(
-                    "Select date range",
-                    options=["All time", "Last 7 days", "Last 30 days", "Custom range"],
-                    key="date_filter_option",
-                )
-
-                if date_filter_option == "Last 7 days":
-                    filter_start_date = max_date - timedelta(days=7)
-                    filter_end_date = max_date
-                elif date_filter_option == "Last 30 days":
-                    filter_start_date = max_date - timedelta(days=30)
-                    filter_end_date = max_date
-                elif date_filter_option == "Custom range":
-                    filter_start_date = st.date_input(
-                        "From",
-                        value=min_date,
-                        min_value=min_date,
-                        max_value=max_date,
-                        key="date_from",
-                    )
-                    filter_end_date = st.date_input(
-                        "To", value=max_date, min_value=min_date, max_value=max_date, key="date_to"
-                    )
-                else:  # All time
-                    filter_start_date = None
-                    filter_end_date = None
-
-                # Apply date filter
-                if filter_start_date and filter_end_date:
-                    filtered_by_date = []
-                    for run in sorted_runs:
-                        run_date_str = run.get("run_date")
-                        if run_date_str and run_date_str != "N/A":
-                            try:
-                                run_date = datetime.strptime(
-                                    run_date_str, "%Y-%m-%d %H:%M:%S"
-                                ).date()
-                                if filter_start_date <= run_date <= filter_end_date:
-                                    filtered_by_date.append(run)
-                            except Exception:
-                                pass
-                    sorted_runs = filtered_by_date
+            # Apply GPU type filter
+            if selected_gpu_types:
+                filtered_by_gpu = []
+                for run in sorted_runs:
+                    if run.get("gpu_type") in selected_gpu_types:
+                        filtered_by_gpu.append(run)
+                sorted_runs = filtered_by_gpu
         else:
-            st.caption("No date information available")
+            st.caption("No GPU type information available")
 
     # 2. Topology Filter
     with st.sidebar.expander("🔧 Topology", expanded=False):
-        # Extract unique topologies
+        # Extract unique topologies (using worker counts)
         topologies = set()
+        topology_map = {}  # Maps display label to (prefill_workers, decode_workers)
         for run in sorted_runs:
-            prefill_dp = run.get("prefill_dp", "?")
-            decode_dp = run.get("decode_dp", "?")
-            topology = f"{prefill_dp}P/{decode_dp}D"
+            # Get from metadata - these should be worker counts
+            prefill_workers = run.get("prefill_dp", "?")
+            decode_workers = run.get("decode_dp", "?")
+            topology = f"{prefill_workers}P/{decode_workers}D"
             if topology != "?P/?D":
                 topologies.add(topology)
+                topology_map[topology] = (prefill_workers, decode_workers)
 
         if topologies:
             topology_options = sorted(topologies)
@@ -588,50 +552,33 @@ def main():
 
     # 3. ISL/OSL Filter
     with st.sidebar.expander("📊 ISL/OSL", expanded=False):
-        # Extract unique ISL and OSL values
-        isl_values = set()
-        osl_values = set()
+        # Extract unique ISL/OSL pairs
+        isl_osl_pairs = set()
         for run in sorted_runs:
             isl = run.get("isl")
             osl = run.get("osl")
-            if isl and isl != "N/A" and isl != "?":
-                isl_values.add(isl)
-            if osl and osl != "N/A" and osl != "?":
-                osl_values.add(osl)
+            if isl and osl and isl != "N/A" and osl != "N/A" and isl != "?" and osl != "?":
+                isl_osl_pairs.add(f"{isl}/{osl}")
 
-        if isl_values:
-            isl_options = sorted(isl_values)
-            selected_isl = st.multiselect(
-                "Input Sequence Length (ISL)",
-                options=isl_options,
-                default=isl_options,
-                key="isl_filter",
+        if isl_osl_pairs:
+            pair_options = sorted(isl_osl_pairs)
+            selected_pairs = st.multiselect(
+                "Select ISL/OSL pairs",
+                options=pair_options,
+                default=pair_options,
+                key="isl_osl_filter",
             )
-        else:
-            selected_isl = None
-            st.caption("No ISL information available")
 
-        if osl_values:
-            osl_options = sorted(osl_values)
-            selected_osl = st.multiselect(
-                "Output Sequence Length (OSL)",
-                options=osl_options,
-                default=osl_options,
-                key="osl_filter",
-            )
+            # Apply ISL/OSL pair filter
+            if selected_pairs:
+                filtered_by_isl_osl = []
+                for run in sorted_runs:
+                    pair = f"{run.get('isl')}/{run.get('osl')}"
+                    if pair in selected_pairs:
+                        filtered_by_isl_osl.append(run)
+                sorted_runs = filtered_by_isl_osl
         else:
-            selected_osl = None
-            st.caption("No OSL information available")
-
-        # Apply ISL/OSL filter
-        if selected_isl or selected_osl:
-            filtered_by_isl_osl = []
-            for run in sorted_runs:
-                isl_match = (not selected_isl) or (run.get("isl") in selected_isl)
-                osl_match = (not selected_osl) or (run.get("osl") in selected_osl)
-                if isl_match and osl_match:
-                    filtered_by_isl_osl.append(run)
-            sorted_runs = filtered_by_isl_osl
+            st.caption("No ISL/OSL information available")
 
     # 4. Container Filter
     with st.sidebar.expander("🐳 Container", expanded=False):
@@ -698,12 +645,13 @@ def main():
         run_labels.append(label)
         label_to_run[label] = run
 
-    # Multiselect with formatted labels
+    # Multiselect with formatted labels (use max_selections=None to show all)
     selected_labels = st.sidebar.multiselect(
         "Select runs to compare",
         options=run_labels,
         default=run_labels[: min(3, len(run_labels))],  # Select first 3 by default
         help="Select one or more runs to visualize",
+        label_visibility="visible",
     )
 
     if not selected_labels:
@@ -730,33 +678,8 @@ def main():
     # Get dataframe - use helper function to convert dicts
     df = _runs_to_dataframe(filtered_runs)
 
-    # Filters
-    st.sidebar.header("Filters")
-
-    # Concurrency range filter
-    min_concurrency = int(df["Concurrency"].min())
-    max_concurrency = int(df["Concurrency"].max())
-
-    if min_concurrency < max_concurrency:
-        concurrency_range = st.sidebar.slider(
-            "Concurrency Range",
-            min_value=min_concurrency,
-            max_value=max_concurrency,
-            value=(min_concurrency, max_concurrency),
-        )
-        df = df[
-            (df["Concurrency"] >= concurrency_range[0])
-            & (df["Concurrency"] <= concurrency_range[1])
-        ]
-
     # Pareto options
     st.sidebar.header("Pareto Graph Options")
-    y_axis_metric = st.sidebar.radio(
-        "Y-axis metric",
-        options=["Output TPS/GPU", "Total TPS/GPU"],
-        index=0,
-        help="Choose between decode throughput per GPU or total throughput per GPU (input + output)",
-    )
     show_cutoff = st.sidebar.checkbox("Show TPS/User cutoff line", value=False)
     cutoff_value = st.sidebar.number_input(
         "Cutoff value (TPS/User)",
@@ -812,6 +735,15 @@ def main():
 
     with tab1:
         st.subheader("Pareto Frontier Analysis")
+
+        # Y-axis metric toggle at the top
+        y_axis_metric = st.radio(
+            "Y-axis metric",
+            options=["Output TPS/GPU", "Total TPS/GPU"],
+            index=0,
+            horizontal=True,
+            help="Choose between decode throughput per GPU or total throughput per GPU (input + output)",
+        )
 
         if y_axis_metric == "Total TPS/GPU":
             st.markdown("""
@@ -1333,7 +1265,10 @@ def main():
                 with col3:
                     st.metric("ISL/OSL", f"{run.get('isl', 'N/A')}/{run.get('osl', 'N/A')}")
                 with col4:
-                    st.metric("Profiler", run.get("profiler_type", "N/A"))
+                    # Display profiler with GPU type from metadata
+                    gpu_type = run.get("gpu_type", "")
+                    gpu_type_suffix = f" ({gpu_type})" if gpu_type else ""
+                    st.metric("Profiler", f"{run.get('profiler_type', 'N/A')}{gpu_type_suffix}")
 
                 st.caption(f"Model: {config_data['summary']['model']}")
                 st.divider()
