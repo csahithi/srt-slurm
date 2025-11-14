@@ -263,13 +263,20 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
     parser.add_argument(
         "--enable-multiple-frontends",
         action="store_true",
-        help="Enable multiple frontend architecture with nginx load balancer",
+        default=True,
+        help="Enable multiple frontend architecture with nginx load balancer (default: True)",
+    )
+    parser.add_argument(
+        "--disable-multiple-frontends",
+        action="store_false",
+        dest="enable_multiple_frontends",
+        help="Disable multiple frontends (use single frontend)",
     )
     parser.add_argument(
         "--num-additional-frontends",
         type=int,
-        default=0,
-        help="Number of additional frontend nodes (beyond the first frontend on node 1)",
+        default=9,
+        help="Number of additional frontend nodes (default: 9)",
     )
 
     parser.add_argument(

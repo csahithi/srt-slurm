@@ -1,120 +1,160 @@
-# Example: Deploy DeepSeek R1 - FP8 with Dynamo and SGLang on SLURM
+# SLURM Job Submission
 
-This folder allows you to deploy the SGLang DeepSeek-R1 Disaggregated with WideEP on a GB200 SLURM cluster.
+Scripts for submitting benchmark jobs to SLURM clusters.
 
-## SLURM Prerequisites
+## Prerequisites
 
-For this example, we will make some assumptions about your SLURM cluster:
+1. **SLURM cluster** with GPU nodes
+2. **Pyxis plugin** for container support (`--container-image`, `--container-mounts`, etc.)
+3. **Container image** with Dynamo+SGLang ([build instructions](https://hub.docker.com/r/lmsysorg/sglang/tags))
 
-1. We assume you have access to a SLURM cluster with multiple GPU nodes
-   available. For functional testing, most setups should be fine. For performance
-   testing, you should aim to allocate groups of nodes that are performantly
-   inter-connected, such as those in an NVL72 setup.
-2. We assume this SLURM cluster has the [Pyxis](https://github.com/NVIDIA/pyxis)
-   SPANK plugin setup. In particular, the `job_script_template.j2` template in this
-   example will use `srun` arguments like `--container-image`,
-   `--container-mounts`, and `--container-env` that are added to `srun` by Pyxis.
-   If your cluster supports similar container based plugins, you may be able to
-   modify the template to use that instead.
-3. We assume you have already built a recent Dynamo+SGLang container image as
-   described [here](../../../../docs/backends/sglang/dsr1-wideep-gb200.md#instructions).
-   This is the image that can be passed to the `--container-image` argument in later steps.
+## Quick Start
 
-## Scripts Overview
-
-- **`submit_job_script.py`**: Main script for generating and submitting SLURM job scripts from templates
-- **`job_script_template.j2`**: Jinja2 template for generating SLURM sbatch scripts
-- **`scripts/worker_setup.py`**: Worker script that handles the setup on each node
-- **`submit_disagg.sh`**: A simple one-liner script that invokes the `submit_job_script.py`
-
-## Logs Folder Structure
-
-Each SLURM job creates a unique log directory in the repo root using the job ID, worker configuration, and timestamp. For example, a job creates a directory like `3062824_1P_4D_20251110_192145/`.
-
-You can customize the log directory location using the `--log-dir` argument:
-
-- **Default**: Logs saved to repo root (parent of `slurm_runner/`)
-- **Relative path**: `--log-dir logs/` saves to `slurm_runner/logs/`
-- **Absolute path**: `--log-dir /path/to/logs` saves to that absolute path
-
-## Usage
-
-> [!NOTE]
-> The logic for finding prefill and decode node IPs in [`job_script_template.j2`](job_script_template.j2) is still a work in progress. You may need to tweak the `ip addr show $NETWORK_INTERFACE` bits for your cluster, especially if your networking or hostname conventions differ. PRs and suggestions are always welcome.
-
-1. **Submit a benchmark job**:
+1. **Run setup** (from repo root):
 
    ```bash
-   python3 submit_job_script.py \
-     --template job_script_template.j2 \
-     --model-dir <path-to>/deepseek-r1-0528 \
-     --container-image <path-to>/dynamo-sglang+v0.5.3rc1-v0.3.12.sqsh \
-     --gpus-per-node 4 \
-     --config-dir <path-to>/klconfigs \
-     --gpu-type gb200-fp8 \
-     --script-variant max-tpt \
-     --network-interface enP6p9s0np0 \
-     --prefill-nodes 6 \
-     --decode-nodes 12 \
-     --prefill-workers 3 \
-     --decode-workers 1 \
-     --account <account> \
-     --partition <partition> \
-     --time-limit 4:00:00 \
-     --enable-multiple-frontends \
-     --num-additional-frontends 9 \
-     --profiler "type=vllm; isl=8192; osl=1024; concurrencies=16x2048x4096x8192; req-rate=inf"
+   make setup
    ```
 
-   This command will deploy 3 prefill workers and 1 decode worker with 9 additional frontends load-balanced by nginx. Diving deeper into the command:
+   This creates `srtslurm.yaml` with your cluster defaults.
 
-   - `--template job_script_template.j2`: Path to Jinja2 template file (this shouldn't change unless you want to modify the template)
-   - `--model-dir <path-to>/deepseek-r1-0528`: Path to DSR1-FP8 model directory
-   - `--container-image <path-to>/dynamo-sglang+v0.5.3rc1-v0.3.12.sqsh`: Enroot container image URI
-   - `--gpus-per-node 4`: Number of GPUs per node (each GB200 tray has 4 GPUs)
-   - `--config-dir <path-to>/klconfigs`: Various configs (see explanation below)
-   - `--gpu-type gb200-fp8`: GPU type to use, choices: `gb200-fp8`
-   - `--script-variant max-tpt`: Script variant to run (e.g., `max-tpt`, `1p_4d`). Corresponds to shell scripts in `scripts/<gpu-type>/<agg|disagg>/`
-   - `--network-interface enP6p9s0np0`: Network interface to use (depends on your cluster)
-   - `--prefill-nodes 6`: Number of prefill nodes
-   - `--decode-nodes 12`: Number of decode nodes
-   - `--prefill-workers 3`: Number of prefill workers
-   - `--decode-workers 1`: Number of decode workers
-   - `--account <account>`: SLURM account
-   - `--partition <partition>`: SLURM partition
-   - `--time-limit 4:00:00`: Time limit in HH:MM:SS format
-   - `--enable-multiple-frontends`: Enable multiple frontend architecture with nginx load balancer
-   - `--num-additional-frontends 9`: Number of additional frontends
-   - `--profiler "type=vllm; isl=8192; osl=1024; concurrencies=16x2048x4096x8192; req-rate=inf"`: Profiler configurations (see explanation below)
-
-   **Note**: The script automatically calculates the total number of nodes needed based on `--prefill-nodes` and `--decode-nodes` parameters.
-
-2. **Check logs in real-time**:
+2. **Submit a job**:
 
    ```bash
-   cd {JOB_ID}_*
+   cd slurm_runner
+   python3 submit_job_script.py \
+     --model-dir /path/to/model \
+     --gpu-type gb200-fp4 \
+     --gpus-per-node 4 \
+     --prefill-nodes 1 \
+     --decode-nodes 12 \
+     --prefill-workers 1 \
+     --decode-workers 1 \
+     --script-variant max-tpt \
+     --benchmark "type=sa-bench; isl=1024; osl=1024; concurrencies=1024x2048; req-rate=inf"
+   ```
+
+   All cluster settings (account, partition, network interface, container image) are read from `../srtslurm.yaml`.
+
+3. **Monitor logs**:
+   ```bash
+   cd ../logs/{JOB_ID}_*
    tail -f *_prefill_*.err *_decode_*.err
    ```
 
-## Configs directory
+## Configuration
 
-The `--config-dir` argument is used to specify the directory containing the various configs that are used when running this model. Here are the current configs that are in our directory.
+### Cluster Settings (`srtslurm.yaml`)
 
-```bash
-klconfigs/
-├── decode_dsr1-0528_loadgen_in1024out1024_num2000_2p12d.json
-├── deepep_config.json
-├── dgcache/
-└── prefill_dsr1-0528_in1000out1000_num40000.json
+Created automatically by `make setup` in repo root:
+
+```yaml
+cluster:
+  account: "restricted"
+  partition: "batch"
+  network_interface: "enP6p9s0np0"
+  time_limit: "4:00:00"
+  container_image: "/path/to/container.sqsh"
 ```
 
-1. `decode_dsr1-0528_loadgen_in1024out1024_num2000_2p12d.json`: `init-expert-location` for decode worker
-2. `deepep_config.json`: DeepEP config file for GB2009
-3. `dgcache/`: DeepGEMM kernel cache directory. Instructions for creating this can be found [here](https://github.com/sgl-project/sglang/issues/9867#issuecomment-3336551174)
-4. `prefill_dsr1-0528_in1000out1000_num40000.json`: `init-expert-location` for prefill worker
+All settings can be overridden via CLI flags.
 
-**Note**: The expert locations are collected using the instructions [here](https://github.com/sgl-project/sglang/issues/6017). See the section titled "Create expert distribution data". Note that this is sensitive to your data and performance results may differ if you dont benchmark with the same data that was used to collect the expert locations.
+### Config Directory
 
-## Profiler
+The `--config-dir` (defaults to `../configs`) contains:
 
-If you provide the `--profiler` command, the sbatch script will automatically warmup the model and run the vllm benchmarking script. Benchmark results and outputs are stored in the `outputs/` directory, which is mounted into the container.
+- **Dynamo wheels**: `ai_dynamo*.whl` (downloaded by `make setup`)
+- **Binaries**: `nats-server`, `etcd`, `etcdctl` (downloaded by `make setup`)
+- **DeepEP config**: `deepep_config.json` (optional, for GB200)
+- **Expert locations**: `*_init-expert-location.json` (optional, use `--use-init-location`)
+- **DeepGEMM cache**: `dgcache/` directory (optional)
+
+### Script Variants
+
+Script variants are shell scripts in `scripts/<gpu-type>/<mode>/`:
+
+- `max-tpt.sh` - Maximum throughput configuration
+- `1p_4d.sh` - 1 prefill, 4 decode workers
+- Custom variants - Add your own `.sh` files
+
+Available GPU types: `gb200-fp4`, `gb200-fp8`
+
+## Optional Arguments
+
+These have sensible defaults or read from `srtslurm.yaml`:
+
+```bash
+--account <account>              # From srtslurm.yaml
+--partition <partition>          # From srtslurm.yaml
+--network-interface <interface>  # From srtslurm.yaml
+--time-limit <HH:MM:SS>         # From srtslurm.yaml or 04:00:00
+--container-image <path>         # From srtslurm.yaml
+--config-dir <path>              # Defaults to ../configs
+--log-dir <path>                 # Defaults to ../logs
+```
+
+## Logs
+
+Jobs create directories named: `{SLURM_JOB_ID}_{P}P_{D}D_{TIMESTAMP}/`
+
+Example: `3667_1P_12D_20251113_214831/`
+
+Each contains:
+
+- `{JOB_ID}.json` - Run metadata
+- `sa-bench_isl_*/` - Benchmark results (JSON)
+- `*_config.json` - Node configurations
+- `*.err`, `*.out` - SLURM logs
+
+## Benchmarking
+
+Specify benchmark config with `--benchmark`:
+
+```bash
+--benchmark "type=sa-bench; isl=1024; osl=1024; concurrencies=128x512x1024; req-rate=inf"
+```
+
+- `type`: Benchmark type (`sa-bench`, `sglang`, `manual`)
+- `isl`: Input sequence length
+- `osl`: Output sequence length
+- `concurrencies`: Concurrency levels (x-separated)
+- `req-rate`: Request rate (`inf` for max throughput)
+
+Set `type=manual` to skip automated benchmarking.
+
+## Advanced
+
+### Multiple Frontends
+
+Multiple frontends with nginx load balancing are **enabled by default** (9 additional frontends).
+
+To disable:
+
+```bash
+--disable-multiple-frontends
+```
+
+To change the count:
+
+```bash
+--num-additional-frontends 5
+```
+
+### Aggregated Mode
+
+For non-disaggregated deployments:
+
+```bash
+--agg-nodes 4 \
+--agg-workers 1
+```
+
+(Use `--agg-*` instead of `--prefill-*` and `--decode-*`)
+
+## Troubleshooting
+
+**Network interface issues**: The templates use `ip addr show $NETWORK_INTERFACE` to find node IPs. If this doesn't work on your cluster, modify the templates or set your interface correctly.
+
+**Missing configs**: Ensure you ran `make setup` from repo root to download required binaries.
+
+For full documentation, see [main README](../README.md).
