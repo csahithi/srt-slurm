@@ -34,7 +34,7 @@ from cluster_config import validate_cluster_settings, get_cluster_setting
 def print_welcome_message(job_ids: list[str], log_dir_name: str):
     """Print a concise welcome message with log directory info."""
     print(
-        f"\nYour logs will be in ../{log_dir_name}. To access them, run:\n\n    cd ../{log_dir_name}\n"
+        f"\nYour logs will be in ../logs/{log_dir_name}. To access them, run:\n\n    cd ../logs/{log_dir_name}\n"
     )
 
 
