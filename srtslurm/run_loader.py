@@ -39,12 +39,27 @@ class RunLoader:
         Returns:
             List of BenchmarkRun objects, sorted by job ID (newest first)
         """
+        runs, _ = self.load_all_with_skipped()
+        return runs
+
+    def load_all_with_skipped(self) -> tuple[list[BenchmarkRun], list[tuple[str, str, str]]]:
+        """Load all benchmark runs and track which ones were skipped.
+
+        Returns:
+            Tuple of (runs_with_data, skipped_runs)
+            - runs_with_data: List of BenchmarkRun objects with benchmark results
+            - skipped_runs: List of tuples (job_id, run_dir, reason)
+        """
         paths = self._find_run_directories()
 
         runs = []
+        skipped = []
+        
         for path in sorted(
             paths, key=lambda p: self._extract_job_id(os.path.basename(p)), reverse=True
         ):
+            run_dir = os.path.basename(path)
+            
             try:
                 run = BenchmarkRun.from_json_file(path)
                 if run is not None:
@@ -64,14 +79,24 @@ class RunLoader:
                     if run.profiler.output_tps:
                         runs.append(run)
                     else:
-                        logger.debug(f"Skipping run {run.job_id} - no benchmark data")
+                        reason = "No benchmark results found"
+                        logger.debug(f"Skipping run {run.job_id} - {reason}")
+                        skipped.append((run.job_id, run_dir, reason))
                 else:
-                    logger.warning(f"No metadata JSON found for {os.path.basename(path)}")
+                    # Extract job ID from directory name for skipped list
+                    job_id = run_dir.split("_")[0] if "_" in run_dir else run_dir
+                    reason = "No metadata JSON file"
+                    logger.warning(f"No metadata JSON found for {run_dir}")
+                    skipped.append((job_id, run_dir, reason))
             except Exception as e:
+                # Extract job ID from directory name for skipped list
+                job_id = run_dir.split("_")[0] if "_" in run_dir else run_dir
+                reason = f"Error loading: {str(e)}"
                 logger.error(f"Error loading run from {path}: {e}")
+                skipped.append((job_id, run_dir, reason))
                 continue
 
-        return runs
+        return runs, skipped
 
     def load_single(self, run_dir: str) -> BenchmarkRun | None:
         """Load a single benchmark run.

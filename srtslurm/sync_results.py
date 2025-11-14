@@ -2,13 +2,34 @@
 """
 CLI tool for syncing benchmark results with S3-compatible cloud storage.
 
-Usage:
-    python scripts/sync_results.py push <run_dir>        - Push single run
-    python scripts/sync_results.py push-all              - Push all local runs
-    python scripts/sync_results.py pull <run_id>         - Pull specific run
-    python scripts/sync_results.py pull-missing          - Pull all missing runs
-    python scripts/sync_results.py list-remote           - List remote runs
-    python scripts/sync_results.py test                  - Test cloud connection
+This script intelligently syncs files - it only uploads/downloads files that don't
+already exist on the destination, making it safe to run repeatedly.
+
+Usage Examples:
+    # From logs directory
+    cd logs
+    
+    # Test connection and see what's in the bucket
+    python -m srtslurm.sync_results test
+    python -m srtslurm.sync_results list-remote
+    
+    # Push all local runs (only uploads missing files)
+    python -m srtslurm.sync_results push-all
+    
+    # Pull missing runs (only downloads missing files)
+    python -m srtslurm.sync_results pull-missing
+    
+    # Push/pull specific run
+    python -m srtslurm.sync_results push 3667_1P_1D_20251110_192145
+    python -m srtslurm.sync_results pull 3667_1P_1D_20251110_192145
+
+Commands:
+    test          - Test cloud connection
+    list-remote   - List all runs in bucket
+    push          - Push single run (skips existing files)
+    push-all      - Push all local runs (skips existing files)
+    pull          - Pull specific run (skips existing files)
+    pull-missing  - Pull all runs from cloud (skips existing files)
 """
 
 import argparse
@@ -27,19 +48,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def progress_callback(current: int, total: int, filename: str):
+def progress_callback(current: int, total: int, filename: str, status: str = "processing"):
     """Progress callback for file operations.
     
     Note: Uses print() for interactive progress display with carriage returns.
     This is intentional for CLI tools and doesn't work well with logging.
     """
     percentage = (current / total) * 100
-    print(f"\r[{current}/{total}] ({percentage:.1f}%) {filename}", end="", flush=True)
+    status_icon = "✓" if status == "uploaded" else "⊙" if status == "skipped" else "↓" if status == "downloaded" else "→"
+    print(f"\r{status_icon} [{current}/{total}] ({percentage:.1f}%) {filename:<60}", end="", flush=True)
     if current == total:
         print()  # New line when done
 
 
-def sync_progress_callback(run_name: str, current: int, total: int):
+def sync_progress_callback(run_name: str, current: int, total: int, status: str = "syncing"):
     """Progress callback for sync operations.
     
     Note: Uses print() for interactive progress display.
@@ -55,10 +77,10 @@ def cmd_push(args, sync_manager):
         return 1
 
     logger.info(f"Pushing {run_dir.name} to cloud storage...")
-    success = sync_manager.push_run(str(run_dir), progress_callback)
+    success, uploaded, skipped = sync_manager.push_run(str(run_dir), progress_callback)
 
     if success:
-        logger.info(f"✓ Successfully pushed {run_dir.name}")
+        logger.info(f"✓ Successfully pushed {run_dir.name}: {uploaded} uploaded, {skipped} skipped")
         return 0
     else:
         logger.error(f"✗ Failed to push {run_dir.name}")
@@ -91,23 +113,22 @@ def cmd_push_all(args, sync_manager):
 
     # Push each run
     success_count = 0
+    total_uploaded = 0
+    total_skipped = 0
+    
     for i, run_dir in enumerate(run_dirs, 1):
         logger.info(f"\n[{i}/{len(run_dirs)}] Pushing {run_dir.name}...")
 
-        # Check if already exists in cloud
-        if sync_manager.run_exists_in_cloud(run_dir.name):
-            logger.info(f"  → Already exists in cloud, skipping")
-            success_count += 1
-            continue
-
-        success = sync_manager.push_run(str(run_dir), progress_callback)
+        success, uploaded, skipped = sync_manager.push_run(str(run_dir), progress_callback)
         if success:
             success_count += 1
-            logger.info(f"  ✓ Success")
+            total_uploaded += uploaded
+            total_skipped += skipped
+            logger.info(f"  ✓ Success: {uploaded} uploaded, {skipped} skipped")
         else:
             logger.error(f"  ✗ Failed")
 
-    logger.info(f"\nPushed {success_count}/{len(run_dirs)} runs successfully")
+    logger.info(f"\nPushed {success_count}/{len(run_dirs)} runs: {total_uploaded} uploaded, {total_skipped} skipped")
     return 0 if success_count == len(run_dirs) else 1
 
 
@@ -117,10 +138,10 @@ def cmd_pull(args, sync_manager):
     logs_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"Pulling {args.run_id} from cloud storage...")
-    result = sync_manager.pull_run(args.run_id, str(logs_dir), progress_callback)
+    result_path, downloaded, skipped = sync_manager.pull_run(args.run_id, str(logs_dir), progress_callback)
 
-    if result:
-        logger.info(f"✓ Successfully pulled to {result}")
+    if result_path:
+        logger.info(f"✓ Successfully pulled to {result_path}: {downloaded} downloaded, {skipped} skipped")
         return 0
     else:
         logger.error(f"✗ Failed to pull {args.run_id}")
@@ -133,13 +154,15 @@ def cmd_pull_missing(args, sync_manager):
     logs_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Syncing missing runs from cloud storage...")
-    count = sync_manager.sync_missing_runs(str(logs_dir), sync_progress_callback)
+    runs_synced, files_downloaded, files_skipped = sync_manager.sync_missing_runs(
+        str(logs_dir), sync_progress_callback
+    )
 
-    if count > 0:
-        logger.info(f"✓ Downloaded {count} run(s)")
+    if files_downloaded > 0:
+        logger.info(f"✓ Synced {runs_synced} run(s): {files_downloaded} downloaded, {files_skipped} skipped")
         return 0
     else:
-        logger.info("No missing runs to download")
+        logger.info(f"All runs up to date ({files_skipped} files already present)")
         return 0
 
 

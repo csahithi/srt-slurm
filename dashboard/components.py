@@ -55,7 +55,7 @@ def sync_cloud_data(logs_dir):
     """Sync missing runs from cloud storage if configured.
 
     Returns:
-        Tuple of (sync_performed: bool, sync_count: int, error_message: str or None)
+        Tuple of (sync_performed: bool, files_downloaded: int, error_message: str or None)
     """
     try:
         sync_manager = create_sync_manager_from_config(DEFAULT_CONFIG)
@@ -63,9 +63,16 @@ def sync_cloud_data(logs_dir):
             # No cloud config, skip sync
             return False, 0, None
 
-        # Sync missing runs
-        count = sync_manager.sync_missing_runs(logs_dir)
-        return True, count, None
+        # Sync missing runs (only downloads files that don't exist locally)
+        runs_synced, files_downloaded, files_skipped = sync_manager.sync_missing_runs(logs_dir)
+        
+        # Log sync details
+        if files_downloaded > 0:
+            logger.info(f"Synced {runs_synced} runs: {files_downloaded} downloaded, {files_skipped} skipped")
+        else:
+            logger.info(f"All runs up to date ({files_skipped} files already present)")
+        
+        return True, files_downloaded, None
     except Exception as e:
         logger.error(f"Failed to sync cloud data: {e}")
         return True, 0, str(e)
@@ -73,9 +80,15 @@ def sync_cloud_data(logs_dir):
 
 @st.cache_data
 def load_data(logs_dir):
-    """Load and cache benchmark data."""
+    """Load and cache benchmark data.
+    
+    Returns:
+        Tuple of (runs_with_data, skipped_runs)
+        - runs_with_data: List of BenchmarkRun objects with benchmark results
+        - skipped_runs: List of tuples (job_id, run_dir, reason) for skipped runs
+    """
     loader = RunLoader(logs_dir)
-    return loader.load_all()
+    return loader.load_all_with_skipped()
 
 
 @st.cache_data(show_spinner="Loading node metrics from logs...")

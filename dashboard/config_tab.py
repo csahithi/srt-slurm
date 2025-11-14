@@ -26,10 +26,13 @@ def render(filtered_runs: list):
     """
     st.subheader("Run Configuration Details")
     
-    for run in filtered_runs:
+    for idx, run in enumerate(filtered_runs):
         run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
         run_path = run.metadata.path
         run_date = run.metadata.formatted_date
+        
+        # Add index to ensure unique keys even if duplicates exist
+        unique_key = f"{run_id}_{idx}"
         
         expander_title = f"🔧 Job {run.job_id}"
         if run_date:
@@ -75,10 +78,10 @@ def render(filtered_runs: list):
                 _render_topology_tab(run_path)
             
             with config_tab2:
-                _render_node_config_tab(all_configs, run_id)
+                _render_node_config_tab(all_configs, unique_key)
             
             with config_tab3:
-                _render_environment_tab(all_configs, run_id)
+                _render_environment_tab(all_configs, unique_key)
 
 
 def _render_topology_tab(run_path):

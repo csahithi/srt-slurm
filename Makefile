@@ -1,7 +1,8 @@
-.PHONY: lint test setup-configs dashboard
+.PHONY: lint test setup-configs dashboard sync-to-cloud
 
 NATS_VERSION ?= v2.10.28
 ETCD_VERSION ?= v3.5.21
+LOGS_DIR ?= logs
 
 default:
 	./run_dashboard.sh
@@ -14,6 +15,12 @@ test:
 
 dashboard:
 	uv run streamlit run dashboard/app.py
+
+sync-to-cloud:
+	@echo "☁️  Syncing benchmark results to cloud storage..."
+	@echo "📁 Logs directory: $(LOGS_DIR)"
+	@uv run python -m srtslurm.sync_results --logs-dir $(LOGS_DIR) push-all
+	@echo "✅ Sync complete!"
 
 setup:
 	@echo "📦 Setting up configs and logs directories..."

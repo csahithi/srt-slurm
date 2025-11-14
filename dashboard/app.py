@@ -47,8 +47,6 @@ def render_sidebar(logs_dir, runs):
     Returns:
         Tuple of (filtered_runs, selected_runs, run_legend_labels, df, pareto_options, sync_info)
     """
-    st.sidebar.header("Configuration")
-    
     st.sidebar.divider()
     
     # Run selection with formatted labels
@@ -168,7 +166,8 @@ def render_sidebar(logs_dir, runs):
         osl = run.profiler.osl
         gpu_type = run.metadata.gpu_type
         gpu_suffix = f" [{gpu_type}]" if gpu_type else ""
-        label = f"{topology} | {isl}/{osl}{gpu_suffix}"
+        # Include job ID to ensure unique labels
+        label = f"Job {run.job_id} | {topology} | {isl}/{osl}{gpu_suffix}"
         
         run_labels.append(label)
         label_to_run[label] = run
@@ -300,12 +299,24 @@ def main():
     
     # Load data
     with st.spinner("Loading benchmark data..."):
-        runs = components.load_data(logs_dir)
+        all_runs, skipped_runs = components.load_data(logs_dir)
     
-    if not runs:
-        st.warning("No benchmark runs found in the specified directory.")
+    # Show warning if runs were skipped
+    if skipped_runs:
+        with st.expander(f"⚠️ {len(skipped_runs)} run(s) skipped (no benchmark data)", expanded=False):
+            st.warning(
+                "The following runs exist but have no benchmark results. "
+                "They may still be running or failed before completion."
+            )
+            for job_id, run_dir, reason in skipped_runs:
+                st.caption(f"• **Job {job_id}** ({run_dir}): {reason}")
+    
+    if not all_runs:
+        st.warning("No complete benchmark runs found in the specified directory.")
         st.info("Make sure the directory contains subdirectories with benchmark results.")
         return
+    
+    runs = all_runs
     
     # Render sidebar and get filtered data
     result = render_sidebar(logs_dir, runs)
