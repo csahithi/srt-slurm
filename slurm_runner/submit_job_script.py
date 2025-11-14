@@ -32,31 +32,9 @@ from cluster_config import validate_cluster_settings, get_cluster_setting
 
 
 def print_welcome_message(job_ids: list[str], log_dir_name: str):
-    """Print a clean welcome message with job information."""
-
-    _ = f"{', '.join(job_ids)}"
+    """Print a concise welcome message with log directory info."""
     print(
-        f"""
-🚀 Welcome! We hope you enjoy your time on our GB200 NVL72.
-
-Your logs for this submitted job will be available in {log_dir_name}
-You can access them by running:
-
-    cd {log_dir_name}
-
-You can view all of the prefill/decode worker logs by running:
-
-    tail -f *_decode_*.err *_prefill_*.err
-
-To kick off the benchmark we suggest opening up a new terminal, SSH-ing
-into the login node, and running the srun command that is found at the
-bottom of the log.out. You can find it by running:
-
-    cat log.out
-
-Enjoy :)
-- NVIDIA
-"""
+        f"\nYour logs will be in ../{log_dir_name}. To access them, run:\n\n    cd ../{log_dir_name}\n"
     )
 
 
