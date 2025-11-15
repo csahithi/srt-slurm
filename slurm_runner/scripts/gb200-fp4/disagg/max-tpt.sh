@@ -103,7 +103,7 @@ if [ "$mode" = "prefill" ]; then
         --disaggregation-mode prefill \
         --decode-log-interval 1000 \
         --max-running-requests 30000 \
-        --context-length 40000 \
+        --context-length 2176 \
         --disable-radix-cache \
         --disable-shared-experts-fusion \
         --watchdog-timeout 1000000 \
@@ -182,7 +182,7 @@ elif [ "$mode" = "decode" ]; then
         --host 0.0.0.0 \
         --decode-log-interval 1000 \
         --max-running-requests 67584 \
-        --context-length 40000 \
+        --context-length 2176 \
         --disable-radix-cache \
         --disable-shared-experts-fusion \
         --watchdog-timeout 1000000 \
