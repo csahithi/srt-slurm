@@ -31,6 +31,15 @@ if [ "$mode" != "prefill" ] && [ "$mode" != "decode" ]; then
 fi
 
 echo "Mode: $mode"
+
+# Determine which Python module to use based on USE_SGLANG_LAUNCH_SERVER
+if [[ "${USE_SGLANG_LAUNCH_SERVER,,}" == "true" ]]; then
+    PYTHON_MODULE="sglang.launch_server"
+    echo "Command: sglang.launch_server (profiling mode)"
+else
+    PYTHON_MODULE="dynamo.sglang"
+    echo "Command: dynamo.sglang"
+fi
 echo "Command: dynamo"
 
 # Check if required environment variables are set
@@ -99,7 +108,7 @@ if [ "$mode" = "prefill" ]; then
     SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK=1 \
     PYTHONUNBUFFERED=1 \
     numactl --cpunodebind=0 --membind=0 \
-    python3 -m dynamo.sglang \
+    python3 -m $PYTHON_MODULE \
         --disaggregation-mode prefill \
         --host 0.0.0.0 \
         --decode-log-interval 1000 \
@@ -177,7 +186,7 @@ elif [ "$mode" = "decode" ]; then
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK=384 \
     SGLANG_CUTEDSL_MOE_NVFP4_DISPATCH=1 \
     SGLANG_FP4_GEMM_BACKEND=cutlass \
-    python3 -m dynamo.sglang \
+    python3 -m $PYTHON_MODULE \
         --disaggregation-mode decode \
         --host 0.0.0.0 \
         --decode-log-interval 1000 \

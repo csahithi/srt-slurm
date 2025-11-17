@@ -14,6 +14,14 @@ print_usage() {
 echo "Mode: aggregated"
 echo "Command: dynamo"
 
+# Determine which Python module to use based on USE_SGLANG_LAUNCH_SERVER
+if [[ "${USE_SGLANG_LAUNCH_SERVER,,}" == "true" ]]; then
+    PYTHON_MODULE="sglang.launch_server"
+    echo "Using sglang.launch_server (profiling mode)"
+else
+    PYTHON_MODULE="dynamo.sglang"
+fi
+
 # Check if required environment variables are set
 if [ -z "$HOST_IP_MACHINE" ]; then
     echo "Error: HOST_IP_MACHINE environment variable is not set"
@@ -57,7 +65,7 @@ NCCL_MNNVL_ENABLE=1 \
 NCCL_CUMEM_ENABLE=1 \
 SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK=1 \
 PYTHONUNBUFFERED=1 \
-python3 -m dynamo.sglang \
+python3 -m $PYTHON_MODULE \
     --served-model-name deepseek-ai/DeepSeek-R1 \
     --model-path /model/ \
     --skip-tokenizer-init \
