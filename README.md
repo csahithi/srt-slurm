@@ -14,7 +14,7 @@ This downloads dependencies (nats, etcd, dynamo wheels) and creates `srtslurm.ya
 
 ### 2. Run E2E Benchmark with SemiAnalysis Benchmarking Script
 
-## Example: Run FP4 Disagg with the `max-tpt.sh` script
+#### Example: Run FP4 Disagg with the `max-tpt.sh` script
 
 In this example we submit a job with 1 prefill worker (taking up 1 node so 4 GPUs) and 1 decode worker (taking up 12 nodes so 48 GPUs) and run the `max-tpt.sh` script (which you can find in `scripts/gb200-fp4/disagg/max-tpt.sh`). After the model is loaded, we will automatically run the benchmarking script.
 
