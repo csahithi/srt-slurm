@@ -94,8 +94,8 @@ setup:
 		account=$${account:-restricted}; \
 		read -p "Enter SLURM partition [batch]: " partition; \
 		partition=$${partition:-batch}; \
-		read -p "Enter network interface [enP6p9s0np0]: " network; \
-		network=$${network:-enP6p9s0np0}; \
+		read -p "Enter network interface (leave blank to auto-detect via hostname/ip route): " network; \
+		network=$${network:-}; \
 		read -p "Enter GPUs per node [8]: " gpus_per_node; \
 		gpus_per_node=$${gpus_per_node:-8}; \
 		read -p "Enter time limit [4:00:00]: " time_limit; \

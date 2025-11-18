@@ -122,19 +122,21 @@ Specify benchmark config with `--benchmark`:
 
 Set `type=manual` to skip automated benchmarking.
 
-## Accuracy 
+## Accuracy
+
 Also specify accuracy benchmark config with `--benchmark`:
 
 ```bash
 --benchmark "type=gpqa; num-examples=198; max-tokens=32768; repeat=8; num-threads=512; --thinking-mode=deepseek-r1"
 ```
+
 - `type`: Benchmark type (`gpqa`, `mmlu`)
 - `num-examples`: Number of examples for testing
 - `max-tokens`: Maximum number of generated tokens. Might affect accuracy for gpqa dataset
 - `repeat`: Number of turns for benchmarking
 - `num-threads`: Concurrency of running test
 
-In the bottom it will call `sglang.test.run_eval` for testing gpqa/mmlu datasets. 
+In the bottom it will call `sglang.test.run_eval` for testing gpqa/mmlu datasets.
 For accuracy test, the`--context-length` argument for sglang launching needs to be changed to a larger value (e.g. 40000) which covers the `max-tokens`. If running correctly, the deepseek r1 model should show an accuracy of about 0.80 on gpqa dataset.
 
 In the future other benchmark tools like lm_eval or nemo_skills can be added.
@@ -186,6 +188,7 @@ The network interface can be specified in `srtslurm.yaml` or via `--network-inte
 **H100 clusters** typically use interfaces like `eth3`
 
 Example for H100:
+
 ```bash
 python3 submit_job_script.py \
   --gpu-type h100-fp8 \
@@ -195,9 +198,10 @@ python3 submit_job_script.py \
 ```
 
 Or add to `srtslurm.yaml`:
+
 ```yaml
 cluster:
-  network_interface: "eth3"  # For H100 clusters
+  network_interface: "eth3" # For H100 clusters
 ```
 
 ### Automatic Fallback
