@@ -5,7 +5,7 @@
 """
 Base backend interface for inference frameworks.
 
-Inspired by ignition's backend protocol.
+Defines a protocol for framework-specific implementations.
 """
 
 from abc import ABC, abstractmethod

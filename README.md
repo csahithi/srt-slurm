@@ -256,7 +256,7 @@ make dashboard   # Launch dashboard
 
 ### Backend Protocol
 
-Inspired by ignition's design, backends implement:
+Backends implement a clean protocol for framework-specific logic:
 - `generate_config_file()` - Generate backend-specific configs
 - `render_command()` - Render execution commands
 - `generate_slurm_script()` - Create SLURM job scripts from templates
