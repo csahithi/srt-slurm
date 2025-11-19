@@ -1,2 +1,0 @@
-[console_scripts]
-infbench = infbench.cli.submit:main
