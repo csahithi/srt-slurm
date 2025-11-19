@@ -220,9 +220,20 @@ def render_sglang_command(config: dict, sglang_config_path: Path, mode: str = "p
         else:
             lines.append(f"    --{flag_name} {value} \\")
 
-    # Coordination flags (filled by worker_setup.py at runtime)
+    # Determine nnodes based on mode and whether aggregated or disaggregated
+    is_aggregated = 'agg_nodes' in resources
+    if is_aggregated:
+        nnodes = resources['agg_nodes']
+    else:
+        # Disaggregated: prefill and decode have different node counts
+        if mode == "prefill":
+            nnodes = resources['prefill_nodes']
+        else:  # decode
+            nnodes = resources['decode_nodes']
+
+    # Coordination flags
     lines.append("    --dist-init-addr $HOST_IP_MACHINE:$PORT \\")
-    lines.append("    --nnodes $TOTAL_NODES \\")
+    lines.append(f"    --nnodes {nnodes} \\")
     lines.append("    --node-rank $RANK \\")
 
     # Parallelism flags (computed from resources)
