@@ -223,9 +223,10 @@ class SGLangBackend(Backend):
 
         # Get backend settings
         gpu_type = self.backend_config.get("gpu_type", "h100")
-        # script_variant is legacy - only used for backwards compat with old bash scripts
-        # YAML configs don't need this since they define everything inline
-        script_variant = self.backend_config.get("script_variant", "yaml-config")
+        # script_variant determines which bash script to use in scripts/legacy/{gpu_type}/
+        # For YAML configs, use "max-tpt" as the default (most common case)
+        # Users can override with backend.script_variant if needed
+        script_variant = self.backend_config.get("script_variant", "max-tpt")
 
         # Benchmark config
         benchmark_config = self.config.get("benchmark", {})
