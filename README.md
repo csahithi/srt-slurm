@@ -137,12 +137,12 @@ cluster:
   default_time_limit: "4:00:00"
   default_container: "/path/to/container.sqsh"
 
-# Model path aliases
+# Model path aliases (optional - allows using short names like "deepseek-r1")
 model_paths:
   deepseek-r1: "/models/deepseek-r1"
   llama-3-70b: "/models/llama-3-70b"
 
-# Container aliases
+# Container aliases (optional - allows using short names like "latest")
 containers:
   latest: "/containers/sglang-latest.sqsh"
   stable: "/containers/sglang-stable.sqsh"
@@ -156,6 +156,12 @@ cloud:
 ### Job Configuration
 
 Each job is defined in a YAML file. See `configs/gb200_fp4_max_tpt.yaml` for a complete example.
+
+**Model Path & Container Aliases:**
+- Aliases defined in `srtslurm.yaml` are optional but convenient
+- Use full paths directly in job configs if you prefer
+- Example with alias: `model.path: "deepseek-r1"` → resolves to `/models/deepseek-r1`
+- Example with full path: `model.path: "/models/deepseek-r1"` → used as-is
 
 Override cluster defaults in your job config or use CLI flags.
 
