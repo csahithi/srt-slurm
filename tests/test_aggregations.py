@@ -4,8 +4,8 @@ Test aggregation and grouping functionality
 
 import os
 
-from srtlog import NodeAnalyzer
-from srtlog.visualizations import aggregate_all_nodes, group_nodes_by_dp
+from analysis.srtlog import NodeAnalyzer
+from analysis.srtlog.visualizations import aggregate_all_nodes, group_nodes_by_dp
 
 
 def test_group_by_dp():
