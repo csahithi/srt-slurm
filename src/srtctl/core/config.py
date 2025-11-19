@@ -75,7 +75,12 @@ def resolve_config_with_defaults(user_config: dict, cluster_config: dict | None)
     model = config.get("model", {})
     model_path = model.get("path", "")
 
-    if cluster_config and "model_paths" in cluster_config and model_path in cluster_config["model_paths"]:
+    if (
+        cluster_config
+        and "model_paths" in cluster_config
+        and cluster_config["model_paths"] is not None
+        and model_path in cluster_config["model_paths"]
+    ):
         resolved_path = cluster_config["model_paths"][model_path]
         model["path"] = resolved_path
         logging.debug(f"Resolved model alias '{model_path}' -> '{resolved_path}'")
@@ -83,7 +88,12 @@ def resolve_config_with_defaults(user_config: dict, cluster_config: dict | None)
     # Resolve container alias
     container = model.get("container", "")
 
-    if cluster_config and "containers" in cluster_config and container in cluster_config["containers"]:
+    if (
+        cluster_config
+        and "containers" in cluster_config
+        and cluster_config["containers"] is not None
+        and container in cluster_config["containers"]
+    ):
         resolved_container = cluster_config["containers"][container]
         model["container"] = resolved_container
         logging.debug(f"Resolved container alias '{container}' -> '{resolved_container}'")
