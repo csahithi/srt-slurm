@@ -35,6 +35,12 @@ class ClusterConfig(BaseModel):
     gpus_per_node: Optional[int] = Field(None, description="Default GPUs per node")
     network_interface: Optional[str] = Field(None, description="Network interface (e.g., enP6p9s0np0)")
 
+    # Path settings
+    srtctl_root: Optional[str] = Field(
+        None,
+        description="Path to srtctl repo root (where scripts/templates/ lives)",
+    )
+
     # Model path aliases (optional convenience)
     model_paths: Optional[Dict[str, str]] = Field(
         None,

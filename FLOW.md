@@ -118,7 +118,7 @@ uv run srtctl configs/gb200_fp8_1p_4d.yaml
 
 7. **Create Log Directory**
    ```
-   ../infbench/logs/3667_1P_4D_20251118_233054/
+   ../srtctl/logs/3667_1P_4D_20251118_233054/
    ```
 
    Files saved:

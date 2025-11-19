@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Slurm utility functions for infbench
+# Slurm utility functions for srtctl
 # Common functions used across SLURM job templates
 
 # Function to get node IP address in SLURM environment with fallback mechanisms

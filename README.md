@@ -70,7 +70,7 @@ benchmark:
   req_rate: "inf"
 ```
 
-Logs saved to `../infbench/logs/{JOB_ID}_{P}P_{D}D_{TIMESTAMP}/`
+Logs saved to `../srtctl/logs/{JOB_ID}_{P}P_{D}D_{TIMESTAMP}/`
 
 ### 3. Profile Performance (Optional)
 
@@ -182,7 +182,7 @@ Override cluster defaults in your job config or use CLI flags.
 ## Repository Structure
 
 ```
-infbench-yaml-config/
+srtctl-yaml-config/
 ├── src/srtctl/          # Python package (submission logic)
 │   ├── cli/             # CLI entrypoints (submit.py)
 │   ├── backends/        # Backend implementations (SGLang, etc.)
@@ -201,7 +201,7 @@ infbench-yaml-config/
 ├── tests/              # Unit tests
 └── srtslurm.yaml       # Cluster config (gitignored)
 
-../infbench/            # Shared with main infbench repo
+../srtctl/              # Shared with main srtctl repo
 └── logs/               # Benchmark results
 ```
 

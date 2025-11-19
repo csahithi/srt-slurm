@@ -8,7 +8,7 @@ This directory contains Jinja2 templates and runtime scripts for SLURM job execu
 - `job_script_template_disagg.j2` - Disaggregated prefill/decode mode
 - `job_script_template_agg.j2` - Aggregated mode
 
-These templates are used by the `infbench` CLI to generate SLURM job scripts.
+These templates are used by the `srtctl` CLI to generate SLURM job scripts.
 
 ### Scripts Directory
 Contains runtime scripts mounted into containers during job execution:
@@ -34,18 +34,18 @@ Contains runtime scripts mounted into containers during job execution:
 
 ## Usage
 
-**This directory is not meant to be used directly.** Instead, use the `infbench` CLI:
+**This directory is not meant to be used directly.** Instead, use the `srtctl` CLI:
 
 ```bash
 # From repo root
-uv run infbench configs/gb200_fp4_max_tpt.yaml
+uv run srtctl configs/gb200_fp4_max_tpt.yaml
 ```
 
 See the main [README](../README.md) for documentation on the YAML-based submission flow.
 
 ## How It Works
 
-1. User runs `infbench submit config.yaml`
+1. User runs `srtctl config.yaml`
 2. Backend generates SLURM script from templates in this directory
 3. Scripts are mounted into containers at `/scripts/`
 4. `worker_setup.py` launches SGLang workers with appropriate configs

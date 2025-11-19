@@ -89,6 +89,9 @@ setup:
 	else \
 		echo "Creating srtslurm.yaml with your cluster settings..."; \
 		echo ""; \
+		SRTCTL_ROOT=$$(cd .. && pwd); \
+		echo "📍 Auto-detected srtctl root: $$SRTCTL_ROOT"; \
+		echo ""; \
 		read -p "Enter SLURM account [restricted]: " account; \
 		account=$${account:-restricted}; \
 		read -p "Enter SLURM partition [batch]: " partition; \
@@ -103,21 +106,33 @@ setup:
 		container=$${container:-}; \
 		echo ""; \
 		echo "# SRT SLURM Configuration" > srtslurm.yaml; \
+		echo "# This file provides cluster-specific defaults and settings for srtctl" >> srtslurm.yaml; \
 		echo "" >> srtslurm.yaml; \
-		echo "cluster:" >> srtslurm.yaml; \
-		echo "  account: \"$$account\"" >> srtslurm.yaml; \
-		echo "  partition: \"$$partition\"" >> srtslurm.yaml; \
-		echo "  network_interface: \"$$network\"" >> srtslurm.yaml; \
-		echo "  gpus_per_node: $$gpus_per_node" >> srtslurm.yaml; \
-		echo "  time_limit: \"$$time_limit\"" >> srtslurm.yaml; \
-		echo "  container_image: \"$$container\"" >> srtslurm.yaml; \
+		echo "# Default SLURM settings" >> srtslurm.yaml; \
+		echo "default_account: \"$$account\"" >> srtslurm.yaml; \
+		echo "default_partition: \"$$partition\"" >> srtslurm.yaml; \
+		echo "default_time_limit: \"$$time_limit\"" >> srtslurm.yaml; \
 		echo "" >> srtslurm.yaml; \
+		echo "# Resource defaults" >> srtslurm.yaml; \
+		echo "gpus_per_node: $$gpus_per_node" >> srtslurm.yaml; \
+		echo "network_interface: \"$$network\"" >> srtslurm.yaml; \
+		echo "" >> srtslurm.yaml; \
+		echo "# Path to srtctl repo root (where scripts/templates/ lives)" >> srtslurm.yaml; \
+		echo "# Auto-detected from parent directory" >> srtslurm.yaml; \
+		echo "srtctl_root: \"$$SRTCTL_ROOT\"" >> srtslurm.yaml; \
+		echo "" >> srtslurm.yaml; \
+		if [ -n "$$container" ]; then \
+			echo "# Default container" >> srtslurm.yaml; \
+			echo "default_container: \"$$container\"" >> srtslurm.yaml; \
+			echo "" >> srtslurm.yaml; \
+		fi; \
+		echo "# Cloud sync settings (optional)" >> srtslurm.yaml; \
 		echo "cloud:" >> srtslurm.yaml; \
 		echo "  endpoint_url: \"\"" >> srtslurm.yaml; \
 		echo "  bucket: \"\"" >> srtslurm.yaml; \
 		echo "  prefix: \"benchmark-results/\"" >> srtslurm.yaml; \
 		echo "✅ Created srtslurm.yaml"; \
-		echo "   You can edit it anytime or run: cp srtslurm.yaml.example srtslurm.yaml"; \
+		echo "   You can edit it anytime to add model_paths, containers, etc."; \
 	fi
 
 cleanup:

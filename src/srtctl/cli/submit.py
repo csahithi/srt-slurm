@@ -208,10 +208,10 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
                 decode_workers = config["resources"]["decode_workers"]
                 log_dir_name = f"{job_id}_{prefill_workers}P_{decode_workers}D_{timestamp}"
 
-            # Create log directory in infbench repo (parent of infbench-yaml-config)
+            # Create log directory in srtctl repo (parent of srtctl-yaml-config)
             yaml_config_root = Path(__file__).parent.parent.parent.parent
-            infbench_root = yaml_config_root.parent / "infbench"
-            log_dir = infbench_root / "logs" / log_dir_name
+            srtctl_root = yaml_config_root.parent / "srtctl"
+            log_dir = srtctl_root / "logs" / log_dir_name
             log_dir.mkdir(parents=True, exist_ok=True)
 
             # Save rendered script

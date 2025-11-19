@@ -215,7 +215,7 @@ class SGLangBackend(Backend):
             total_nodes = prefill_nodes + decode_nodes
 
         # Get SLURM settings
-        job_name = self.config.get("name", "infbench-job")
+        job_name = self.config.get("name", "srtctl-job")
         account = self.slurm.get("account")
         partition = self.slurm.get("partition")
         time_limit = self.slurm.get("time_limit", "01:00:00")
@@ -256,10 +256,15 @@ class SGLangBackend(Backend):
         yaml_config_root = Path(srtctl.__file__).parent.parent.parent
         config_dir_path = yaml_config_root / "configs"
 
-        # Log directory - relative path from scripts/ to infbench/logs
-        # Template will be run from scripts/, so ../logs points to infbench/logs
-        infbench_root = yaml_config_root.parent / "infbench"
-        log_dir_path = infbench_root / "logs"
+        # Log directory - check srtslurm.yaml first, then fall back to default
+        srtctl_root_setting = get_srtslurm_setting("srtctl_root")
+        if srtctl_root_setting:
+            srtctl_root = Path(srtctl_root_setting)
+        else:
+            # Fall back to default: ../srtctl relative to yaml-config directory
+            srtctl_root = yaml_config_root.parent / "srtctl"
+
+        log_dir_path = srtctl_root / "logs"
 
         # Template variables
         template_vars = {
@@ -301,16 +306,22 @@ class SGLangBackend(Backend):
         else:
             template_name = "job_script_template_disagg.j2"
 
-        # Find template path - templates are in ../infbench/scripts/templates
-        # relative to the infbench-yaml-config directory
-        yaml_config_root = Path(srtctl.__file__).parent.parent.parent
-        template_path = yaml_config_root.parent / "infbench" / "scripts" / "templates" / template_name
+        # Find template path - check srtslurm.yaml first, then fall back to default location
+        srtctl_root = get_srtslurm_setting("srtctl_root")
+
+        if srtctl_root:
+            # User specified srtctl_root in srtslurm.yaml
+            template_path = Path(srtctl_root) / "scripts" / "templates" / template_name
+        else:
+            # Fall back to default: ../srtctl relative to yaml-config directory
+            yaml_config_root = Path(srtctl.__file__).parent.parent.parent
+            template_path = yaml_config_root.parent / "srtctl" / "scripts" / "templates" / template_name
 
         if not template_path.exists():
             raise FileNotFoundError(
                 f"Template not found: {template_path}\n"
-                f"Expected template at: {template_path}\n"
-                f"Make sure infbench repo with scripts/templates/ is at: {yaml_config_root.parent / 'infbench'}"
+                f"Set 'srtctl_root' in srtslurm.yaml to point to your srtctl repo.\n"
+                f"Example: srtctl_root: /path/to/srtctl"
             )
 
         # Render template
