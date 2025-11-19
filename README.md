@@ -36,18 +36,22 @@ name: "gb200-fp4-max-tpt"
 model:
   path: "/path/to/model"
   container: "your-container.sqsh"
+  precision: "fp4"  # fp4, fp8, fp16, bf16
 
 resources:
+  gpu_type: "gb200"  # gb200, h100
   prefill_nodes: 1
   decode_nodes: 12
   prefill_workers: 1
   decode_workers: 1
   gpus_per_node: 4
 
-backend:
-  type: "sglang"
-  gpu_type: "gb200-fp4"
+slurm:
+  account: "your-account"
+  partition: "batch"
+  time_limit: "4:00:00"
 
+backend:
   sglang_config:
     prefill:
       kv_cache_dtype: "fp8_e4m3"
@@ -64,11 +68,6 @@ benchmark:
   osl: 1024
   concurrencies: [1024, 2048, 4096]
   req_rate: "inf"
-
-slurm:
-  account: "your-account"
-  partition: "batch"
-  time_limit: "4:00:00"
 ```
 
 Logs saved to `../infbench/logs/{JOB_ID}_{P}P_{D}D_{TIMESTAMP}/`

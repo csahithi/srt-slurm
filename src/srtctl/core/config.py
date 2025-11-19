@@ -112,7 +112,7 @@ def load_config(path: Path) -> dict:
 
     Returns fully resolved config ready for submission.
     """
-    from .validation import validate_config
+    from .schema import JobConfig
 
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
@@ -127,10 +127,11 @@ def load_config(path: Path) -> dict:
     # Resolve with defaults
     config = resolve_config_with_defaults(user_config, cluster_config)
 
-    # Validate
-    errors = validate_config(config)
-    if errors:
-        raise ValueError(f"Invalid config in {path}:\n  " + "\n  ".join(errors))
-
-    logging.info(f"Loaded config: {config['name']}")
-    return config
+    # Validate with pydantic
+    try:
+        validated = JobConfig(**config)
+        logging.info(f"Loaded config: {validated.name}")
+        # Return as dict with enums converted to strings
+        return validated.model_dump(mode="python", by_alias=False, exclude_none=False)
+    except Exception as e:
+        raise ValueError(f"Invalid config in {path}: {e}") from e

@@ -4,25 +4,25 @@
 
 name: "gb200-fp4-max-tpt"
 
-slurm:
-  account: "your-account"
-  partition: "gpu"
-  time_limit: "04:00:00"
+model:
+  path: "/models/deepseek-r1"
+  container: "/containers/sglang.sqsh"
+  precision: "fp4"
 
 resources:
+  gpu_type: "gb200"
   prefill_nodes: 1
   decode_nodes: 12
   prefill_workers: 1
   decode_workers: 1
   gpus_per_node: 4
 
-model:
-  path: "/models/deepseek-r1"
-  container: "/containers/sglang.sqsh"
+slurm:
+  account: "your-account"
+  partition: "gpu"
+  time_limit: "04:00:00"
 
 backend:
-  type: "sglang"
-  gpu_type: "gb200-fp4"  # Used for metadata/logging only
 
   # Prefill-specific environment variables
   prefill_environment:
