@@ -22,7 +22,7 @@ thinking_mode=${9:-deepseek-r1} # Default: deepseek-r1
 echo "GPQA Benchmark Config: num_examples=${num_examples}; max_tokens=${max_tokens}; repeat=${repeat}; num_threads=${num_threads}; thinking-mode=${thinking_mode}"
 
 # Source utilities for wait_for_model
-source /scripts/benchmark_utils.sh
+source /scripts/utils/benchmark_utils.sh
 
 wait_for_model_timeout=1500 # 25 minutes
 wait_for_model_check_interval=5 # check interval -> 5s

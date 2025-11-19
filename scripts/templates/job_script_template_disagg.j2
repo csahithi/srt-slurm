@@ -41,7 +41,7 @@ set +x
 mkdir -p "${OUTPUT_DIR}" "${LOG_DIR}"
 
 # Source utility functions for robust IP discovery
-source "${SCRIPT_DIR}/slurm_utils.sh"
+source "${SCRIPT_DIR}/utils/slurm_utils.sh"
 
 nodes=($(scontrol show hostnames $SLURM_NODELIST))
 if [ ${#nodes[@]} -ne $TOTAL_NODES ]; then
@@ -111,7 +111,7 @@ python3 - <<'PY'
 import os
 from jinja2 import Template
 
-template_path = os.path.join(os.environ['SCRIPT_DIR'], 'nginx.conf.j2')
+template_path = os.path.join(os.environ['SCRIPT_DIR'], 'templates/nginx.conf.j2')
 output_path = os.path.join(os.environ['LOG_DIR'], 'nginx.conf')
 
 with open(template_path, 'r') as f:
@@ -342,7 +342,7 @@ BENCHMARK_ARGS="{{ benchmark_arg }}"
 
 {% if do_benchmark %}
 {% raw %}
-srun --nodes=1 --ntasks=1 $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${nodes[0]} --output=${LOG_DIR}/benchmark.out --error=${LOG_DIR}/benchmark.err --overlap bash /scripts/${BENCHMARK_TYPE}/bench.sh $PREFILL_WORKERS $DECODE_WORKERS $PREFILL_GPUS $DECODE_GPUS ${BENCHMARK_ARGS} &
+srun --nodes=1 --ntasks=1 $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${nodes[0]} --output=${LOG_DIR}/benchmark.out --error=${LOG_DIR}/benchmark.err --overlap bash /scripts/benchmarks/${BENCHMARK_TYPE}/bench.sh $PREFILL_WORKERS $DECODE_WORKERS $PREFILL_GPUS $DECODE_GPUS ${BENCHMARK_ARGS} &
 {% endraw %}
 {% endif %}
 
@@ -361,12 +361,12 @@ echo "Decode profiling will run on: $DECODE_LEADER_NODE"
 # Run prefill profiling on first prefill worker's leader node
 srun --nodes=1 --ntasks=1 $ENROOT_ARGS --jobid $SLURM_JOB_ID -w $PREFILL_LEADER_NODE \
     --output=${LOG_DIR}/profile_prefill.out --error=${LOG_DIR}/profile_prefill.err --overlap \
-    bash -c "PROFILING_MODE=prefill SGLANG_TORCH_PROFILER_DIR=/logs/profiles /scripts/profile.sh $PREFILL_WORKERS $DECODE_WORKERS $PREFILL_GPUS $DECODE_GPUS $TOTAL_GPUS" &
+    bash -c "PROFILING_MODE=prefill SGLANG_TORCH_PROFILER_DIR=/logs/profiles /scripts/profiling/profile.sh $PREFILL_WORKERS $DECODE_WORKERS $PREFILL_GPUS $DECODE_GPUS $TOTAL_GPUS" &
 
 # Run decode profiling on first decode worker's leader node
 srun --nodes=1 --ntasks=1 $ENROOT_ARGS --jobid $SLURM_JOB_ID -w $DECODE_LEADER_NODE \
     --output=${LOG_DIR}/profile_decode.out --error=${LOG_DIR}/profile_decode.err --overlap \
-    bash -c "PROFILING_MODE=decode SGLANG_TORCH_PROFILER_DIR=/logs/profiles /scripts/profile.sh $PREFILL_WORKERS $DECODE_WORKERS $PREFILL_GPUS $DECODE_GPUS $TOTAL_GPUS" &
+    bash -c "PROFILING_MODE=decode SGLANG_TORCH_PROFILER_DIR=/logs/profiles /scripts/profiling/profile.sh $PREFILL_WORKERS $DECODE_WORKERS $PREFILL_GPUS $DECODE_GPUS $TOTAL_GPUS" &
 {% endraw %}
 {% endif %}
 

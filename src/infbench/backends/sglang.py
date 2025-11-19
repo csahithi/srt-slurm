@@ -285,17 +285,17 @@ class SGLangBackend(Backend):
         else:
             template_name = "job_script_template_disagg.j2"
 
-        # Find template path - templates are in ../infbench/scripts
+        # Find template path - templates are in ../infbench/scripts/templates
         # relative to the infbench-yaml-config directory
         import infbench
         yaml_config_root = Path(infbench.__file__).parent.parent.parent
-        template_path = yaml_config_root.parent / "infbench" / "scripts" / template_name
+        template_path = yaml_config_root.parent / "infbench" / "scripts" / "templates" / template_name
 
         if not template_path.exists():
             raise FileNotFoundError(
                 f"Template not found: {template_path}\n"
                 f"Expected template at: {template_path}\n"
-                f"Make sure infbench repo with scripts/ is at: {yaml_config_root.parent / 'infbench'}"
+                f"Make sure infbench repo with scripts/templates/ is at: {yaml_config_root.parent / 'infbench'}"
             )
 
         # Render template

@@ -21,7 +21,7 @@ num_threads=${8:-512}   # Default: 512
 echo "MMLU Benchmark Config: num_examples=${num_examples}; max_tokens=${max_tokens}; repeat=${repeat}; num_threads=${num_threads}"
 
 # Source utilities for wait_for_model
-source /scripts/benchmark_utils.sh
+source /scripts/utils/benchmark_utils.sh
 
 wait_for_model_timeout=1500 # 25 minutes
 wait_for_model_check_interval=5 # check interval -> 5s

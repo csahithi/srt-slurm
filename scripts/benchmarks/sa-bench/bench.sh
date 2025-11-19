@@ -15,7 +15,7 @@ prefill_gpus=$3
 decode_gpus=$4
 total_gpus=$((prefill_gpus+decode_gpus))
 
-source /scripts/benchmark_utils.sh
+source /scripts/utils/benchmark_utils.sh
 work_dir="/scripts/sa-bench/"
 cd $work_dir
 

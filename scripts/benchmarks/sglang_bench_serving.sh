@@ -16,7 +16,7 @@ SERVED_MODEL_NAME="deepseek-ai/DeepSeek-R1"
 MODEL_PATH=/model/
 
 # This file contains `wait_for_model` and `warmup_model`
-source /scripts/benchmark_utils.sh
+source /scripts/utils/benchmark_utils.sh
 
 ### Benchmark runs
 # 1. wait for model to come alive - `wait_for_model`
