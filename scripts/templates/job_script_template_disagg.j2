@@ -207,6 +207,8 @@ WORKER_ARGS="$WORKER_ARGS --sglang-torch-profiler"
 {% endraw %}
 {% endif %}
 {% raw %}
+# Add SGLang config path (mounted in container at /logs/)
+WORKER_ARGS="$WORKER_ARGS --sglang-config-path /logs/sglang_config.yaml"
 
 {% endraw %}
 {% if enable_multiple_frontends %}
