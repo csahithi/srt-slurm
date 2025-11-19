@@ -296,7 +296,7 @@ class SGLangBackend(Backend):
             "timestamp": timestamp,
             "enable_config_dump": self.config.get("enable_config_dump", True),
             "use_dynamo_whls": True,
-            "log_dir_prefix": "../logs",  # Relative to scripts/
+            "log_dir_prefix": str(log_dir_path),  # Absolute path to logs directory
             "sglang_torch_profiler": self.backend_config.get("enable_profiling", False),
         }
 
