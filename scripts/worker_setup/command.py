@@ -25,6 +25,7 @@ def build_sglang_command_from_yaml(
         python3 -m dynamo.sglang --config file.yaml --config-key prefill
 
     This builds the command with:
+    - Environment variables from YAML config
     - Python module (dynamo.sglang or sglang.launch_server)
     - --config and --config-key flags to read YAML
     - Coordination flags (dist-init-addr, nnodes, node-rank)
@@ -43,13 +44,28 @@ def build_sglang_command_from_yaml(
     Returns:
         Full command string ready to execute
     """
+    import yaml
+
+    # Load config to extract environment variables
+    with open(sglang_config_path) as f:
+        sglang_config = yaml.safe_load(f)
+
+    config_key = worker_type if worker_type != "aggregated" else "aggregated"
+
+    # Environment variables are stored at top level as {mode}_environment
+    env_key = f"{config_key}_environment"
+    env_vars = sglang_config.get(env_key, {})
+
+    # Build environment variable exports
+    env_exports = []
+    for key, value in env_vars.items():
+        env_exports.append(f"export {key}={value}")
+
     # Determine Python module based on profiling mode
     python_module = "sglang.launch_server" if use_profiling else "dynamo.sglang"
 
     # Build command parts - only add coordination flags
     # All SGLang-specific flags (including ep-size, tp-size, dp-size) come from YAML
-    config_key = worker_type if worker_type != "aggregated" else "aggregated"
-
     cmd_parts = [
         f"python3 -m {python_module}",
         f"--config {sglang_config_path}",
@@ -59,7 +75,10 @@ def build_sglang_command_from_yaml(
         f"--node-rank {rank}",
     ]
 
-    return " ".join(cmd_parts)
+    # Combine environment exports and command
+    full_command = " && ".join(env_exports + [" ".join(cmd_parts)]) if env_exports else " ".join(cmd_parts)
+
+    return full_command
 
 
 def install_dynamo_wheels(gpu_type: str) -> None:

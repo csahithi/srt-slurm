@@ -79,6 +79,12 @@ class SGLangBackend(Backend):
             if mode in sglang_cfg:
                 result[mode] = sglang_cfg[mode]
 
+        # Add environment variables as top-level keys
+        for mode in ["prefill", "decode"]:
+            env_vars = self.get_environment_vars(mode)
+            if env_vars:
+                result[f"{mode}_environment"] = env_vars
+
         # Write to temp file
         fd, temp_path = tempfile.mkstemp(suffix=".yaml", prefix="sglang_config_")
         with os.fdopen(fd, "w") as f:

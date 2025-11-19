@@ -25,6 +25,7 @@ from pathlib import Path
 
 # Import from srtctl modules
 from srtctl.core.config import load_config
+from srtctl.core.sweep import generate_sweep_configs
 from srtctl.backends.sglang import SGLangBackend
 
 
@@ -320,9 +321,6 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
         config_path: Path to sweep YAML config
         dry_run: If True, don't submit to SLURM, just validate and save artifacts
     """
-    # Import sweep logic
-    from srtctl.core.sweep import generate_sweep_configs
-
     sweep_config = load_config(config_path)
 
     # Generate all configs
