@@ -47,4 +47,4 @@ configs/*.whl
 configs/*.deb
 configs/*.tar.gz
 
-.ruff_cache/
+.ruff_cache/*.egg-info/
