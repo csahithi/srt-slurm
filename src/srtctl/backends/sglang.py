@@ -17,27 +17,9 @@ from typing import Any
 
 import srtctl
 from srtctl.core.config import get_srtslurm_setting
+from srtctl.core.sweep import expand_template
 
 from .base import Backend
-
-
-def expand_template(template: Any, values: dict[str, Any]) -> Any:
-    """Recursively expand template strings with values.
-
-    Used for parameter sweeping - replaces {param_name} with actual values.
-    """
-    if isinstance(template, dict):
-        return {k: expand_template(v, values) for k, v in template.items()}
-    elif isinstance(template, list):
-        return [expand_template(item, values) for item in template]
-    elif isinstance(template, str):
-        result = template
-        for key, value in values.items():
-            placeholder = f"{{{key}}}"
-            result = result.replace(placeholder, str(value))
-        return result
-    else:
-        return template
 
 
 class SGLangBackend(Backend):

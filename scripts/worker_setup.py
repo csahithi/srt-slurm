@@ -163,7 +163,7 @@ def main(input_args: list[str] | None = None):
     if args.worker_type == "nginx":
         if not args.nginx_config:
             raise ValueError("--nginx_config is required for nginx worker type")
-        setup_nginx_worker(args.master_ip, args.nginx_config)
+        setup_nginx_worker(args.nginx_config)
     elif args.worker_type == "frontend":
         setup_frontend_worker(args.worker_idx, args.master_ip, args.gpu_type)
     elif args.worker_type == "prefill":

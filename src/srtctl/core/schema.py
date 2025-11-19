@@ -220,7 +220,6 @@ class JobConfig(BaseModel):
     benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
 
     # Additional optional settings
-    use_init_location: bool = False
     enable_config_dump: bool = True
 
     def model_post_init(self, __context: Any) -> None:

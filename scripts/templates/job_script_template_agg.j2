@@ -287,15 +287,6 @@ echo "scancel $SLURM_JOB_ID"
 
 {% endraw %}
 
-PROFILER_TYPE={{ profiler_type }}
-PROFILER_ARGS="{{ profiler_arg }}"
-
-{% if do_profile %}
-{% raw %}
-srun --nodes=1 --ntasks=1 $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${nodes[0]} --output=${LOG_DIR}/profile.out --error=${LOG_DIR}/profile.err --overlap bash /scripts/profiling/${PROFILER_TYPE}/bench.sh 0 $AGG_WORKERS $PREFILL_GPUS $DECODE_GPUS $TOTAL_GPUS ${PROFILER_ARGS} &
-{% endraw %}
-{% endif %}
-
 {% if sglang_torch_profiler %}
 {% raw %}
 # Torch profiling mode for aggregated workers
@@ -310,7 +301,7 @@ echo "Aggregated profiling will run on: $AGG_LEADER_NODE"
 # Use "decode" mode for aggregated since it profiles the full generation pipeline
 srun --nodes=1 --ntasks=1 $ENROOT_ARGS --jobid $SLURM_JOB_ID -w $AGG_LEADER_NODE \
     --output=${LOG_DIR}/profile_aggregated.out --error=${LOG_DIR}/profile_aggregated.err --overlap \
-    bash -c "PROFILING_MODE=decode SGLANG_TORCH_PROFILER_DIR=/logs/profiles /scripts/profiling/profile.sh 0 $AGG_WORKERS 0 $AGG_GPUS $TOTAL_GPUS" &
+    bash -c "PROFILING_MODE=decode SGLANG_TORCH_PROFILER_DIR=/logs/profiles /scripts/profiling/profile.sh 0 $AGG_WORKERS 0 $DECODE_GPUS $TOTAL_GPUS" &
 {% endraw %}
 {% endif %}
 

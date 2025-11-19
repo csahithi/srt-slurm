@@ -31,7 +31,7 @@ def setup_head_prefill_node(prefill_host_ip: str) -> None:
         raise RuntimeError("Failed to start etcd")
 
 
-def setup_nginx_worker(master_ip: str, nginx_config: str) -> int:
+def setup_nginx_worker(nginx_config: str) -> int:
     """Setup nginx load balancer"""
     logging.info("Setting up nginx load balancer")
 

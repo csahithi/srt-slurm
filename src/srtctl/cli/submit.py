@@ -99,13 +99,12 @@ class DryRunContext:
         logging.info(f"  ✓ Saved rendered commands: {commands_path.name}")
         return commands_path
 
-    def save_metadata(self, config: dict, args: list[str]) -> Path:
+    def save_metadata(self, config: dict) -> Path:
         """Save submission metadata"""
         metadata = {
             "job_name": self.job_name,
             "timestamp": self.timestamp,
             "config": config,
-            "submit_args": args,
             "mode": "dry-run",
         }
 
@@ -169,8 +168,8 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
         else:
             sglang_config_path = None
 
-        # Save metadata (no more args conversion needed)
-        ctx.save_metadata(config, [])
+        # Save metadata
+        ctx.save_metadata(config)
 
         # Print summary
         ctx.print_summary()
