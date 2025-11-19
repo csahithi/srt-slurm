@@ -7,8 +7,57 @@ Pydantic schema definitions for job configuration validation.
 """
 
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, Dict, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
+
+
+# ============================================================================
+# Cluster Configuration (srtslurm.yaml)
+# ============================================================================
+
+
+class ClusterConfig(BaseModel):
+    """Cluster configuration from srtslurm.yaml.
+
+    Optional configuration file that provides cluster-specific defaults
+    and aliases for model paths and containers.
+    """
+    model_config = {"extra": "allow"}  # Allow additional fields
+
+    # Default SLURM settings
+    default_account: Optional[str] = Field(None, description="Default SLURM account")
+    default_partition: Optional[str] = Field(None, description="Default SLURM partition")
+    default_time_limit: Optional[str] = Field(None, description="Default job time limit")
+    default_container: Optional[str] = Field(None, description="Default container path")
+
+    # Resource defaults
+    gpus_per_node: Optional[int] = Field(None, description="Default GPUs per node")
+    network_interface: Optional[str] = Field(None, description="Network interface (e.g., enP6p9s0np0)")
+
+    # Model path aliases (optional convenience)
+    model_paths: Optional[Dict[str, str]] = Field(
+        None,
+        description="Mapping of short names to full model paths",
+        examples=[{"deepseek-r1": "/models/deepseek-r1"}],
+    )
+
+    # Container aliases (optional convenience)
+    containers: Optional[Dict[str, str]] = Field(
+        None,
+        description="Mapping of short names to container paths",
+        examples=[{"latest": "/containers/sglang-latest.sqsh"}],
+    )
+
+    # Cloud sync settings (optional)
+    cloud: Optional[Dict[str, str]] = Field(
+        None,
+        description="S3-compatible cloud storage settings for result syncing",
+    )
+
+
+# ============================================================================
+# Job Configuration
+# ============================================================================
 
 
 class GpuType(str, Enum):
@@ -92,27 +141,19 @@ class BenchmarkConfig(BaseModel):
 
 
 class SGLangPrefillConfig(BaseModel):
-    """SGLang prefill worker configuration."""
-    # Allow any additional fields for SGLang flags
-    model_config = {"extra": "allow"}
+    """SGLang prefill worker configuration.
 
-    # Common required fields
-    served_model_name: Optional[str] = None
-    model_path: str = "/model/"
-    trust_remote_code: bool = True
-    disaggregation_mode: Literal["prefill"] = "prefill"
+    Accepts any SGLang flags - no required fields.
+    """
+    model_config = {"extra": "allow"}
 
 
 class SGLangDecodeConfig(BaseModel):
-    """SGLang decode worker configuration."""
-    # Allow any additional fields for SGLang flags
-    model_config = {"extra": "allow"}
+    """SGLang decode worker configuration.
 
-    # Common required fields
-    served_model_name: Optional[str] = None
-    model_path: str = "/model/"
-    trust_remote_code: bool = True
-    disaggregation_mode: Literal["decode"] = "decode"
+    Accepts any SGLang flags - no required fields.
+    """
+    model_config = {"extra": "allow"}
 
 
 class SGLangConfig(BaseModel):

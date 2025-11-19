@@ -18,6 +18,8 @@ def load_cluster_config() -> dict | None:
 
     Returns None if file doesn't exist (graceful degradation).
     """
+    from .schema import ClusterConfig
+
     # Look for srtslurm.yaml at project root
     cluster_config_path = Path.cwd() / "srtslurm.yaml"
 
@@ -27,11 +29,14 @@ def load_cluster_config() -> dict | None:
 
     try:
         with open(cluster_config_path) as f:
-            cluster_config = yaml.safe_load(f)
+            raw_config = yaml.safe_load(f)
+
+        # Validate with pydantic
+        validated = ClusterConfig(**raw_config)
         logging.debug(f"Loaded cluster config from {cluster_config_path}")
-        return cluster_config
+        return validated.model_dump()
     except Exception as e:
-        logging.warning(f"Failed to load srtslurm.yaml: {e}")
+        logging.warning(f"Failed to load or validate srtslurm.yaml: {e}")
         return None
 
 
