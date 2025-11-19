@@ -116,10 +116,10 @@ cloud:
   bucket: "benchmark-results"
   prefix: "runs/"
 
-# Push results
-./push_after_benchmark.sh
+# Push results (via Makefile)
+make sync-to-cloud
 
-# Dashboard auto-pulls missing runs
+# Dashboard auto-pulls missing runs on startup
 ```
 
 ## Configuration
@@ -209,17 +209,16 @@ infbench-yaml-config/
 **Push from cluster:**
 
 ```bash
-./push_after_benchmark.sh                    # Push all runs
-./push_after_benchmark.sh --log-dir /path    # Specify directory
-./push_after_benchmark.sh 3667_1P_12D_...   # Push single run
+make sync-to-cloud                # Push all runs
+make sync-run RUN_ID=3667_1P_12D  # Push single run
 ```
 
 **Pull locally:**
 Dashboard auto-syncs missing runs on startup. Or manually:
 
 ```bash
-uv run python scripts/sync_results.py pull-missing
-uv run python scripts/sync_results.py list-remote
+uv run python -m srtslurm.sync_results pull-missing
+uv run python -m srtslurm.sync_results list-remote
 ```
 
 ## Development

@@ -26,9 +26,6 @@ srtctl = "srtctl.cli.submit:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-data]
-srtctl = ["slurm/templates/*.j2"]
-
 [tool.ruff]
 line-length = 120
 target-version = "py310"
