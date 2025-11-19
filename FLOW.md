@@ -424,22 +424,27 @@ Conditional: python3 -m sglang.launch_server vs dynamo.sglang
 5. **Template Defaults** - Hardcoded in Jinja templates
 6. **Legacy Script** - Hardcoded in bash scripts (currently used)
 
-### The YAML Config Paradox
+### The YAML Config Solution
 
-**Problem**: We generate a beautiful YAML config with all user's SGLang flags, but then ignore it and use legacy scripts with hardcoded flags!
+**Solution**: Use dynamo.sglang's native `--config` flag support!
 
-**Why This Works Anyway**:
-- Legacy scripts set up environment correctly
-- They handle infrastructure (ETCD, NATS)
-- They handle profiling mode toggle
-- The specific SGLang flags are similar enough
+Instead of parsing YAML and building 50+ CLI flags, we simply:
+```bash
+python3 -m dynamo.sglang \
+    --config /path/to/sglang_config.yaml \
+    --config-key prefill \
+    --dist-init-addr $HOST_IP_MACHINE:$PORT \
+    --nnodes 1 \
+    --node-rank $RANK
+```
 
-**Future Fix**:
-Create a true `yaml-config.sh` that:
-1. Reads `$SGLANG_CONFIG_PATH` environment variable
-2. Parses YAML with Python
-3. Builds command dynamically
-4. Executes with proper environment
+**How It Works**:
+1. `worker_setup.py` receives `--sglang-config-path` argument
+2. When sglang_config_path is provided, `get_gpu_command()` calls `build_sglang_command_from_yaml()`
+3. This builds a simple command using `--config` and `--config-key` flags
+4. Only coordination flags (dist-init-addr, nnodes, node-rank) are added dynamically
+5. All SGLang-specific flags (ep-size, tp-size, dp-size, kv-cache-dtype, etc.) come from YAML
+6. Legacy scripts are still available as fallback when sglang_config_path is not provided
 
 ---
 
@@ -476,26 +481,28 @@ SGLang Process: python3 -m dynamo.sglang ...
 
 ---
 
-## Next Steps for Complete YAML Support
+## Completed YAML Support Implementation
 
-To make YAML configs truly independent of legacy scripts:
+✅ **worker_setup.py updates**:
+   - Added `--sglang-config-path` CLI argument
+   - Created `build_sglang_command_from_yaml()` function
+   - Updated `get_gpu_command()` to support YAML configs
+   - Updated all worker setup functions (prefill, decode, aggregated) to accept and use sglang_config_path
+   - Maintains backward compatibility with legacy bash scripts
 
-1. **Create `scripts/yaml-config.sh`**:
-   - Reads from `$SGLANG_CONFIG_PATH`
-   - Parses YAML with Python
-   - Builds command from config
-   - Executes with proper environment
+## Remaining Steps
 
-2. **Update `worker_setup.py`**:
-   - Add `--sglang-config-path` argument
-   - Pass to legacy script via environment: `SGLANG_CONFIG_PATH=/path/to/config.yaml`
+1. **Update SLURM templates**:
+   - Modify `scripts/templates/job_script_template_disagg.j2` to pass `--sglang-config-path` to worker_setup.py
+   - Modify `scripts/templates/job_script_template_agg.j2` similarly
+   - The SGLang config file needs to be copied to a location accessible from worker nodes (e.g., /logs/ directory)
 
-3. **Update templates**:
-   - Pass SGLang config path to worker_setup.py
-   - Set `SGLANG_CONFIG_PATH` environment variable
+2. **Update config file handling in backend**:
+   - Ensure the generated sglang_config.yaml is saved to the log directory
+   - Pass the correct path to the SLURM template
 
-4. **Deprecate `script_variant`**:
-   - Always use `yaml-config.sh` for YAML-based jobs
-   - Keep legacy scripts for backward compat only
-
-This would give us true declarative configuration with no hardcoded flags!
+3. **Test end-to-end**:
+   - Submit test job with YAML config
+   - Verify command uses `--config` flag
+   - Test both normal and profiling modes
+   - Verify all flags from YAML are applied correctly

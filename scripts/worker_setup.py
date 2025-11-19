@@ -235,6 +235,13 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
         help="Enable torch profiling mode: use sglang.launch_server and skip --disaggregation-mode",
     )
 
+    parser.add_argument(
+        "--sglang-config-path",
+        type=str,
+        default=None,
+        help="Path to sglang_config.yaml for YAML-based configs (enables direct command execution)",
+    )
+
     return parser.parse_args(args)
 
 
@@ -307,24 +314,93 @@ def setup_env_vars_for_gpu_script(
         logging.info(f"Set DUMP_CONFIG_PATH: {dump_config_path}")
 
 
-def get_gpu_command(worker_type: str, gpu_type: str, script_variant: str) -> str:
-    """Generate command to run the appropriate GPU script.
+def build_sglang_command_from_yaml(worker_type: str, sglang_config_path: str) -> str:
+    """Build SGLang command using native YAML config support.
 
-    Scripts are organized as: scripts/{gpu_type}/{agg,disagg}/{script_variant}.sh
+    dynamo.sglang supports reading config from YAML:
+        python3 -m dynamo.sglang --config file.yaml --config-key prefill
+
+    This builds the command with:
+    - Python module (dynamo.sglang or sglang.launch_server)
+    - --config and --config-key flags to read YAML
+    - Coordination flags from environment (dist-init-addr, nnodes, node-rank)
+
+    Parallelism flags (ep-size, tp-size, dp-size) come from the YAML config itself.
+
+    Args:
+        worker_type: "prefill", "decode", or "aggregated"
+        sglang_config_path: Path to generated sglang_config.yaml
+
+    Returns:
+        Full command string ready to execute
     """
+    # Determine Python module based on profiling mode
+    use_profiling = os.environ.get("USE_SGLANG_LAUNCH_SERVER", "").lower() == "true"
+    python_module = "sglang.launch_server" if use_profiling else "dynamo.sglang"
+
+    # Get environment variables for coordination
+    host_ip = os.environ.get("HOST_IP_MACHINE")
+    port = os.environ.get("PORT")
+    total_nodes = os.environ.get("TOTAL_NODES")
+    rank = os.environ.get("RANK")
+
+    if not all([host_ip, port, total_nodes, rank]):
+        raise ValueError("Missing required environment variables for coordination (HOST_IP_MACHINE, PORT, TOTAL_NODES, RANK)")
+
+    # Build command parts - only add coordination flags
+    # All SGLang-specific flags (including ep-size, tp-size, dp-size) come from YAML
+    config_key = worker_type if worker_type != "aggregated" else "aggregated"
+
+    cmd_parts = [
+        f"python3 -m {python_module}",
+        f"--config {sglang_config_path}",
+        f"--config-key {config_key}",
+        f"--dist-init-addr {host_ip}:{port}",
+        f"--nnodes {total_nodes}",
+        f"--node-rank {rank}",
+    ]
+
+    return " ".join(cmd_parts)
+
+
+def get_gpu_command(worker_type: str, gpu_type: str, script_variant: str, sglang_config_path: str = None) -> str:
+    """Generate command to run SGLang worker.
+
+    For YAML configs (script_variant='max-tpt' with sglang_config_path provided):
+        Builds command directly from YAML config
+
+    For legacy configs:
+        Falls back to bash scripts in scripts/legacy/{gpu_type}/
+
+    Args:
+        worker_type: "prefill", "decode", or "aggregated"
+        gpu_type: e.g. "gb200-fp8", "h100-fp8"
+        script_variant: Legacy script name (e.g., "max-tpt")
+        sglang_config_path: Path to sglang_config.yaml (for YAML configs)
+
+    Returns:
+        Command string to execute
+    """
+    # If YAML config path provided, use direct command execution
+    if sglang_config_path and os.path.exists(sglang_config_path):
+        logging.info(f"Building command from YAML config: {sglang_config_path}")
+        return build_sglang_command_from_yaml(worker_type, sglang_config_path)
+
+    # Otherwise, fall back to legacy bash scripts
+    logging.info(f"Using legacy script variant: {script_variant}")
     script_base = Path(__file__).parent
     script_name = f"{script_variant}.sh"
 
     if worker_type == "aggregated":
         # Remove any -prefill or -decode suffix if present
         base_gpu_type = gpu_type.replace("-prefill", "").replace("-decode", "")
-        script_path = script_base / base_gpu_type / "agg" / script_name
+        script_path = script_base / "legacy" / base_gpu_type / "agg" / script_name
         if not script_path.exists():
             raise ValueError(f"Aggregated GPU script not found: {script_path}")
         return f"bash {script_path}"
     else:
-        # Disaggregated mode: scripts/{gpu_type}/disagg/{script_variant}.sh {prefill|decode}
-        script_path = script_base / gpu_type / "disagg" / script_name
+        # Disaggregated mode: scripts/legacy/{gpu_type}/disagg/{script_variant}.sh {prefill|decode}
+        script_path = script_base / "legacy" / gpu_type / "disagg" / script_name
         if not script_path.exists():
             raise ValueError(f"Disaggregated GPU script not found: {script_path}")
         mode = worker_type  # "prefill" or "decode"
@@ -412,6 +488,7 @@ def setup_prefill_worker(
     dump_config_path: str | None = None,
     use_dynamo_whls: bool = False,
     sglang_torch_profiler: bool = False,
+    sglang_config_path: str | None = None,
 ) -> int:
     """
     Setup the prefill worker.
@@ -438,8 +515,8 @@ def setup_prefill_worker(
         worker_type="prefill",
     )
 
-    # Use appropriate GPU script instead of generating command directly
-    cmd_to_run = get_gpu_command("prefill", gpu_type, script_variant)
+    # Build command from YAML config or use legacy script
+    cmd_to_run = get_gpu_command("prefill", gpu_type, script_variant, sglang_config_path)
     return run_command(cmd_to_run)
 
 
@@ -456,6 +533,7 @@ def setup_decode_worker(
     dump_config_path: str | None = None,
     use_dynamo_whls: bool = False,
     sglang_torch_profiler: bool = False,
+    sglang_config_path: str | None = None,
 ) -> int:
     """
     Setup the decode worker.
@@ -479,8 +557,8 @@ def setup_decode_worker(
         worker_type="decode",
     )
 
-    # Use appropriate GPU script instead of generating command directly
-    cmd_to_run = get_gpu_command("decode", gpu_type, script_variant)
+    # Build command from YAML config or use legacy script
+    cmd_to_run = get_gpu_command("decode", gpu_type, script_variant, sglang_config_path)
     return run_command(cmd_to_run)
 
 
@@ -497,6 +575,7 @@ def setup_aggregated_worker(
     dump_config_path: str | None = None,
     use_dynamo_whls: bool = False,
     sglang_torch_profiler: bool = False,
+    sglang_config_path: str | None = None,
 ) -> int:
     """
     Setup the aggregated worker.
@@ -524,8 +603,8 @@ def setup_aggregated_worker(
         worker_type="aggregated",
     )
 
-    # Use appropriate aggregated GPU script
-    cmd_to_run = get_gpu_command("aggregated", gpu_type, script_variant)
+    # Build command from YAML config or use legacy script
+    cmd_to_run = get_gpu_command("aggregated", gpu_type, script_variant, sglang_config_path)
     return run_command(cmd_to_run)
 
 
@@ -582,6 +661,7 @@ def main(input_args: list[str] | None = None):
             args.dump_config_path,
             args.use_dynamo_whls,
             args.sglang_torch_profiler,
+            args.sglang_config_path,
         )
     elif args.worker_type == "decode":
         setup_decode_worker(
@@ -597,6 +677,7 @@ def main(input_args: list[str] | None = None):
             args.dump_config_path,
             args.use_dynamo_whls,
             args.sglang_torch_profiler,
+            args.sglang_config_path,
         )
     elif args.worker_type == "aggregated":
         setup_aggregated_worker(
@@ -612,6 +693,7 @@ def main(input_args: list[str] | None = None):
             args.dump_config_path,
             args.use_dynamo_whls,
             args.sglang_torch_profiler,
+            args.sglang_config_path,
         )
 
     logging.info(f"{args.worker_type.capitalize()} worker setup complete")
