@@ -78,6 +78,7 @@ def wait_for_etcd(etcd_url: str, max_retries: int = 1000) -> bool:
 
         logging.info(f"Etcd not ready yet, retrying in 2 seconds... (attempt {attempt + 1}/{max_retries})")
         import time
+
         time.sleep(2)
 
     return False

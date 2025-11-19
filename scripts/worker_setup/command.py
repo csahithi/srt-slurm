@@ -74,11 +74,7 @@ def install_dynamo_wheels(gpu_type: str) -> None:
     # Install runtime wheel
     runtime_whl = f"/configs/ai_dynamo_runtime-0.6.1-cp310-abi3-manylinux_2_28_{arch}.whl"
     logging.info(f"Installing {runtime_whl}")
-    result = subprocess.run(
-        ["python3", "-m", "pip", "install", runtime_whl],
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(["python3", "-m", "pip", "install", runtime_whl], capture_output=True, text=True)
     if result.returncode != 0:
         logging.error(f"Failed to install runtime wheel: {result.stderr}")
         raise RuntimeError(f"Failed to install {runtime_whl}")
@@ -86,11 +82,7 @@ def install_dynamo_wheels(gpu_type: str) -> None:
     # Install dynamo wheel
     dynamo_whl = "/configs/ai_dynamo-0.6.1-py3-none-any.whl"
     logging.info(f"Installing {dynamo_whl}")
-    result = subprocess.run(
-        ["python3", "-m", "pip", "install", dynamo_whl],
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(["python3", "-m", "pip", "install", dynamo_whl], capture_output=True, text=True)
     if result.returncode != 0:
         logging.error(f"Failed to install dynamo wheel: {result.stderr}")
         raise RuntimeError(f"Failed to install {dynamo_whl}")
