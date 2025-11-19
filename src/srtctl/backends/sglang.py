@@ -95,8 +95,12 @@ class SGLangBackend(Backend):
         for key, val in env_vars.items():
             lines.append(f"{key}={val} \\")
 
-        # Python command
-        lines.append("python3 -m dynamo.sglang \\")
+        # Python command - use sglang.launch_server for profiling, dynamo.sglang otherwise
+        is_profiling = self.backend_config.get("enable_profiling", False)
+        if is_profiling:
+            lines.append("python3 -m sglang.launch_server \\")
+        else:
+            lines.append("python3 -m dynamo.sglang \\")
 
         # Inline all SGLang flags from config file
         if config_path:
@@ -123,10 +127,15 @@ class SGLangBackend(Backend):
             List of flag strings with backslash continuations
         """
         lines = []
+        is_profiling = self.backend_config.get("enable_profiling", False)
 
         for key, value in sorted(config.items()):
             # Convert underscores to hyphens
             flag_name = key.replace("_", "-")
+
+            # Skip disaggregation-mode flag when profiling (sglang.launch_server doesn't accept it)
+            if is_profiling and flag_name == "disaggregation-mode":
+                continue
 
             if isinstance(value, bool):
                 if value:
