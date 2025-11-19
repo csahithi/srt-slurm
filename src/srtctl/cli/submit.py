@@ -325,7 +325,9 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
         config_path: Path to sweep YAML config
         dry_run: If True, don't submit to SLURM, just validate and save artifacts
     """
-    sweep_config = load_config(config_path)
+    # Load YAML directly without validation (sweep configs have extra 'sweep' field)
+    with open(config_path) as f:
+        sweep_config = yaml.load(f, Loader=yaml.FullLoader)
 
     # Generate all configs
     configs = generate_sweep_configs(sweep_config)
