@@ -67,9 +67,9 @@ def validate_config(config: dict) -> list[str]:
             is_aggregated = 'agg_nodes' in config.get('resources', {})
 
             if is_aggregated:
-                # Aggregated needs 'shared' or 'aggregated' section
-                if 'shared' not in sglang_cfg and 'aggregated' not in sglang_cfg:
-                    errors.append("Aggregated mode requires backend.sglang_config.shared or backend.sglang_config.aggregated")
+                # Aggregated needs 'aggregated' section
+                if 'aggregated' not in sglang_cfg:
+                    errors.append("Aggregated mode requires backend.sglang_config.aggregated")
             else:
                 # Disaggregated needs prefill and decode sections
                 for mode in ['prefill', 'decode']:

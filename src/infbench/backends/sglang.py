@@ -53,14 +53,12 @@ def generate_sglang_config_file(user_config: dict, params: dict = None) -> Path:
         sglang_cfg = expand_template(sglang_cfg, params)
         logging.info(f"Expanded config with params: {params}")
 
-    # Merge shared config into prefill/decode
-    shared = sglang_cfg.get('shared', {})
+    # No more merging - just use prefill and decode directly
     result = {}
 
     for mode in ['prefill', 'decode']:
         if mode in sglang_cfg:
-            # Merge: shared + mode-specific (mode-specific wins on conflicts)
-            result[mode] = {**shared, **sglang_cfg[mode]}
+            result[mode] = sglang_cfg[mode]
 
     # Write to temp file
     fd, temp_path = tempfile.mkstemp(suffix='.yaml', prefix='sglang_config_')
@@ -86,15 +84,12 @@ def render_sglang_command(config: dict, sglang_config_path: Path, mode: str = "p
     backend = config.get('backend', {})
     resources = config.get('resources', {})
 
-    # Environment variables
+    # Environment variables - mode-specific
     env_vars = []
-    if 'environment' in backend:
-        for key, val in backend['environment'].items():
-            env_vars.append(f"{key}={val}")
+    env_key = f'{mode}_environment'  # prefill_environment or decode_environment
 
-    # Add decode-specific env vars if in decode mode
-    if mode == "decode" and 'decode_environment' in backend:
-        for key, val in backend['decode_environment'].items():
+    if env_key in backend:
+        for key, val in backend[env_key].items():
             env_vars.append(f"{key}={val}")
 
     # Build command

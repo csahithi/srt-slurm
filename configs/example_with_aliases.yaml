@@ -21,20 +21,30 @@ model:
 backend:
   type: "sglang"
 
-  environment:
+  # Prefill-specific environment variables
+  prefill_environment:
     PYTHONUNBUFFERED: "1"
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
+
+  # Decode-specific environment variables
+  decode_environment:
+    PYTHONUNBUFFERED: "1"
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
 
   sglang_config:
-    shared:
+    prefill:
+      # Explicit prefill config
       served_model_name: "deepseek-ai/DeepSeek-R1"
       model_path: "/model/"
       kv_cache_dtype: "fp8_e4m3"
-
-    prefill:
       disaggregation_mode: "prefill"
       mem_fraction_static: 0.84
 
     decode:
+      # Explicit decode config
+      served_model_name: "deepseek-ai/DeepSeek-R1"
+      model_path: "/model/"
+      kv_cache_dtype: "fp8_e4m3"
       disaggregation_mode: "decode"
       mem_fraction_static: 0.82
 

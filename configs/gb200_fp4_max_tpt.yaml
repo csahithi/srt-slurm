@@ -23,35 +23,49 @@ model:
 backend:
   type: "sglang"
 
-  environment:
-    # Shared environment variables
+  # Prefill-specific environment variables
+  prefill_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
-
-    # FP4/FP8 settings
     SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1"
     SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2: "1"
-
-    # Disaggregation settings
     SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
     SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
     SGLANG_HACK_SEQ_BOOTSTRAP_ROOM: "1"
-
-    # Mooncake/NCCL settings
     MC_TE_METRIC: "true"
     MC_FORCE_MNNVL: "1"
     NCCL_MNNVL_ENABLE: "1"
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
-
-    # Other settings
     SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
     SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
 
+  # Decode-specific environment variables
+  decode_environment:
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
+    PYTHONUNBUFFERED: "1"
+    DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
+    SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1"
+    SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2: "1"
+    SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
+    SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
+    SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
+    SGLANG_HACK_SEQ_BOOTSTRAP_ROOM: "1"
+    MC_TE_METRIC: "true"
+    MC_FORCE_MNNVL: "1"
+    NCCL_MNNVL_ENABLE: "1"
+    NCCL_CUMEM_ENABLE: "1"
+    SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
+    SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
+    SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
+    SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
+    SGLANG_CUTEDSL_MOE_NVFP4_DISPATCH: "1"
+    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
+
   sglang_config:
-    shared:
+    prefill:
       # Model configuration
       served_model_name: "deepseek-ai/DeepSeek-R1"
       model_path: "/model/"
@@ -69,7 +83,7 @@ backend:
       disable_radix_cache: true
       disable_chunked_prefix_cache: true
 
-      # Other shared flags
+      # Other flags
       host: "0.0.0.0"
       stream_interval: 50
       decode_log_interval: 1000
@@ -79,7 +93,6 @@ backend:
       eplb_algorithm: "deepseek"
       disaggregation_bootstrap_port: 30001
 
-    prefill:
       # Prefill-specific mode
       disaggregation_mode: "prefill"
 
@@ -96,12 +109,36 @@ backend:
       # Performance optimizations
       enable_single_batch_overlap: true
       disable_cuda_graph: true
-
-      # Parallelism settings (filled by submit script)
       enable_dp_attention: true
-      # ep_size, tp_size, dp_size set automatically based on resources
 
     decode:
+      # Model configuration
+      served_model_name: "deepseek-ai/DeepSeek-R1"
+      model_path: "/model/"
+      trust_remote_code: true
+
+      # KV cache and attention
+      kv_cache_dtype: "fp8_e4m3"
+      attention_backend: "trtllm_mla"
+
+      # Quantization
+      quantization: "modelopt_fp4"
+      moe_runner_backend: "flashinfer_cutedsl"
+
+      # Radix cache disabled
+      disable_radix_cache: true
+      disable_chunked_prefix_cache: true
+
+      # Other flags
+      host: "0.0.0.0"
+      stream_interval: 50
+      decode_log_interval: 1000
+      watchdog_timeout: 1000000
+      context_length: 2176
+      disable_shared_experts_fusion: true
+      eplb_algorithm: "deepseek"
+      disaggregation_bootstrap_port: 30001
+
       # Decode-specific mode
       disaggregation_mode: "decode"
 
@@ -128,15 +165,6 @@ backend:
       enable_dp_lm_head: true
       prefill_round_robin_balance: true
       enable_dp_attention: true
-
-      # Parallelism settings (filled by submit script)
-      # ep_size, tp_size, dp_size set automatically based on resources
-
-  # Decode-specific environment variables (appended during decode worker setup)
-  decode_environment:
-    SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
-    SGLANG_CUTEDSL_MOE_NVFP4_DISPATCH: "1"
-    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
 
 benchmark:
   type: "sa-bench"
