@@ -261,8 +261,8 @@ class SGLangBackend(Backend):
         if srtctl_root_setting:
             srtctl_root = Path(srtctl_root_setting)
         else:
-            # Fall back to default: ../srtctl relative to yaml-config directory
-            srtctl_root = yaml_config_root.parent / "srtctl"
+            # Fall back to default: current yaml-config directory (which contains scripts/)
+            srtctl_root = yaml_config_root
 
         log_dir_path = srtctl_root / "logs"
 
@@ -313,15 +313,15 @@ class SGLangBackend(Backend):
             # User specified srtctl_root in srtslurm.yaml
             template_path = Path(srtctl_root) / "scripts" / "templates" / template_name
         else:
-            # Fall back to default: ../srtctl relative to yaml-config directory
+            # Fall back to default: current yaml-config directory (which contains scripts/)
             yaml_config_root = Path(srtctl.__file__).parent.parent.parent
-            template_path = yaml_config_root.parent / "srtctl" / "scripts" / "templates" / template_name
+            template_path = yaml_config_root / "scripts" / "templates" / template_name
 
         if not template_path.exists():
             raise FileNotFoundError(
                 f"Template not found: {template_path}\n"
                 f"Set 'srtctl_root' in srtslurm.yaml to point to your srtctl repo.\n"
-                f"Example: srtctl_root: /path/to/srtctl"
+                f"Example: srtctl_root: /mnt/lustre01/users/slurm-shared/ishan/sweepr"
             )
 
         # Render template

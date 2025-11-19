@@ -208,9 +208,17 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
                 decode_workers = config["resources"]["decode_workers"]
                 log_dir_name = f"{job_id}_{prefill_workers}P_{decode_workers}D_{timestamp}"
 
-            # Create log directory in srtctl repo (parent of srtctl-yaml-config)
-            yaml_config_root = Path(__file__).parent.parent.parent.parent
-            srtctl_root = yaml_config_root.parent / "srtctl"
+            # Create log directory in srtctl repo
+            from srtctl.core.config import get_srtslurm_setting
+
+            srtctl_root_setting = get_srtslurm_setting("srtctl_root")
+            if srtctl_root_setting:
+                srtctl_root = Path(srtctl_root_setting)
+            else:
+                # Fall back to current yaml-config directory
+                yaml_config_root = Path(__file__).parent.parent.parent.parent
+                srtctl_root = yaml_config_root
+
             log_dir = srtctl_root / "logs" / log_dir_name
             log_dir.mkdir(parents=True, exist_ok=True)
 

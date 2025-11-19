@@ -89,7 +89,7 @@ setup:
 	else \
 		echo "Creating srtslurm.yaml with your cluster settings..."; \
 		echo ""; \
-		SRTCTL_ROOT=$$(cd .. && pwd); \
+		SRTCTL_ROOT=$$(pwd); \
 		echo "📍 Auto-detected srtctl root: $$SRTCTL_ROOT"; \
 		echo ""; \
 		read -p "Enter SLURM account [restricted]: " account; \
@@ -118,7 +118,7 @@ setup:
 		echo "network_interface: \"$$network\"" >> srtslurm.yaml; \
 		echo "" >> srtslurm.yaml; \
 		echo "# Path to srtctl repo root (where scripts/templates/ lives)" >> srtslurm.yaml; \
-		echo "# Auto-detected from parent directory" >> srtslurm.yaml; \
+		echo "# Auto-detected from current directory" >> srtslurm.yaml; \
 		echo "srtctl_root: \"$$SRTCTL_ROOT\"" >> srtslurm.yaml; \
 		echo "" >> srtslurm.yaml; \
 		if [ -n "$$container" ]; then \
