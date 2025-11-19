@@ -1,5 +1,5 @@
 # GB200 FP4 Max Throughput Configuration
-# Converted from slurm_runner/scripts/gb200-fp4/disagg/max-tpt.sh
+# Converted from scripts/gb200-fp4/disagg/max-tpt.sh
 # Reference: https://github.com/sgl-project/sglang/issues/10903 (low-prec decode setup)
 
 name: "gb200-fp4-max-tpt"

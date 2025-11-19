@@ -259,8 +259,8 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
     """
     # Import sweep logic from submit_yaml
     import sys
-    slurm_runner_path = Path(__file__).parent.parent.parent.parent / "slurm_runner"
-    sys.path.insert(0, str(slurm_runner_path))
+    scripts_path = Path(__file__).parent.parent.parent.parent / "scripts"
+    sys.path.insert(0, str(scripts_path))
 
     from submit_yaml import generate_sweep_configs
 

@@ -240,8 +240,8 @@ class SGLangBackend(Backend):
         yaml_config_root = Path(infbench.__file__).parent.parent.parent
         config_dir_path = yaml_config_root / "configs"
 
-        # Log directory - relative path from slurm_runner/ to infbench/logs
-        # Template will be run from slurm_runner/, so ../logs points to infbench/logs
+        # Log directory - relative path from scripts/ to infbench/logs
+        # Template will be run from scripts/, so ../logs points to infbench/logs
         infbench_root = yaml_config_root.parent / "infbench"
         log_dir_path = infbench_root / "logs"
 
@@ -275,7 +275,7 @@ class SGLangBackend(Backend):
             "timestamp": timestamp,
             "enable_config_dump": self.config.get('enable_config_dump', True),
             "use_dynamo_whls": True,
-            "log_dir_prefix": "../logs",  # Relative to slurm_runner/
+            "log_dir_prefix": "../logs",  # Relative to scripts/
             "sglang_torch_profiler": False,
         }
 
@@ -285,17 +285,17 @@ class SGLangBackend(Backend):
         else:
             template_name = "job_script_template_disagg.j2"
 
-        # Find template path - templates are in ../infbench/slurm_runner
+        # Find template path - templates are in ../infbench/scripts
         # relative to the infbench-yaml-config directory
         import infbench
         yaml_config_root = Path(infbench.__file__).parent.parent.parent
-        template_path = yaml_config_root.parent / "infbench" / "slurm_runner" / template_name
+        template_path = yaml_config_root.parent / "infbench" / "scripts" / template_name
 
         if not template_path.exists():
             raise FileNotFoundError(
                 f"Template not found: {template_path}\n"
                 f"Expected template at: {template_path}\n"
-                f"Make sure infbench repo with slurm_runner/ is at: {yaml_config_root.parent / 'infbench'}"
+                f"Make sure infbench repo with scripts/ is at: {yaml_config_root.parent / 'infbench'}"
             )
 
         # Render template

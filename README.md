@@ -20,7 +20,7 @@ This downloads dependencies (nats, etcd, dynamo wheels) and creates `srtslurm.ya
 In this example we submit a job with 1 prefill worker (taking up 1 node so 4 GPUs) and 1 decode worker (taking up 12 nodes so 48 GPUs) and run the `max-tpt.sh` script (which you can find in `scripts/gb200-fp4/disagg/max-tpt.sh`). After the model is loaded, we will automatically run the benchmarking script.
 
 ```bash
-cd slurm_runner
+cd scripts
 python3 submit_job_script.py \
   --model-dir /path/to/model \
   --gpu-type gb200-fp4 \
@@ -35,7 +35,7 @@ python3 submit_job_script.py \
 
 Logs saved to `logs/{JOB_ID}_{P}P_{D}D_{TIMESTAMP}/`
 
-See [slurm_runner/README.md](slurm_runner/README.md) for detailed options.
+See [scripts/README.md](scripts/README.md) for detailed options.
 
 ### 3. Analyze Results
 
@@ -110,7 +110,7 @@ Override any setting via CLI flags.
 infbench/
 ├── dashboard/           # Streamlit UI (modular tabs)
 ├── srtslurm/           # Core analysis library
-├── slurm_runner/       # SLURM job submission scripts
+├── scripts/       # SLURM job submission scripts
 ├── logs/               # Benchmark results
 ├── configs/            # Dynamo dependencies (nats, etcd, wheels)
 ├── tests/              # Unit tests
@@ -151,8 +151,8 @@ infbench/
 Dashboard auto-syncs missing runs on startup. Or manually:
 
 ```bash
-uv run python slurm_runner/scripts/sync_results.py pull-missing
-uv run python slurm_runner/scripts/sync_results.py list-remote
+uv run python scripts/scripts/sync_results.py pull-missing
+uv run python scripts/scripts/sync_results.py list-remote
 ```
 
 ## Development
@@ -169,4 +169,4 @@ make dashboard   # Launch dashboard
 - SLURM cluster with Pyxis (for container support)
 - GPU nodes (tested on GB200 NVL72)
 
-For detailed SLURM job submission docs, see [slurm_runner/README.md](slurm_runner/README.md).
+For detailed SLURM job submission docs, see [scripts/README.md](scripts/README.md).
