@@ -145,6 +145,7 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
     # Load config if needed
     if config is None:
         config = load_config(config_path)
+    # else: config already validated and expanded from sweep
 
     # Dry-run mode
     if dry_run:

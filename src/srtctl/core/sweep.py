@@ -83,6 +83,12 @@ def generate_sweep_configs(sweep_config: dict) -> list[tuple[dict, dict]]:
         param_str = "_".join(f"{k}{v}" for k, v in params.items())
         config["name"] = f"{sweep_config['name']}_{param_str}"
 
+        # Validate and apply defaults
+        from srtctl.core.schema import JobConfig
+
+        validated = JobConfig(**config)
+        config = validated.model_dump(mode="json", by_alias=False, exclude_none=False)
+
         configs.append((config, params))
 
     return configs
