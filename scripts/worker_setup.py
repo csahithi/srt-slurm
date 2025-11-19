@@ -196,7 +196,7 @@ def main(input_args: list[str] | None = None):
             raise ValueError("--nginx_config is required for nginx worker type")
         setup_nginx_worker(args.master_ip, args.nginx_config)
     elif args.worker_type == "frontend":
-        setup_frontend_worker(args.worker_idx, args.master_ip, args.gpu_type, args.use_dynamo_whls)
+        setup_frontend_worker(args.worker_idx, args.master_ip, args.gpu_type)
     elif args.worker_type == "prefill":
         setup_prefill_worker(
             args.worker_idx,
@@ -204,13 +204,9 @@ def main(input_args: list[str] | None = None):
             args.leader_ip,
             args.master_ip,
             args.nodes_per_worker,
-            args.gpus_per_node,
             args.gpu_type,
             args.script_variant,
             args.multiple_frontends_enabled,
-            args.use_init_locations,
-            args.dump_config_path,
-            args.use_dynamo_whls,
             args.sglang_torch_profiler,
             args.sglang_config_path,
         )
@@ -221,12 +217,8 @@ def main(input_args: list[str] | None = None):
             args.leader_ip,
             args.master_ip,
             args.nodes_per_worker,
-            args.gpus_per_node,
             args.gpu_type,
             args.script_variant,
-            args.use_init_locations,
-            args.dump_config_path,
-            args.use_dynamo_whls,
             args.sglang_torch_profiler,
             args.sglang_config_path,
         )
@@ -237,12 +229,9 @@ def main(input_args: list[str] | None = None):
             args.leader_ip,
             args.master_ip,
             args.nodes_per_worker,
-            args.gpus_per_node,
             args.gpu_type,
             args.script_variant,
             args.multiple_frontends_enabled,
-            args.dump_config_path,
-            args.use_dynamo_whls,
             args.sglang_torch_profiler,
             args.sglang_config_path,
         )

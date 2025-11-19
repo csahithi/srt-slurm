@@ -10,7 +10,15 @@ import subprocess
 from .utils import get_wheel_arch_from_gpu_type
 
 
-def build_sglang_command_from_yaml(worker_type: str, sglang_config_path: str) -> str:
+def build_sglang_command_from_yaml(
+    worker_type: str,
+    sglang_config_path: str,
+    host_ip: str,
+    port: int,
+    total_nodes: int,
+    rank: int,
+    use_profiling: bool = False,
+) -> str:
     """Build SGLang command using native YAML config support.
 
     dynamo.sglang supports reading config from YAML:
@@ -19,29 +27,24 @@ def build_sglang_command_from_yaml(worker_type: str, sglang_config_path: str) ->
     This builds the command with:
     - Python module (dynamo.sglang or sglang.launch_server)
     - --config and --config-key flags to read YAML
-    - Coordination flags from environment (dist-init-addr, nnodes, node-rank)
+    - Coordination flags (dist-init-addr, nnodes, node-rank)
 
     Parallelism flags (ep-size, tp-size, dp-size) come from the YAML config itself.
 
     Args:
         worker_type: "prefill", "decode", or "aggregated"
         sglang_config_path: Path to generated sglang_config.yaml
+        host_ip: Host IP for distributed coordination
+        port: Port for distributed coordination
+        total_nodes: Total number of nodes
+        rank: Node rank (0-indexed)
+        use_profiling: Whether to use sglang.launch_server (profiling mode)
 
     Returns:
         Full command string ready to execute
     """
     # Determine Python module based on profiling mode
-    use_profiling = os.environ.get("USE_SGLANG_LAUNCH_SERVER", "").lower() == "true"
     python_module = "sglang.launch_server" if use_profiling else "dynamo.sglang"
-
-    # Get environment variables for coordination
-    host_ip = os.environ.get("HOST_IP_MACHINE")
-    port = os.environ.get("PORT")
-    total_nodes = os.environ.get("TOTAL_NODES")
-    rank = os.environ.get("RANK")
-
-    if not all([host_ip, port, total_nodes, rank]):
-        raise ValueError("Missing required environment variables for coordination (HOST_IP_MACHINE, PORT, TOTAL_NODES, RANK)")
 
     # Build command parts - only add coordination flags
     # All SGLang-specific flags (including ep-size, tp-size, dp-size) come from YAML
@@ -60,16 +63,11 @@ def build_sglang_command_from_yaml(worker_type: str, sglang_config_path: str) ->
 
 
 def install_dynamo_wheels(gpu_type: str) -> None:
-    """Install dynamo wheels if needed.
+    """Install dynamo wheels.
 
     Args:
         gpu_type: GPU type to determine architecture (e.g., "gb200-fp8", "h100-fp8")
     """
-    use_dynamo_whls = os.environ.get("USE_DYNAMO_WHLS", "").lower() == "true"
-    if not use_dynamo_whls:
-        logging.info("Skipping dynamo wheel installation (USE_DYNAMO_WHLS not set)")
-        return
-
     arch = get_wheel_arch_from_gpu_type(gpu_type)
     logging.info(f"Installing dynamo wheels for architecture: {arch}")
 
@@ -100,12 +98,25 @@ def install_dynamo_wheels(gpu_type: str) -> None:
     logging.info("Successfully installed dynamo wheels")
 
 
-def get_gpu_command(worker_type: str, sglang_config_path: str) -> str:
+def get_gpu_command(
+    worker_type: str,
+    sglang_config_path: str,
+    host_ip: str,
+    port: int,
+    total_nodes: int,
+    rank: int,
+    use_profiling: bool = False,
+) -> str:
     """Generate command to run SGLang worker using YAML config.
 
     Args:
         worker_type: "prefill", "decode", or "aggregated"
         sglang_config_path: Path to sglang_config.yaml
+        host_ip: Host IP for distributed coordination
+        port: Port for distributed coordination
+        total_nodes: Total number of nodes
+        rank: Node rank (0-indexed)
+        use_profiling: Whether to use sglang.launch_server (profiling mode)
 
     Returns:
         Command string to execute
@@ -114,4 +125,6 @@ def get_gpu_command(worker_type: str, sglang_config_path: str) -> str:
         raise ValueError(f"SGLang config path required but not found: {sglang_config_path}")
 
     logging.info(f"Building command from YAML config: {sglang_config_path}")
-    return build_sglang_command_from_yaml(worker_type, sglang_config_path)
+    return build_sglang_command_from_yaml(
+        worker_type, sglang_config_path, host_ip, port, total_nodes, rank, use_profiling
+    )
