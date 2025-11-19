@@ -74,9 +74,7 @@ class NodeAnalyzer:
                     nodes.append(node)
                     parsed_successfully += 1
 
-        logger.info(
-            f"Parsed {parsed_successfully}/{total_err_files} prefill/decode .err files from {run_path}"
-        )
+        logger.info(f"Parsed {parsed_successfully}/{total_err_files} prefill/decode .err files from {run_path}")
 
         if total_err_files == 0:
             logger.warning(f"No prefill/decode .err files found in {run_path}")
@@ -102,8 +100,7 @@ class NodeAnalyzer:
         node_info = self._extract_node_info_from_filename(filepath)
         if not node_info:
             logger.warning(
-                f"Could not extract node info from filename: {filepath}. "
-                f"Expected format: <node>_<service>_<id>.err"
+                f"Could not extract node info from filename: {filepath}. " f"Expected format: <node>_<service>_<id>.err"
             )
             return None
 
@@ -201,10 +198,7 @@ class NodeAnalyzer:
                 f"Log format may have changed."
             )
 
-        logger.debug(
-            f"Parsed {filepath}: {len(batches)} batches, "
-            f"{len(memory_snapshots)} memory snapshots"
-        )
+        logger.debug(f"Parsed {filepath}: {len(batches)} batches, " f"{len(memory_snapshots)} memory snapshots")
 
         return NodeMetrics(
             node_info=node_info,
@@ -385,7 +379,7 @@ class NodeAnalyzer:
             batches = []
             if not batch_df.empty:
                 # Convert to dict records in bulk (much faster than iterrows)
-                batch_records = batch_df.to_dict('records')
+                batch_records = batch_df.to_dict("records")
                 for row in batch_records:
                     batch = BatchMetrics(
                         timestamp=row["timestamp"],
@@ -395,47 +389,29 @@ class NodeAnalyzer:
                         batch_type=row["batch_type"],
                         new_seq=int(row["new_seq"]) if pd.notna(row.get("new_seq")) else None,
                         new_token=int(row["new_token"]) if pd.notna(row.get("new_token")) else None,
-                        cached_token=(
-                            int(row["cached_token"]) if pd.notna(row.get("cached_token")) else None
-                        ),
-                        token_usage=row.get("token_usage")
-                        if pd.notna(row.get("token_usage"))
-                        else None,
-                        running_req=(
-                            int(row["running_req"]) if pd.notna(row.get("running_req")) else None
-                        ),
+                        cached_token=(int(row["cached_token"]) if pd.notna(row.get("cached_token")) else None),
+                        token_usage=row.get("token_usage") if pd.notna(row.get("token_usage")) else None,
+                        running_req=(int(row["running_req"]) if pd.notna(row.get("running_req")) else None),
                         queue_req=int(row["queue_req"]) if pd.notna(row.get("queue_req")) else None,
-                        prealloc_req=(
-                            int(row["prealloc_req"]) if pd.notna(row.get("prealloc_req")) else None
-                        ),
-                        inflight_req=(
-                            int(row["inflight_req"]) if pd.notna(row.get("inflight_req")) else None
-                        ),
-                        transfer_req=(
-                            int(row["transfer_req"]) if pd.notna(row.get("transfer_req")) else None
-                        ),
+                        prealloc_req=(int(row["prealloc_req"]) if pd.notna(row.get("prealloc_req")) else None),
+                        inflight_req=(int(row["inflight_req"]) if pd.notna(row.get("inflight_req")) else None),
+                        transfer_req=(int(row["transfer_req"]) if pd.notna(row.get("transfer_req")) else None),
                         preallocated_usage=(
-                            row.get("preallocated_usage")
-                            if pd.notna(row.get("preallocated_usage"))
-                            else None
+                            row.get("preallocated_usage") if pd.notna(row.get("preallocated_usage")) else None
                         ),
                         num_tokens=int(row["num_tokens"]) if pd.notna(row.get("num_tokens")) else None,
                         input_throughput=(
-                            row.get("input_throughput")
-                            if pd.notna(row.get("input_throughput"))
-                            else None
+                            row.get("input_throughput") if pd.notna(row.get("input_throughput")) else None
                         ),
-                        gen_throughput=(
-                            row.get("gen_throughput") if pd.notna(row.get("gen_throughput")) else None
-                        ),
+                        gen_throughput=(row.get("gen_throughput") if pd.notna(row.get("gen_throughput")) else None),
                     )
                     batches.append(batch)
 
-            # Reconstruct memory metrics using vectorized operations  
+            # Reconstruct memory metrics using vectorized operations
             memory_snapshots = []
             if not memory_df.empty:
                 # Convert to dict records in bulk (much faster than iterrows)
-                memory_records = memory_df.to_dict('records')
+                memory_records = memory_df.to_dict("records")
                 for row in memory_records:
                     mem = MemoryMetrics(
                         timestamp=row["timestamp"],
@@ -443,15 +419,9 @@ class NodeAnalyzer:
                         tp=int(row["tp"]) if pd.notna(row["tp"]) else 0,
                         ep=int(row["ep"]) if pd.notna(row["ep"]) else 0,
                         metric_type="memory",
-                        avail_mem_gb=(
-                            row.get("avail_mem_gb") if pd.notna(row.get("avail_mem_gb")) else None
-                        ),
-                        mem_usage_gb=(
-                            row.get("mem_usage_gb") if pd.notna(row.get("mem_usage_gb")) else None
-                        ),
-                        kv_cache_gb=(
-                            row.get("kv_cache_gb") if pd.notna(row.get("kv_cache_gb")) else None
-                        ),
+                        avail_mem_gb=(row.get("avail_mem_gb") if pd.notna(row.get("avail_mem_gb")) else None),
+                        mem_usage_gb=(row.get("mem_usage_gb") if pd.notna(row.get("mem_usage_gb")) else None),
+                        kv_cache_gb=(row.get("kv_cache_gb") if pd.notna(row.get("kv_cache_gb")) else None),
                         kv_tokens=int(row["kv_tokens"]) if pd.notna(row.get("kv_tokens")) else None,
                     )
                     memory_snapshots.append(mem)
@@ -471,9 +441,7 @@ class NodeAnalyzer:
 
     # Private helper methods
 
-    def _parse_dp_tp_ep_tag(
-        self, line: str
-    ) -> tuple[int | None, int | None, int | None, str | None]:
+    def _parse_dp_tp_ep_tag(self, line: str) -> tuple[int | None, int | None, int | None, str | None]:
         """Extract DP, TP, EP indices and timestamp from log line.
 
         Supports two formats:
@@ -487,9 +455,7 @@ class NodeAnalyzer:
             (dp, tp, ep, timestamp) or (None, None, None, None) if pattern not found
         """
         # Try full format first: DP0 TP0 EP0
-        match = re.search(
-            r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) DP(\d+) TP(\d+) EP(\d+)\]", line
-        )
+        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) DP(\d+) TP(\d+) EP(\d+)\]", line)
         if match:
             timestamp, dp, tp, ep = match.groups()
             return int(dp), int(tp), int(ep), timestamp
@@ -622,9 +588,7 @@ class NodeAnalyzer:
         Example: watchtower-navy-cn01_prefill_w0.err
         Returns: {'node': 'watchtower-navy-cn01', 'worker_type': 'prefill', 'worker_id': 'w0'}
         """
-        match = re.match(
-            r"([^_]+)_(prefill|decode|frontend)_([^.]+)\.err", os.path.basename(filename)
-        )
+        match = re.match(r"([^_]+)_(prefill|decode|frontend)_([^.]+)\.err", os.path.basename(filename))
         if match:
             return {
                 "node": match.group(1),
@@ -644,9 +608,11 @@ def get_node_label(node_data: dict) -> str:
     run_metadata = node_data.get("run_metadata", {})
 
     # Clean node name
-    node_name = node_info["node"].replace("watchtower-navy-", "").replace("watchtower-aqua-", "").replace("inkwell-copper-", "")
-    worker_type = node_info['worker_type'][0].lower()  # 'p' for prefill, 'd' for decode
-    worker_id = node_info['worker_id']
+    node_name = (
+        node_info["node"].replace("watchtower-navy-", "").replace("watchtower-aqua-", "").replace("inkwell-copper-", "")
+    )
+    worker_type = node_info["worker_type"][0].lower()  # 'p' for prefill, 'd' for decode
+    worker_id = node_info["worker_id"]
     node_short = f"{node_name}-{worker_type}-w{worker_id}"
 
     # If we have run metadata, use it for context
@@ -657,10 +623,10 @@ def get_node_label(node_data: dict) -> str:
         gpus_per_node = run_metadata.get("gpus_per_node", 0)
         prefill_nodes = run_metadata.get("prefill_nodes", 0)
         decode_nodes = run_metadata.get("decode_nodes", 0)
-        
+
         prefill_gpus = prefill_nodes * gpus_per_node
         decode_gpus = decode_nodes * gpus_per_node
-        
+
         # Format: id | xPyD | prefill_gpus/decode_gpus | node
         return f"{job_id} | {prefill_workers}P{decode_workers}D | {prefill_gpus}/{decode_gpus} | {node_short}"
     else:

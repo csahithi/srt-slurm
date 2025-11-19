@@ -61,22 +61,22 @@ class CloudSyncManager:
         """
         prefix = f"{self.prefix}{run_id}/"
         files = set()
-        
+
         try:
-            paginator = self.s3.get_paginator('list_objects_v2')
+            paginator = self.s3.get_paginator("list_objects_v2")
             for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
                 if "Contents" not in page:
                     continue
-                    
+
                 for obj in page["Contents"]:
                     s3_key = obj["Key"]
                     # Remove prefix and run_id to get relative path
-                    rel_path = s3_key[len(prefix):]
+                    rel_path = s3_key[len(prefix) :]
                     if rel_path:  # Skip directory markers
                         files.add(rel_path)
         except ClientError as e:
             logger.error(f"Failed to list remote files for {run_id}: {e}")
-            
+
         return files
 
     def push_run(self, run_dir: str, progress_callback=None, skip_existing=True) -> tuple[bool, int, int]:
@@ -121,10 +121,10 @@ class CloudSyncManager:
         uploaded = 0
         skipped = 0
         total = len(local_files)
-        
+
         for file_path, rel_path in local_files:
             s3_key = f"{self.prefix}{run_name}/{rel_path}"
-            
+
             # Check if file already exists remotely
             if skip_existing and rel_path in remote_files:
                 skipped += 1
@@ -148,7 +148,9 @@ class CloudSyncManager:
         logger.info(f"Successfully pushed {uploaded} files from {run_name} ({skipped} skipped)")
         return True, uploaded, skipped
 
-    def pull_run(self, run_id: str, local_dir: str, progress_callback=None, skip_existing=True) -> tuple[str | None, int, int]:
+    def pull_run(
+        self, run_id: str, local_dir: str, progress_callback=None, skip_existing=True
+    ) -> tuple[str | None, int, int]:
         """Download a single run from cloud storage.
 
         Args:
@@ -174,10 +176,10 @@ class CloudSyncManager:
         # Determine which files to download
         files_to_download = []
         skipped = 0
-        
+
         for rel_path in remote_files:
             local_file = run_path / rel_path
-            
+
             # Skip if exists locally
             if skip_existing and local_file.exists():
                 skipped += 1
@@ -195,7 +197,7 @@ class CloudSyncManager:
         # Download missing files
         downloaded = 0
         total = len(remote_files)
-        
+
         for rel_path in files_to_download:
             s3_key = f"{self.prefix}{run_id}/{rel_path}"
             local_file = run_path / rel_path
@@ -224,9 +226,7 @@ class CloudSyncManager:
         """
         try:
             # Use delimiter to get "directories" at the prefix level
-            response = self.s3.list_objects_v2(
-                Bucket=self.bucket, Prefix=self.prefix, Delimiter="/"
-            )
+            response = self.s3.list_objects_v2(Bucket=self.bucket, Prefix=self.prefix, Delimiter="/")
         except ClientError as e:
             logger.error(f"Failed to list remote runs: {e}")
             return []
@@ -271,15 +271,13 @@ class CloudSyncManager:
         runs_synced = 0
         total_downloaded = 0
         total_skipped = 0
-        
+
         for i, run_id in enumerate(remote_runs, 1):
             if progress_callback:
                 progress_callback(run_id, i, len(remote_runs), "syncing")
 
-            result_path, downloaded, skipped = self.pull_run(
-                run_id, local_dir, skip_existing=True
-            )
-            
+            result_path, downloaded, skipped = self.pull_run(run_id, local_dir, skip_existing=True)
+
             if result_path:
                 runs_synced += 1
                 total_downloaded += downloaded
@@ -322,7 +320,7 @@ class CloudSyncManager:
 
         # List all files for this run
         remote_files = self.list_remote_files(run_id)
-        
+
         if not remote_files:
             logger.warning(f"No files found for run {run_id}")
             return False, 0
@@ -332,17 +330,17 @@ class CloudSyncManager:
         # Delete all files
         deleted = 0
         total = len(remote_files)
-        
+
         for rel_path in remote_files:
             s3_key = f"{self.prefix}{run_id}/{rel_path}"
-            
+
             try:
                 self.s3.delete_object(Bucket=self.bucket, Key=s3_key)
                 deleted += 1
-                
+
                 if progress_callback:
                     progress_callback(deleted, total, rel_path)
-                
+
                 logger.debug(f"Deleted {rel_path}")
             except Exception as e:
                 logger.error(f"Failed to delete {rel_path}: {e}")
@@ -383,7 +381,7 @@ def load_cloud_config(config_path: str = "srtslurm.yaml") -> dict | None:
         Dict with cloud config, or None if file doesn't exist
     """
     import yaml
-    
+
     config_file = Path(config_path)
     if not config_file.exists():
         return None

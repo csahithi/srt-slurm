@@ -8,21 +8,21 @@ already exist on the destination, making it safe to run repeatedly.
 Usage Examples:
     # From logs directory
     cd logs
-    
+
     # Test connection and see what's in the bucket
     python -m srtslurm.sync_results test
     python -m srtslurm.sync_results list-remote
-    
+
     # Push all local runs (only uploads missing files)
     python -m srtslurm.sync_results push-all
-    
+
     # Pull missing runs (only downloads missing files)
     python -m srtslurm.sync_results pull-missing
-    
+
     # Push/pull specific run
     python -m srtslurm.sync_results push 3667_1P_1D_20251110_192145
     python -m srtslurm.sync_results pull 3667_1P_1D_20251110_192145
-    
+
     # Delete run from cloud (requires confirmation)
     python -m srtslurm.sync_results delete 3667_1P_1D_20251110_192145
     python -m srtslurm.sync_results delete 3667_1P_1D_20251110_192145 --force
@@ -55,12 +55,14 @@ logger = logging.getLogger(__name__)
 
 def progress_callback(current: int, total: int, filename: str, status: str = "processing"):
     """Progress callback for file operations.
-    
+
     Note: Uses print() for interactive progress display with carriage returns.
     This is intentional for CLI tools and doesn't work well with logging.
     """
     percentage = (current / total) * 100
-    status_icon = "✓" if status == "uploaded" else "⊙" if status == "skipped" else "↓" if status == "downloaded" else "→"
+    status_icon = (
+        "✓" if status == "uploaded" else "⊙" if status == "skipped" else "↓" if status == "downloaded" else "→"
+    )
     print(f"\r{status_icon} [{current}/{total}] ({percentage:.1f}%) {filename:<60}", end="", flush=True)
     if current == total:
         print()  # New line when done
@@ -68,7 +70,7 @@ def progress_callback(current: int, total: int, filename: str, status: str = "pr
 
 def sync_progress_callback(run_name: str, current: int, total: int, status: str = "syncing"):
     """Progress callback for sync operations.
-    
+
     Note: Uses print() for interactive progress display.
     """
     print(f"[{current}/{total}] Syncing {run_name}...")
@@ -120,7 +122,7 @@ def cmd_push_all(args, sync_manager):
     success_count = 0
     total_uploaded = 0
     total_skipped = 0
-    
+
     for i, run_dir in enumerate(run_dirs, 1):
         logger.info(f"\n[{i}/{len(run_dirs)}] Pushing {run_dir.name}...")
 
@@ -131,7 +133,7 @@ def cmd_push_all(args, sync_manager):
             total_skipped += skipped
             logger.info(f"  ✓ Success: {uploaded} uploaded, {skipped} skipped")
         else:
-            logger.error(f"  ✗ Failed")
+            logger.error("  ✗ Failed")
 
     logger.info(f"\nPushed {success_count}/{len(run_dirs)} runs: {total_uploaded} uploaded, {total_skipped} skipped")
     return 0 if success_count == len(run_dirs) else 1
@@ -159,9 +161,7 @@ def cmd_pull_missing(args, sync_manager):
     logs_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Syncing missing runs from cloud storage...")
-    runs_synced, files_downloaded, files_skipped = sync_manager.sync_missing_runs(
-        str(logs_dir), sync_progress_callback
-    )
+    runs_synced, files_downloaded, files_skipped = sync_manager.sync_missing_runs(str(logs_dir), sync_progress_callback)
 
     if files_downloaded > 0:
         logger.info(f"✓ Synced {runs_synced} run(s): {files_downloaded} downloaded, {files_skipped} skipped")
@@ -190,12 +190,12 @@ def cmd_list_remote(args, sync_manager):
 def cmd_delete(args, sync_manager):
     """Delete a run from cloud storage."""
     run_id = args.run_id
-    
+
     # Check if run exists
     if not sync_manager.run_exists_in_cloud(run_id):
         logger.error(f"Run {run_id} does not exist in cloud storage")
         return 1
-    
+
     # Confirm deletion unless --force is used
     if not args.force:
         logger.warning(f"⚠️  WARNING: This will permanently delete run {run_id} from cloud storage!")
@@ -203,10 +203,10 @@ def cmd_delete(args, sync_manager):
         if response != run_id:
             logger.info("Deletion cancelled")
             return 0
-    
+
     logger.info(f"Deleting {run_id} from cloud storage...")
     success, deleted = sync_manager.delete_run(run_id, progress_callback)
-    
+
     if success:
         logger.info(f"✓ Successfully deleted {deleted} files")
         return 0
@@ -229,9 +229,7 @@ def cmd_test(args, sync_manager):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Sync benchmark results with S3-compatible cloud storage"
-    )
+    parser = argparse.ArgumentParser(description="Sync benchmark results with S3-compatible cloud storage")
     parser.add_argument(
         "--config",
         default="srtslurm.yaml",
@@ -298,4 +296,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

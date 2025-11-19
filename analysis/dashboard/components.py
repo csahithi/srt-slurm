@@ -65,13 +65,13 @@ def sync_cloud_data(logs_dir):
 
         # Sync missing runs (only downloads files that don't exist locally)
         runs_synced, files_downloaded, files_skipped = sync_manager.sync_missing_runs(logs_dir)
-        
+
         # Log sync details
         if files_downloaded > 0:
             logger.info(f"Synced {runs_synced} runs: {files_downloaded} downloaded, {files_skipped} skipped")
         else:
             logger.info(f"All runs up to date ({files_skipped} files already present)")
-        
+
         return True, files_downloaded, None
     except Exception as e:
         logger.error(f"Failed to sync cloud data: {e}")
@@ -81,7 +81,7 @@ def sync_cloud_data(logs_dir):
 @st.cache_data
 def load_data(logs_dir):
     """Load and cache benchmark data.
-    
+
     Returns:
         Tuple of (runs_with_data, skipped_runs)
         - runs_with_data: List of BenchmarkRun objects with benchmark results
@@ -180,7 +180,7 @@ def get_default_logs_dir():
 def create_node_throughput_graph(node_metrics_list, group_by_dp=False, aggregate_all=False):
     """Create input throughput over time graph."""
     from analysis.srtlog.visualizations import create_node_metric_graph
-    
+
     return create_node_metric_graph(
         node_metrics_list,
         title="Input Throughput Over Time by Node",
@@ -196,7 +196,7 @@ def create_node_throughput_graph(node_metrics_list, group_by_dp=False, aggregate
 def create_kv_cache_utilization_graph(node_metrics_list, group_by_dp=False, aggregate_all=False):
     """Create KV cache utilization visualization."""
     from analysis.srtlog.visualizations import create_node_metric_graph
-    
+
     fig = create_node_metric_graph(
         node_metrics_list,
         title="KV Cache Utilization Over Time",
@@ -215,7 +215,7 @@ def create_kv_cache_utilization_graph(node_metrics_list, group_by_dp=False, aggr
 def create_queue_depth_graph(node_metrics_list, group_by_dp=False, aggregate_all=False):
     """Create queued requests visualization."""
     from analysis.srtlog.visualizations import create_node_metric_graph
-    
+
     fig = create_node_metric_graph(
         node_metrics_list,
         title="Queued Requests Over Time",
@@ -233,7 +233,7 @@ def create_queue_depth_graph(node_metrics_list, group_by_dp=False, aggregate_all
 def create_node_inflight_requests_graph(node_metrics_list, group_by_dp=False, aggregate_all=False):
     """Create inflight requests visualization."""
     from analysis.srtlog.visualizations import create_node_metric_graph
-    
+
     fig = create_node_metric_graph(
         node_metrics_list,
         title="Inflight Requests Over Time",
@@ -252,7 +252,7 @@ def create_node_inflight_requests_graph(node_metrics_list, group_by_dp=False, ag
 def create_decode_running_requests_graph(node_metrics_list, group_by_dp=False, aggregate_all=False):
     """Create running requests visualization for decode nodes."""
     from analysis.srtlog.visualizations import create_node_metric_graph
-    
+
     fig = create_node_metric_graph(
         node_metrics_list,
         title="Running Requests Over Time",
@@ -271,7 +271,7 @@ def create_decode_running_requests_graph(node_metrics_list, group_by_dp=False, a
 def create_decode_gen_throughput_graph(node_metrics_list, group_by_dp=False, aggregate_all=False):
     """Create generation throughput visualization for decode nodes."""
     from analysis.srtlog.visualizations import create_node_metric_graph
-    
+
     return create_node_metric_graph(
         node_metrics_list,
         title="Generation Throughput Over Time",
@@ -288,7 +288,7 @@ def create_decode_gen_throughput_graph(node_metrics_list, group_by_dp=False, agg
 def create_decode_transfer_req_graph(node_metrics_list, group_by_dp=False, aggregate_all=False):
     """Create transfer requests visualization for decode nodes."""
     from analysis.srtlog.visualizations import create_node_metric_graph
-    
+
     fig = create_node_metric_graph(
         node_metrics_list,
         title="Transfer Requests Over Time",
@@ -308,7 +308,7 @@ def create_decode_transfer_req_graph(node_metrics_list, group_by_dp=False, aggre
 def create_decode_prealloc_req_graph(node_metrics_list, group_by_dp=False, aggregate_all=False):
     """Create prealloc requests visualization for decode nodes."""
     from analysis.srtlog.visualizations import create_node_metric_graph
-    
+
     fig = create_node_metric_graph(
         node_metrics_list,
         title="Prealloc Requests Over Time",
@@ -328,13 +328,13 @@ def create_decode_prealloc_req_graph(node_metrics_list, group_by_dp=False, aggre
 def create_decode_disagg_stacked_graph(node_metrics_list, group_by_dp=False, aggregate_all=False):
     """Create stacked area chart for disaggregation request flow."""
     from analysis.srtlog.visualizations import create_stacked_metric_graph
-    
+
     metrics_config = [
         {"key": "prealloc_req", "name": "Prealloc Queue", "color": "rgba(99, 110, 250, 0.3)"},
         {"key": "transfer_req", "name": "Transfer Queue", "color": "rgba(239, 85, 59, 0.3)"},
         {"key": "running_req", "name": "Running", "color": "rgba(0, 204, 150, 0.3)"},
     ]
-    
+
     return create_stacked_metric_graph(
         node_metrics_list,
         title="Disaggregation Request Flow (Stacked)",
@@ -343,4 +343,3 @@ def create_decode_disagg_stacked_graph(node_metrics_list, group_by_dp=False, agg
         group_by_dp=group_by_dp,
         aggregate_all=aggregate_all,
     )
-

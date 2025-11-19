@@ -16,7 +16,6 @@ Usage:
 import argparse
 import json
 import logging
-import os
 import shutil
 import sys
 import yaml
@@ -41,7 +40,7 @@ class DryRunContext:
 
     def __init__(self, config: dict, job_name: str = None):
         self.config = config
-        self.job_name = job_name or config.get('name', 'dry-run')
+        self.job_name = job_name or config.get("name", "dry-run")
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.output_dir = None
         self.sglang_config_path = None
@@ -59,7 +58,7 @@ class DryRunContext:
     def save_config(self, config: dict) -> Path:
         """Save resolved config (with all defaults applied)"""
         config_path = self.output_dir / "config.yaml"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
         logging.info(f"  ✓ Saved resolved config: {config_path.name}")
         return config_path
@@ -92,7 +91,7 @@ class DryRunContext:
         content += backend.render_command(mode="decode", config_path=sglang_config_path)
         content += "\n"
 
-        with open(commands_path, 'w') as f:
+        with open(commands_path, "w") as f:
             f.write(content)
         commands_path.chmod(0o755)
         logging.info(f"  ✓ Saved rendered commands: {commands_path.name}")
@@ -109,27 +108,27 @@ class DryRunContext:
         }
 
         metadata_path = self.output_dir / "metadata.json"
-        with open(metadata_path, 'w') as f:
+        with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
         logging.info(f"  ✓ Saved metadata: {metadata_path.name}")
         return metadata_path
 
     def print_summary(self):
         """Print summary of what would be submitted"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("🔍 DRY-RUN SUMMARY")
-        print("="*60)
+        print("=" * 60)
         print(f"\nJob Name: {self.job_name}")
         print(f"Output Directory: {self.output_dir}")
-        print(f"\nGenerated Files:")
-        print(f"  - config.yaml          (resolved config with defaults)")
+        print("\nGenerated Files:")
+        print("  - config.yaml          (resolved config with defaults)")
         if self.sglang_config_path:
-            print(f"  - sglang_config.yaml   (SGLang flags)")
-        print(f"  - commands.sh          (full bash commands)")
-        print(f"  - metadata.json        (submission info)")
-        print(f"\nTo see what commands would run:")
+            print("  - sglang_config.yaml   (SGLang flags)")
+        print("  - commands.sh          (full bash commands)")
+        print("  - metadata.json        (submission info)")
+        print("\nTo see what commands would run:")
         print(f"  cat {self.output_dir}/commands.sh")
-        print("\n" + "="*60 + "\n")
+        print("\n" + "=" * 60 + "\n")
 
 
 def submit_single(config_path: Path = None, config: dict = None, dry_run: bool = False):
@@ -155,8 +154,8 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
         ctx.save_config(config)
 
         # Create backend instance
-        backend_type = config.get('backend', {}).get('type')
-        if backend_type == 'sglang':
+        backend_type = config.get("backend", {}).get("type")
+        if backend_type == "sglang":
             backend = SGLangBackend(config)
             sglang_config_path = backend.generate_config_file()
             ctx.save_sglang_config(sglang_config_path)
@@ -179,8 +178,8 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
     logging.info(f"🚀 Submitting job: {config['name']}")
 
     # Create backend and generate config
-    backend_type = config.get('backend', {}).get('type')
-    if backend_type == 'sglang':
+    backend_type = config.get("backend", {}).get("type")
+    if backend_type == "sglang":
         backend = SGLangBackend(config)
         sglang_config_path = backend.generate_config_file()
 
@@ -190,31 +189,25 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         script_path, rendered_script = backend.generate_slurm_script(
-            config_path=sglang_config_path,
-            timestamp=timestamp
+            config_path=sglang_config_path, timestamp=timestamp
         )
 
         # Submit to SLURM
         try:
-            result = subprocess.run(
-                ["sbatch", str(script_path)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            result = subprocess.run(["sbatch", str(script_path)], capture_output=True, text=True, check=True)
 
             # Parse job ID from sbatch output
             job_id = result.stdout.strip().split()[-1]
             logging.info(f"✅ Job submitted successfully with ID: {job_id}")
 
             # Create log directory
-            is_aggregated = 'agg_nodes' in config.get('resources', {})
+            is_aggregated = "agg_nodes" in config.get("resources", {})
             if is_aggregated:
-                agg_workers = config['resources']['agg_workers']
+                agg_workers = config["resources"]["agg_workers"]
                 log_dir_name = f"{job_id}_{agg_workers}A_{timestamp}"
             else:
-                prefill_workers = config['resources']['prefill_workers']
-                decode_workers = config['resources']['decode_workers']
+                prefill_workers = config["resources"]["prefill_workers"]
+                decode_workers = config["resources"]["decode_workers"]
                 log_dir_name = f"{job_id}_{prefill_workers}P_{decode_workers}D_{timestamp}"
 
             # Create log directory in infbench repo (parent of infbench-yaml-config)
@@ -224,26 +217,29 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
             log_dir.mkdir(parents=True, exist_ok=True)
 
             # Save rendered script
-            with open(log_dir / "sbatch_script.sh", 'w') as f:
+            with open(log_dir / "sbatch_script.sh", "w") as f:
                 f.write(rendered_script)
 
             # Save config
             import yaml
-            with open(log_dir / "config.yaml", 'w') as f:
+
+            with open(log_dir / "config.yaml", "w") as f:
                 yaml.dump(config, f, default_flow_style=False)
 
             # Save SGLang config if present
             if sglang_config_path:
                 import shutil
+
                 shutil.copy(sglang_config_path, log_dir / "sglang_config.yaml")
 
             # Generate jobid.json metadata
             from datetime import datetime as dt
-            resources = config.get('resources', {})
-            backend_cfg = config.get('backend', {})
-            model = config.get('model', {})
-            slurm_cfg = config.get('slurm', {})
-            benchmark_cfg = config.get('benchmark', {})
+
+            resources = config.get("resources", {})
+            backend_cfg = config.get("backend", {})
+            model = config.get("model", {})
+            slurm_cfg = config.get("slurm", {})
+            benchmark_cfg = config.get("benchmark", {})
 
             metadata = {
                 "version": "1.0",
@@ -251,50 +247,56 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
                 "run_metadata": {
                     "slurm_job_id": job_id,
                     "run_date": timestamp,
-                    "job_name": config.get('name', 'unnamed'),
-                    "account": slurm_cfg.get('account'),
-                    "partition": slurm_cfg.get('partition'),
-                    "time_limit": slurm_cfg.get('time_limit'),
-                    "container": model.get('container'),
-                    "model_dir": model.get('path'),
-                    "gpus_per_node": resources.get('gpus_per_node'),
-                    "gpu_type": backend_cfg.get('gpu_type'),
+                    "job_name": config.get("name", "unnamed"),
+                    "account": slurm_cfg.get("account"),
+                    "partition": slurm_cfg.get("partition"),
+                    "time_limit": slurm_cfg.get("time_limit"),
+                    "container": model.get("container"),
+                    "model_dir": model.get("path"),
+                    "gpus_per_node": resources.get("gpus_per_node"),
+                    "gpu_type": backend_cfg.get("gpu_type"),
                     "mode": "aggregated" if is_aggregated else "disaggregated",
-                }
+                },
             }
 
             # Add mode-specific metadata
             if is_aggregated:
-                metadata["run_metadata"].update({
-                    "agg_nodes": resources.get('agg_nodes'),
-                    "agg_workers": resources.get('agg_workers'),
-                })
+                metadata["run_metadata"].update(
+                    {
+                        "agg_nodes": resources.get("agg_nodes"),
+                        "agg_workers": resources.get("agg_workers"),
+                    }
+                )
             else:
-                metadata["run_metadata"].update({
-                    "prefill_nodes": resources.get('prefill_nodes'),
-                    "decode_nodes": resources.get('decode_nodes'),
-                    "prefill_workers": resources.get('prefill_workers'),
-                    "decode_workers": resources.get('decode_workers'),
-                })
+                metadata["run_metadata"].update(
+                    {
+                        "prefill_nodes": resources.get("prefill_nodes"),
+                        "decode_nodes": resources.get("decode_nodes"),
+                        "prefill_workers": resources.get("prefill_workers"),
+                        "decode_workers": resources.get("decode_workers"),
+                    }
+                )
 
             # Add benchmark metadata if present
             if benchmark_cfg:
-                bench_type = benchmark_cfg.get('type', 'manual')
+                bench_type = benchmark_cfg.get("type", "manual")
                 profiler_metadata = {"type": bench_type}
 
-                if bench_type == 'sa-bench':
-                    concurrencies = benchmark_cfg.get('concurrencies', [])
+                if bench_type == "sa-bench":
+                    concurrencies = benchmark_cfg.get("concurrencies", [])
                     concurrency_str = "x".join(str(c) for c in concurrencies) if concurrencies else ""
-                    profiler_metadata.update({
-                        "isl": str(benchmark_cfg.get('isl', '')),
-                        "osl": str(benchmark_cfg.get('osl', '')),
-                        "concurrencies": concurrency_str,
-                        "req-rate": str(benchmark_cfg.get('req_rate', 'inf')),
-                    })
+                    profiler_metadata.update(
+                        {
+                            "isl": str(benchmark_cfg.get("isl", "")),
+                            "osl": str(benchmark_cfg.get("osl", "")),
+                            "concurrencies": concurrency_str,
+                            "req-rate": str(benchmark_cfg.get("req_rate", "inf")),
+                        }
+                    )
 
                 metadata["profiler_metadata"] = profiler_metadata
 
-            with open(log_dir / "jobid.json", 'w') as f:
+            with open(log_dir / "jobid.json", "w") as f:
                 json.dump(metadata, f, indent=2)
 
             logging.info(f"📁 Logs directory: {log_dir}")
@@ -319,6 +321,7 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
     """
     # Import sweep logic from submit_yaml
     import sys
+
     scripts_path = Path(__file__).parent.parent.parent.parent / "scripts"
     sys.path.insert(0, str(scripts_path))
 
@@ -340,7 +343,7 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
         logging.info(f"📁 Sweep directory: {sweep_dir}")
 
         # Save sweep config
-        with open(sweep_dir / "sweep_config.yaml", 'w') as f:
+        with open(sweep_dir / "sweep_config.yaml", "w") as f:
             yaml.dump(sweep_config, f, default_flow_style=False)
 
         # Generate each job
@@ -353,27 +356,28 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
             job_dir.mkdir(exist_ok=True)
 
             # Save config
-            with open(job_dir / "config.yaml", 'w') as f:
+            with open(job_dir / "config.yaml", "w") as f:
                 yaml.dump(config, f, default_flow_style=False)
 
             # Generate SGLang config
-            if config.get('backend', {}).get('type') == 'sglang':
-                sglang_config_path = generate_sglang_config_file(config, params)
+            if config.get("backend", {}).get("type") == "sglang":
+                backend = SGLangBackend(config)
+                sglang_config_path = backend.generate_config_file(params)
                 if sglang_config_path:
                     shutil.copy(sglang_config_path, job_dir / "sglang_config.yaml")
 
             logging.info(f"  ✓ Saved to: {job_dir.name}")
 
-        print("\n" + "="*60)
-        print(f"🔍 SWEEP DRY-RUN SUMMARY")
-        print("="*60)
+        print("\n" + "=" * 60)
+        print("🔍 SWEEP DRY-RUN SUMMARY")
+        print("=" * 60)
         print(f"\nSweep: {sweep_config['name']}")
         print(f"Jobs: {len(configs)}")
         print(f"Output: {sweep_dir}")
-        print(f"\nEach job directory contains:")
-        print(f"  - config.yaml (expanded config)")
-        print(f"  - sglang_config.yaml (if applicable)")
-        print("\n" + "="*60 + "\n")
+        print("\nEach job directory contains:")
+        print("  - config.yaml (expanded config)")
+        print("  - sglang_config.yaml (if applicable)")
+        print("\n" + "=" * 60 + "\n")
 
         return
 
@@ -403,27 +407,17 @@ Examples:
 
   # Dry-run sweep (generate all configs without submitting)
   srtctl sweep.yaml --sweep --dry-run
-        """
+        """,
     )
 
     # Primary argument: config file
-    parser.add_argument(
-        "config",
-        type=Path,
-        help="YAML config file"
-    )
+    parser.add_argument("config", type=Path, help="YAML config file")
 
     # Mode flags
-    parser.add_argument(
-        "--sweep",
-        action="store_true",
-        help="Treat as sweep config (multiple jobs)"
-    )
+    parser.add_argument("--sweep", action="store_true", help="Treat as sweep config (multiple jobs)")
 
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Validate and generate artifacts without submitting to SLURM"
+        "--dry-run", action="store_true", help="Validate and generate artifacts without submitting to SLURM"
     )
 
     args = parser.parse_args()

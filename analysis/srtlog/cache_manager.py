@@ -63,9 +63,7 @@ class CacheManager:
         for pattern in file_patterns:
             for file_path in self.run_dir.glob(pattern):
                 if file_path.is_file():
-                    hashes[str(file_path.relative_to(self.run_dir))] = self._get_file_hash(
-                        file_path
-                    )
+                    hashes[str(file_path.relative_to(self.run_dir))] = self._get_file_hash(file_path)
         return hashes
 
     def _load_metadata(self) -> dict[str, Any]:
@@ -117,9 +115,7 @@ class CacheManager:
 
         return current_hashes == cached_hashes
 
-    def save_to_cache(
-        self, cache_name: str, data: pd.DataFrame | list[dict], source_patterns: list[str]
-    ) -> None:
+    def save_to_cache(self, cache_name: str, data: pd.DataFrame | list[dict], source_patterns: list[str]) -> None:
         """Save data to parquet cache.
 
         Args:

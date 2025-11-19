@@ -10,7 +10,7 @@ from analysis.srtlog.visualizations import calculate_pareto_frontier, create_par
 
 def render(df: pd.DataFrame, selected_runs: list[str], run_legend_labels: dict, pareto_options: dict):
     """Render the Pareto frontier analysis tab.
-    
+
     Args:
         df: DataFrame with benchmark data
         selected_runs: List of run IDs
@@ -18,7 +18,7 @@ def render(df: pd.DataFrame, selected_runs: list[str], run_legend_labels: dict, 
         pareto_options: Dict with show_cutoff, cutoff_value, show_frontier
     """
     st.subheader("Pareto Frontier Analysis")
-    
+
     # Y-axis metric toggle
     y_axis_metric = st.radio(
         "Y-axis metric",
@@ -27,7 +27,7 @@ def render(df: pd.DataFrame, selected_runs: list[str], run_legend_labels: dict, 
         horizontal=True,
         help="Choose between decode throughput per GPU or total throughput per GPU (input + output)",
     )
-    
+
     if y_axis_metric == "Total TPS/GPU":
         st.markdown("""
         This graph shows the trade-off between **Total TPS/GPU** (input + output tokens/s per GPU) and
@@ -38,7 +38,7 @@ def render(df: pd.DataFrame, selected_runs: list[str], run_legend_labels: dict, 
         This graph shows the trade-off between **Output TPS/GPU** (decode tokens/s per GPU) and
         **Output TPS/User** (throughput per user).
         """)
-    
+
     pareto_fig = create_pareto_graph(
         df,
         selected_runs,
@@ -50,19 +50,19 @@ def render(df: pd.DataFrame, selected_runs: list[str], run_legend_labels: dict, 
     )
     pareto_fig.update_xaxes(showgrid=True)
     pareto_fig.update_yaxes(showgrid=True)
-    
+
     st.plotly_chart(pareto_fig, width="stretch", key="pareto_main")
-    
+
     # Debug info for frontier
     if pareto_options["show_frontier"]:
         frontier_points = calculate_pareto_frontier(df, y_axis_metric)
         st.caption(f"🔍 Debug: Frontier has {len(frontier_points)} points across {len(df)} total data points")
-        
+
         if len(frontier_points) > 0:
             with st.expander("View Frontier Points Details"):
                 frontier_df = pd.DataFrame(frontier_points, columns=["Output TPS/User", "Output TPS/GPU"])
                 st.dataframe(frontier_df, width="stretch")
-    
+
     # Data export button
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
@@ -73,7 +73,7 @@ def render(df: pd.DataFrame, selected_runs: list[str], run_legend_labels: dict, 
             mime="text/csv",
             width="stretch",
         )
-    
+
     # Metric calculation documentation
     st.divider()
     st.markdown("### 📊 Metric Calculations")
@@ -82,9 +82,7 @@ def render(df: pd.DataFrame, selected_runs: list[str], run_legend_labels: dict, 
 
     **Output TPS/GPU** (Throughput Efficiency):
     """)
-    st.latex(
-        r"\text{Output TPS/GPU} = \frac{\text{Total Output Throughput (tokens/s)}}{\text{Total Number of GPUs}}"
-    )
+    st.latex(r"\text{Output TPS/GPU} = \frac{\text{Total Output Throughput (tokens/s)}}{\text{Total Number of GPUs}}")
     st.markdown("""
     *This measures how efficiently each GPU is being utilized for token generation.*
 
@@ -95,4 +93,3 @@ def render(df: pd.DataFrame, selected_runs: list[str], run_legend_labels: dict, 
     *Where TPOT (Time Per Output Token) is the average time between consecutive output tokens.
     This represents the actual token generation rate experienced by each user, independent of concurrency.*
     """)
-

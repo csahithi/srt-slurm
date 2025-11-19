@@ -53,37 +53,37 @@ def resolve_config_with_defaults(user_config: dict, cluster_config: dict | None)
         return config
 
     # Apply SLURM defaults
-    slurm = config.setdefault('slurm', {})
-    if 'account' not in slurm and 'default_account' in cluster_config:
-        slurm['account'] = cluster_config['default_account']
+    slurm = config.setdefault("slurm", {})
+    if "account" not in slurm and "default_account" in cluster_config:
+        slurm["account"] = cluster_config["default_account"]
         logging.debug(f"Applied default account: {slurm['account']}")
 
-    if 'partition' not in slurm and 'default_partition' in cluster_config:
-        slurm['partition'] = cluster_config['default_partition']
+    if "partition" not in slurm and "default_partition" in cluster_config:
+        slurm["partition"] = cluster_config["default_partition"]
         logging.debug(f"Applied default partition: {slurm['partition']}")
 
-    if 'time_limit' not in slurm and 'default_time_limit' in cluster_config:
-        slurm['time_limit'] = cluster_config['default_time_limit']
+    if "time_limit" not in slurm and "default_time_limit" in cluster_config:
+        slurm["time_limit"] = cluster_config["default_time_limit"]
         logging.debug(f"Applied default time_limit: {slurm['time_limit']}")
 
     # Resolve model path alias
-    model = config.get('model', {})
-    model_path = model.get('path', '')
+    model = config.get("model", {})
+    model_path = model.get("path", "")
 
-    if 'model_paths' in cluster_config and model_path in cluster_config['model_paths']:
-        resolved_path = cluster_config['model_paths'][model_path]
-        model['path'] = resolved_path
+    if "model_paths" in cluster_config and model_path in cluster_config["model_paths"]:
+        resolved_path = cluster_config["model_paths"][model_path]
+        model["path"] = resolved_path
         logging.debug(f"Resolved model alias '{model_path}' -> '{resolved_path}'")
 
     # Resolve container alias
-    container = model.get('container', '')
+    container = model.get("container", "")
 
-    if 'containers' in cluster_config and container in cluster_config['containers']:
-        resolved_container = cluster_config['containers'][container]
-        model['container'] = resolved_container
+    if "containers" in cluster_config and container in cluster_config["containers"]:
+        resolved_container = cluster_config["containers"][container]
+        model["container"] = resolved_container
         logging.debug(f"Resolved container alias '{container}' -> '{resolved_container}'")
-    elif 'container' not in model and 'default_container' in cluster_config:
-        model['container'] = cluster_config['default_container']
+    elif "container" not in model and "default_container" in cluster_config:
+        model["container"] = cluster_config["default_container"]
         logging.debug(f"Applied default container: {model['container']}")
 
     return config
@@ -130,9 +130,7 @@ def load_config(path: Path) -> dict:
     # Validate
     errors = validate_config(config)
     if errors:
-        raise ValueError(
-            f"Invalid config in {path}:\n  " + "\n  ".join(errors)
-        )
+        raise ValueError(f"Invalid config in {path}:\n  " + "\n  ".join(errors))
 
     logging.info(f"Loaded config: {config['name']}")
     return config

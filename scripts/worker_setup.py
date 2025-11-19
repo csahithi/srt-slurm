@@ -97,18 +97,14 @@ def wait_for_etcd(etcd_url: str, max_retries: int = 1000) -> bool:
         except requests.exceptions.RequestException:
             pass
 
-        logging.info(
-            f"Etcd not ready yet, retrying in 2 seconds... (attempt {attempt + 1}/{max_retries})"
-        )
+        logging.info(f"Etcd not ready yet, retrying in 2 seconds... (attempt {attempt + 1}/{max_retries})")
         time.sleep(2)
 
     logging.error("Etcd failed to become ready within the timeout period")
     return False
 
 
-def run_command(
-    cmd: str, background: bool = False, shell: bool = True, stdout=None, stderr=None
-):
+def run_command(cmd: str, background: bool = False, shell: bool = True, stdout=None, stderr=None):
     """
     Run a command either in background or foreground.
 
@@ -246,9 +242,7 @@ def _validate_args(args: argparse.Namespace) -> None:
     """Validate command line arguments"""
     if args.worker_type in ["prefill", "decode"]:
         if args.worker_idx is None or args.worker_idx < 0:
-            raise ValueError(
-                "Worker index must be provided and non-negative for prefill/decode"
-            )
+            raise ValueError("Worker index must be provided and non-negative for prefill/decode")
 
     if args.worker_type in ["prefill", "decode"]:
         if args.local_rank is None or args.local_rank < 0:
@@ -313,9 +307,7 @@ def setup_env_vars_for_gpu_script(
         logging.info(f"Set DUMP_CONFIG_PATH: {dump_config_path}")
 
 
-def get_gpu_command(
-    worker_type: str, gpu_type: str, script_variant: str
-) -> str:
+def get_gpu_command(worker_type: str, gpu_type: str, script_variant: str) -> str:
     """Generate command to run the appropriate GPU script.
 
     Scripts are organized as: scripts/{gpu_type}/{agg,disagg}/{script_variant}.sh
@@ -344,9 +336,7 @@ def setup_head_prefill_node(prefill_host_ip: str, use_dynamo_whls: bool = False)
     Setup NATS, etcd, ingress, and http servers on the prefill host node.
     """
     if use_dynamo_whls:
-        logging.info(
-            f"Starting nats server on node {prefill_host_ip} (using /configs/nats-server)"
-        )
+        logging.info(f"Starting nats server on node {prefill_host_ip} (using /configs/nats-server)")
         nats_cmd = "/configs/nats-server -js"
     else:
         logging.info(f"Starting nats server on node {prefill_host_ip}")
@@ -357,9 +347,7 @@ def setup_head_prefill_node(prefill_host_ip: str, use_dynamo_whls: bool = False)
         raise RuntimeError("Failed to start nats-server")
 
     if use_dynamo_whls:
-        logging.info(
-            f"Starting etcd server on node {prefill_host_ip} (using /configs/etcd)"
-        )
+        logging.info(f"Starting etcd server on node {prefill_host_ip} (using /configs/etcd)")
         etcd_binary = "/configs/etcd"
     else:
         logging.info(f"Starting etcd server on node {prefill_host_ip}")
@@ -388,9 +376,7 @@ def setup_nginx_worker(master_ip: str, nginx_config: str) -> int:
     return run_command(nginx_cmd)
 
 
-def setup_frontend_worker(
-    worker_idx: int, master_ip: str, gpu_type: str, use_dynamo_whls: bool = False
-) -> int:
+def setup_frontend_worker(worker_idx: int, master_ip: str, gpu_type: str, use_dynamo_whls: bool = False) -> int:
     """Setup a frontend worker"""
     logging.info(f"Setting up frontend worker {worker_idx}")
 
@@ -520,9 +506,7 @@ def setup_aggregated_worker(
     if not multiple_frontends_enabled and worker_idx == 0 and local_rank == 0:
         setup_head_prefill_node(master_ip, use_dynamo_whls)
     else:
-        logging.info(
-            f"Setting up aggregated worker {worker_idx}, local rank {local_rank}"
-        )
+        logging.info(f"Setting up aggregated worker {worker_idx}, local rank {local_rank}")
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
             raise RuntimeError("Failed to connect to etcd")
 

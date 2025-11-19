@@ -216,11 +216,7 @@ def get_environment_variables(config: dict) -> dict:
     for key, value in env.items():
         if key.startswith("NCCL_"):
             categories["NCCL"][key] = value
-        elif (
-            key.startswith("SGLANG_")
-            or key == "DYN_SKIP_SGLANG_LOG_FORMATTING"
-            or key == "SGL_FORCE_SHUTDOWN"
-        ):
+        elif key.startswith("SGLANG_") or key == "DYN_SKIP_SGLANG_LOG_FORMATTING" or key == "SGL_FORCE_SHUTDOWN":
             categories["SGLANG"][key] = value
         elif key.startswith("CUDA_"):
             categories["CUDA"][key] = value
@@ -320,7 +316,7 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
         if cached_df is not None and not cached_df.empty:
             # Reconstruct data from cache
             explicit_flags = set(cached_df[cached_df["type"] == "flag"]["name"].tolist())
-            
+
             # Reconstruct services dict
             services: dict[str, list[str]] = {}
             service_rows = cached_df[cached_df["type"] == "service"]
@@ -330,10 +326,8 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
                 if node_name not in services:
                     services[node_name] = []
                 services[node_name].append(service_type)
-            
-            logger.info(
-                f"Loaded {len(explicit_flags)} flags and {len(services)} nodes from cache"
-            )
+
+            logger.info(f"Loaded {len(explicit_flags)} flags and {len(services)} nodes from cache")
             return {"explicit_flags": explicit_flags, "services": services}
 
     # Cache miss - parse from .err files
@@ -407,7 +401,7 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
     for node_name, service_types in services.items():
         for service_type in service_types:
             cache_rows.append({"type": "service", "name": service_type, "node_name": node_name})
-    
+
     if cache_rows:
         cache_df = pd.DataFrame(cache_rows)
         cache_mgr.save_to_cache("config_topology", cache_df, source_patterns)

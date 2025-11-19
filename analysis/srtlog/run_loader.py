@@ -54,12 +54,10 @@ class RunLoader:
 
         runs = []
         skipped = []
-        
-        for path in sorted(
-            paths, key=lambda p: self._extract_job_id(os.path.basename(p)), reverse=True
-        ):
+
+        for path in sorted(paths, key=lambda p: self._extract_job_id(os.path.basename(p)), reverse=True):
             run_dir = os.path.basename(path)
-            
+
             try:
                 run = BenchmarkRun.from_json_file(path)
                 if run is not None:
@@ -241,21 +239,35 @@ class RunLoader:
                     "mean_ttft_ms": cached_df["mean_ttft_ms"].tolist(),
                     "request_rate": cached_df["request_rate"].tolist(),
                 }
-                
+
                 # Optional fields (may not exist in old cache files)
                 optional_fields = [
-                    "mean_tpot_ms", "total_tps", "request_throughput", "request_goodput",
-                    "mean_e2el_ms", "median_ttft_ms", "median_tpot_ms", "median_itl_ms", 
-                    "median_e2el_ms", "p99_ttft_ms", "p99_tpot_ms", "p99_itl_ms", "p99_e2el_ms",
-                    "std_ttft_ms", "std_tpot_ms", "std_itl_ms", "std_e2el_ms",
-                    "total_input_tokens", "total_output_tokens"
+                    "mean_tpot_ms",
+                    "total_tps",
+                    "request_throughput",
+                    "request_goodput",
+                    "mean_e2el_ms",
+                    "median_ttft_ms",
+                    "median_tpot_ms",
+                    "median_itl_ms",
+                    "median_e2el_ms",
+                    "p99_ttft_ms",
+                    "p99_tpot_ms",
+                    "p99_itl_ms",
+                    "p99_e2el_ms",
+                    "std_ttft_ms",
+                    "std_tpot_ms",
+                    "std_itl_ms",
+                    "std_e2el_ms",
+                    "total_input_tokens",
+                    "total_output_tokens",
                 ]
                 for field in optional_fields:
                     if field in cached_df.columns:
                         results[field] = cached_df[field].tolist()
                     else:
                         results[field] = []
-                
+
                 run.profiler.add_benchmark_results(results)
                 return
 
@@ -279,11 +291,11 @@ class RunLoader:
                                 "mean_ttft_ms": results["mean_ttft_ms"],
                                 "request_rate": results["request_rate"],
                             }
-                            
+
                             # Add all optional fields if they have data
                             optional_fields = {
                                 "mean_tpot_ms": "mean_tpot_ms",
-                                "total_tps": "total_tps", 
+                                "total_tps": "total_tps",
                                 "request_throughput": "request_throughput",
                                 "request_goodput": "request_goodput",
                                 "mean_e2el_ms": "mean_e2el_ms",
@@ -302,7 +314,7 @@ class RunLoader:
                                 "total_input_tokens": "total_input_tokens",
                                 "total_output_tokens": "total_output_tokens",
                             }
-                            
+
                             for result_key, cache_key in optional_fields.items():
                                 if results.get(result_key):
                                     cache_data[cache_key] = results[result_key]
@@ -516,7 +528,9 @@ class RunLoader:
         rows = []
 
         for run in runs:
-            run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            run_id = (
+                f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            )
             total_gpus = run.total_gpus
 
             # Create a row for each concurrency level
@@ -526,12 +540,8 @@ class RunLoader:
                 tps_per_gpu = tps / total_gpus if total_gpus > 0 else 0
 
                 # Get total TPS (input + output tokens)
-                total_token_tps = (
-                    run.profiler.total_tps[i] if i < len(run.profiler.total_tps) else None
-                )
-                total_tps_per_gpu = (
-                    total_token_tps / total_gpus if total_token_tps and total_gpus > 0 else None
-                )
+                total_token_tps = run.profiler.total_tps[i] if i < len(run.profiler.total_tps) else None
+                total_tps_per_gpu = total_token_tps / total_gpus if total_token_tps and total_gpus > 0 else None
 
                 # Output TPS/User = 1000 / TPOT(ms)
                 tpot = run.profiler.mean_tpot_ms[i] if i < len(run.profiler.mean_tpot_ms) else None
@@ -550,30 +560,18 @@ class RunLoader:
                     "Frontends": run.metadata.num_additional_frontends,
                     "GPUs per Node": run.metadata.gpus_per_node,
                     "Total GPUs": total_gpus,
-                    "Request Rate": (
-                        run.profiler.request_rate[i]
-                        if i < len(run.profiler.request_rate)
-                        else "N/A"
-                    ),
+                    "Request Rate": (run.profiler.request_rate[i] if i < len(run.profiler.request_rate) else "N/A"),
                     "Concurrency": (
-                        run.profiler.concurrency_values[i]
-                        if i < len(run.profiler.concurrency_values)
-                        else "N/A"
+                        run.profiler.concurrency_values[i] if i < len(run.profiler.concurrency_values) else "N/A"
                     ),
                     "Output TPS": tps,
                     "Total TPS": total_token_tps if total_token_tps else "N/A",
                     "Output TPS/GPU": tps_per_gpu,
                     "Total TPS/GPU": total_tps_per_gpu if total_tps_per_gpu else "N/A",
                     "Output TPS/User": tps_per_user,
-                    "Mean TTFT (ms)": (
-                        run.profiler.mean_ttft_ms[i]
-                        if i < len(run.profiler.mean_ttft_ms)
-                        else "N/A"
-                    ),
+                    "Mean TTFT (ms)": (run.profiler.mean_ttft_ms[i] if i < len(run.profiler.mean_ttft_ms) else "N/A"),
                     "Mean TPOT (ms)": tpot if tpot else "N/A",
-                    "Mean ITL (ms)": (
-                        run.profiler.mean_itl_ms[i] if i < len(run.profiler.mean_itl_ms) else "N/A"
-                    ),
+                    "Mean ITL (ms)": (run.profiler.mean_itl_ms[i] if i < len(run.profiler.mean_itl_ms) else "N/A"),
                 }
                 rows.append(row)
 

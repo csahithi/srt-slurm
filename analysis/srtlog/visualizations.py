@@ -118,7 +118,7 @@ def aggregate_all_nodes(node_metrics_list: list[dict]) -> list[dict]:
 
         aggregated_node = {
             "node_info": {
-                "node": f"ALL",
+                "node": "ALL",
                 "worker_type": worker_type,
                 "worker_id": f"{node_count}nodes",
             },
@@ -317,9 +317,7 @@ def create_node_metric_graph(
                 trace_config["stackgroup"] = stackgroup
 
             trace_config["hovertemplate"] = (
-                f"<b>{label}</b><br>"
-                + "Time: %{x:.1f}s<br>"
-                + f"{y_label}: %{{y:.2f}}<extra></extra>"
+                f"<b>{label}</b><br>" + "Time: %{x:.1f}s<br>" + f"{y_label}: %{{y:.2f}}<extra></extra>"
             )
 
             fig.add_trace(go.Scatter(**trace_config))
@@ -659,10 +657,10 @@ def create_pareto_graph(
     colors = px.colors.qualitative.Set1
     for idx, run_id in enumerate(selected_runs):
         run_data = df[df["Run ID"] == run_id].copy()
-        
+
         # Filter out rows where y_metric is "N/A" (can't plot these)
         run_data = run_data[run_data[y_metric] != "N/A"]
-        
+
         if run_data.empty:
             continue  # Skip this run if no valid data
 
@@ -686,7 +684,7 @@ def create_pareto_graph(
             if val == "N/A" or val is None or (isinstance(val, float) and pd.isna(val)):
                 return "N/A"
             return f"{val:.2f}"
-        
+
         fig.add_trace(
             go.Scatter(
                 x=run_data["Output TPS/User"],

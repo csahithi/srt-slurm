@@ -92,4 +92,3 @@ def validate_cluster_settings(account, partition, network_interface, config_path
         raise ValueError(f"Missing required cluster settings: {', '.join(missing)}")
 
     return final_account, final_partition, final_network_interface
-

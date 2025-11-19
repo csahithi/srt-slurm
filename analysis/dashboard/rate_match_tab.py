@@ -12,7 +12,7 @@ from dashboard.components import load_node_metrics
 
 def render(filtered_runs: list, logs_dir: str):
     """Render rate match analysis.
-    
+
     Args:
         filtered_runs: List of BenchmarkRun objects
         logs_dir: Path to logs directory
@@ -21,36 +21,36 @@ def render(filtered_runs: list, logs_dir: str):
     st.markdown("""
     Compare prefill input rate vs decode generation rate to verify proper node ratio.
     """)
-    
+
     st.caption("""
     **What to look for:**
     - Lines should align when system is balanced
     - Decode rate consistently below prefill = decode bottleneck (need more decode nodes)
     - Decode rate above prefill = prefill bottleneck (decode nodes underutilized)
     """)
-    
+
     st.divider()
-    
+
     # Render each run in its own section
     for idx, run in enumerate(filtered_runs):
         run_path = run.metadata.path
-        
+
         # Load node metrics
         with st.spinner(f"Loading metrics for Job {run.job_id}..."):
             node_metrics = load_node_metrics(run_path)
-        
+
         if not node_metrics:
             st.error(f"No node metrics found for Job {run.job_id}")
             continue
-        
+
         # Split by type
         prefill_nodes = [n for n in node_metrics if n["node_info"]["worker_type"] == "prefill"]
         decode_nodes = [n for n in node_metrics if n["node_info"]["worker_type"] == "decode"]
-        
+
         # Show run details
         with st.expander(
             f"🔧 Job {run.job_id} - {run.metadata.prefill_workers}P{run.metadata.decode_workers}D ({run.metadata.formatted_date})",
-            expanded=len(filtered_runs) == 1
+            expanded=len(filtered_runs) == 1,
         ):
             col1, col2, col3, col4 = st.columns(4)
             with col1:
@@ -63,11 +63,11 @@ def render(filtered_runs: list, logs_dir: str):
                 st.metric("GPU Split", f"{prefill_gpus} / {decode_gpus}")
             with col4:
                 st.metric("ISL/OSL", f"{run.profiler.isl}/{run.profiler.osl}")
-            
+
             # Create rate match graph
             rate_fig = _create_rate_match_graph(prefill_nodes, decode_nodes, run.job_id)
             st.plotly_chart(rate_fig, width="stretch", key=f"rate_match_{run.job_id}")
-        
+
         # Add divider between runs except for the last one
         if idx < len(filtered_runs) - 1:
             st.divider()
@@ -76,9 +76,9 @@ def render(filtered_runs: list, logs_dir: str):
 def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id=""):
     """Create rate matching graph comparing prefill input vs decode generation."""
     rate_fig = go.Figure()
-    
+
     title_suffix = f" - Job {job_id}" if job_id else ""
-    
+
     # Get prefill input throughput over time
     if prefill_nodes:
         all_prefill_batches = {}
@@ -90,22 +90,19 @@ def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id=""):
                         if ts not in all_prefill_batches:
                             all_prefill_batches[ts] = []
                         all_prefill_batches[ts].append(batch["input_throughput"])
-        
+
         timestamps = []
         avg_input_tps = []
-        
+
         for ts in sorted(all_prefill_batches.keys()):
             avg = sum(all_prefill_batches[ts]) / len(all_prefill_batches[ts])
             timestamps.append(ts)
             avg_input_tps.append(avg)
-        
+
         if timestamps:
             first_time = datetime.strptime(timestamps[0], "%Y-%m-%d %H:%M:%S")
-            elapsed = [
-                (datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") - first_time).total_seconds()
-                for ts in timestamps
-            ]
-            
+            elapsed = [(datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") - first_time).total_seconds() for ts in timestamps]
+
             rate_fig.add_trace(
                 go.Scatter(
                     x=elapsed,
@@ -116,7 +113,7 @@ def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id=""):
                     marker={"size": 6},
                 )
             )
-    
+
     # Get decode gen throughput over time
     if decode_nodes:
         all_decode_batches = {}
@@ -128,22 +125,19 @@ def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id=""):
                         if ts not in all_decode_batches:
                             all_decode_batches[ts] = []
                         all_decode_batches[ts].append(batch["gen_throughput"])
-        
+
         timestamps = []
         avg_gen_tps = []
-        
+
         for ts in sorted(all_decode_batches.keys()):
             avg = sum(all_decode_batches[ts]) / len(all_decode_batches[ts])
             timestamps.append(ts)
             avg_gen_tps.append(avg)
-        
+
         if timestamps:
             first_time = datetime.strptime(timestamps[0], "%Y-%m-%d %H:%M:%S")
-            elapsed = [
-                (datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") - first_time).total_seconds()
-                for ts in timestamps
-            ]
-            
+            elapsed = [(datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") - first_time).total_seconds() for ts in timestamps]
+
             rate_fig.add_trace(
                 go.Scatter(
                     x=elapsed,
@@ -154,7 +148,7 @@ def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id=""):
                     marker={"size": 6},
                 )
             )
-    
+
     rate_fig.update_layout(
         title=f"Rate Match: Prefill Input vs Decode Generation{title_suffix}",
         xaxis_title="Time Elapsed (seconds)",
@@ -165,6 +159,5 @@ def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id=""):
     )
     rate_fig.update_xaxes(showgrid=True)
     rate_fig.update_yaxes(showgrid=True)
-    
-    return rate_fig
 
+    return rate_fig

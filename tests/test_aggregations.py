@@ -123,9 +123,7 @@ def test_batch_metrics_calculations():
     # Verify cache hit rate calculation
     assert batch_with_cache.new_token is not None
     assert batch_with_cache.cached_token is not None
-    expected_rate = (
-        batch_with_cache.cached_token / (batch_with_cache.new_token + batch_with_cache.cached_token)
-    ) * 100
+    expected_rate = (batch_with_cache.cached_token / (batch_with_cache.new_token + batch_with_cache.cached_token)) * 100
     assert batch_with_cache.cache_hit_rate == expected_rate
 
 

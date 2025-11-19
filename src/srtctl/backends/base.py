@@ -10,7 +10,6 @@ Defines a protocol for framework-specific implementations.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
 
 
 class Backend(ABC):
@@ -29,23 +28,23 @@ class Backend(ABC):
             config: Full user configuration dict
         """
         self.config = config
-        self.backend_config = config.get('backend', {})
-        self.resources = config.get('resources', {})
-        self.model = config.get('model', {})
-        self.slurm = config.get('slurm', {})
-    
+        self.backend_config = config.get("backend", {})
+        self.resources = config.get("resources", {})
+        self.model = config.get("model", {})
+        self.slurm = config.get("slurm", {})
+
     @abstractmethod
     def generate_config_file(self, params: dict = None) -> Path | None:
         """Generate backend-specific config file.
-        
+
         Args:
             params: Optional sweep parameters for template expansion
-            
+
         Returns:
             Path to generated config file, or None if not applicable
         """
         pass
-    
+
     @abstractmethod
     def render_command(self, mode: str, config_path: Path = None) -> str:
         """Render full command that would be executed.
@@ -81,9 +80,9 @@ class Backend(ABC):
         Returns:
             Dict of environment variable key-value pairs
         """
-        env_key = f'{mode}_environment'
+        env_key = f"{mode}_environment"
         return self.backend_config.get(env_key, {})
 
     def is_disaggregated(self) -> bool:
         """Check if running in disaggregated mode."""
-        return 'agg_nodes' not in self.resources
+        return "agg_nodes" not in self.resources

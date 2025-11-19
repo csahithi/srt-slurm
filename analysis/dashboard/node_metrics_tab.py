@@ -23,7 +23,7 @@ from analysis.srtlog.visualizations import aggregate_all_nodes, group_nodes_by_d
 
 def render(filtered_runs: list, logs_dir: str):
     """Render the node-level metrics tab.
-    
+
     Args:
         filtered_runs: List of BenchmarkRun objects
         logs_dir: Path to logs directory
@@ -32,13 +32,15 @@ def render(filtered_runs: list, logs_dir: str):
     st.markdown("""
     Runtime metrics extracted from log files, split by prefill and decode nodes.
     """)
-    
+
     # Parse log files for all selected runs (cached)
     all_node_metrics = []
     with st.spinner(f"Parsing logs for {len(filtered_runs)} run(s)..."):
         for run in filtered_runs:
             run_path = run.metadata.path
-            run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            run_id = (
+                f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            )
             if run_path and os.path.exists(run_path):
                 node_metrics = load_node_metrics(run_path)
                 for node_data in node_metrics:
@@ -57,18 +59,18 @@ def render(filtered_runs: list, logs_dir: str):
                         "gpu_type": run.metadata.gpu_type,
                     }
                 all_node_metrics.extend(node_metrics)
-    
+
     if not all_node_metrics:
         st.warning("No log files (.err) found for the selected runs.")
         st.info("Node metrics are extracted from files like `*_prefill_*.err` and `*_decode_*.err`")
         return
-    
+
     # Split by prefill vs decode
     prefill_nodes = [n for n in all_node_metrics if n["node_info"]["worker_type"] == "prefill"]
     decode_nodes = [n for n in all_node_metrics if n["node_info"]["worker_type"] == "decode"]
-    
+
     st.caption(f"📊 Found {len(prefill_nodes)} prefill nodes, {len(decode_nodes)} decode nodes")
-    
+
     # Add toggle for aggregation
     aggregation_mode = st.radio(
         "📊 Node Aggregation",
@@ -81,7 +83,7 @@ def render(filtered_runs: list, logs_dir: str):
         horizontal=True,
         help="Control how node metrics are displayed: individual lines, grouped by DP rank, or fully aggregated across all nodes.",
     )
-    
+
     # Pre-aggregate nodes ONCE to avoid recomputing for each graph
     if aggregation_mode == "Aggregate all nodes (single averaged line)":
         with st.spinner("Aggregating nodes..."):
@@ -99,12 +101,12 @@ def render(filtered_runs: list, logs_dir: str):
         # Individual nodes - no preprocessing
         group_by_dp = False
         aggregate_all = False
-    
+
     # Prefill Metrics Section
     if prefill_nodes:
         st.markdown("### 📤 Prefill Node Metrics")
         _render_prefill_metrics(prefill_nodes, group_by_dp, aggregate_all)
-    
+
     # Decode Metrics Section
     if decode_nodes:
         st.divider()
@@ -119,19 +121,23 @@ def _render_prefill_metrics(prefill_nodes, group_by_dp, aggregate_all):
     throughput_fig.update_yaxes(showgrid=True)
     st.plotly_chart(throughput_fig, width="stretch", key="prefill_throughput")
     st.caption("Shows prefill throughput in tokens/s - measures how fast the system processes input prompts")
-    
-    inflight_fig = create_node_inflight_requests_graph(prefill_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
+
+    inflight_fig = create_node_inflight_requests_graph(
+        prefill_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all
+    )
     inflight_fig.update_xaxes(showgrid=True)
     inflight_fig.update_yaxes(showgrid=True)
     st.plotly_chart(inflight_fig, width="stretch", key="prefill_inflight")
     st.caption("Requests that have been sent to decode workers in PD disaggregation mode")
-    
+
     kv_fig = create_kv_cache_utilization_graph(prefill_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
     kv_fig.update_xaxes(showgrid=True)
     kv_fig.update_yaxes(showgrid=True)
     st.plotly_chart(kv_fig, width="stretch", key="prefill_kv_util")
-    st.caption("Percentage of KV cache memory currently in use - helps tune max-total-tokens and identify memory pressure")
-    
+    st.caption(
+        "Percentage of KV cache memory currently in use - helps tune max-total-tokens and identify memory pressure"
+    )
+
     queue_fig = create_queue_depth_graph(prefill_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
     queue_fig.update_layout(title="PREFILL Queued Requests")
     queue_fig.update_xaxes(showgrid=True)
@@ -145,38 +151,46 @@ def _render_decode_metrics(decode_nodes, group_by_dp, aggregate_all):
     # Check if decode nodes have batch data
     has_data = any(node_data["prefill_batches"] for node_data in decode_nodes)
     if not has_data:
-        st.warning("⚠️ No batch metrics found for decode nodes. Decode nodes may not log batch-level metrics in the current setup.")
+        st.warning(
+            "⚠️ No batch metrics found for decode nodes. Decode nodes may not log batch-level metrics in the current setup."
+        )
         return
-    
-    running_fig = create_decode_running_requests_graph(decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
+
+    running_fig = create_decode_running_requests_graph(
+        decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all
+    )
     running_fig.update_xaxes(showgrid=True)
     running_fig.update_yaxes(showgrid=True)
     st.plotly_chart(running_fig, width="stretch", key="decode_running")
     st.caption("Number of requests currently being decoded and generating output tokens")
-    
+
     gen_fig = create_decode_gen_throughput_graph(decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
     gen_fig.update_xaxes(showgrid=True)
     gen_fig.update_yaxes(showgrid=True)
     st.plotly_chart(gen_fig, width="stretch", key="decode_gen_throughput")
     st.caption("Output token generation rate in tokens/s - measures decode performance")
-    
-    kv_decode_fig = create_kv_cache_utilization_graph(decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
+
+    kv_decode_fig = create_kv_cache_utilization_graph(
+        decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all
+    )
     kv_decode_fig.update_xaxes(showgrid=True)
     kv_decode_fig.update_yaxes(showgrid=True)
     st.plotly_chart(kv_decode_fig, width="stretch", key="decode_kv_util")
-    st.caption("Total KV cache tokens in use across all running requests - low indicates underutilization, high indicates risk of OOM")
-    
+    st.caption(
+        "Total KV cache tokens in use across all running requests - low indicates underutilization, high indicates risk of OOM"
+    )
+
     queue_decode_fig = create_queue_depth_graph(decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
     queue_decode_fig.update_layout(title="DECODE Queued Requests")
     queue_decode_fig.update_xaxes(showgrid=True)
     queue_decode_fig.update_yaxes(showgrid=True)
     st.plotly_chart(queue_decode_fig, width="stretch", key="decode_queue_v2")
     st.caption("Decode requests waiting in queue - indicates decode capacity constraints")
-    
+
     # Disaggregation metrics with toggle
     st.divider()
     st.markdown("#### Disaggregation Metrics")
-    
+
     disagg_view = st.radio(
         "View mode",
         options=["Stacked (Combined)", "Separate Graphs"],
@@ -184,24 +198,32 @@ def _render_decode_metrics(decode_nodes, group_by_dp, aggregate_all):
         horizontal=True,
         help="Stacked view shows request flow through stages. Separate graphs show individual metrics.",
     )
-    
+
     if disagg_view == "Stacked (Combined)":
-        stacked_fig = create_decode_disagg_stacked_graph(decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
+        stacked_fig = create_decode_disagg_stacked_graph(
+            decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all
+        )
         stacked_fig.update_xaxes(showgrid=True)
         stacked_fig.update_yaxes(showgrid=True)
         st.plotly_chart(stacked_fig, width="stretch", key="decode_disagg_stacked")
-        st.caption("Shows the request flow funnel: Prealloc Queue → Transfer Queue → Running requests in PD disaggregation")
+        st.caption(
+            "Shows the request flow funnel: Prealloc Queue → Transfer Queue → Running requests in PD disaggregation"
+        )
     else:
-        transfer_fig = create_decode_transfer_req_graph(decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
+        transfer_fig = create_decode_transfer_req_graph(
+            decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all
+        )
         transfer_fig.update_xaxes(showgrid=True)
         transfer_fig.update_yaxes(showgrid=True)
         st.plotly_chart(transfer_fig, width="stretch", key="decode_transfer")
         st.caption("Requests waiting for KV cache transfer from prefill to decode workers in PD disaggregation mode")
-        
-        prealloc_fig = create_decode_prealloc_req_graph(decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
+
+        prealloc_fig = create_decode_prealloc_req_graph(
+            decode_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all
+        )
         prealloc_fig.update_xaxes(showgrid=True)
         prealloc_fig.update_yaxes(showgrid=True)
         st.plotly_chart(prealloc_fig, width="stretch", key="decode_prealloc")
-        st.caption("Requests in pre-allocation queue for PD disaggregation - waiting for memory allocation on decode workers")
-
-
+        st.caption(
+            "Requests in pre-allocation queue for PD disaggregation - waiting for memory allocation on decode workers"
+        )
