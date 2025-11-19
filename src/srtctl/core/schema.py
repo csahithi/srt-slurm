@@ -150,7 +150,9 @@ class BenchmarkConfig(BaseModel):
     # SA-bench specific
     isl: Optional[int] = Field(None, description="Input sequence length")
     osl: Optional[int] = Field(None, description="Output sequence length")
-    concurrencies: Optional[list[int]] = Field(None, description="Concurrency levels to test")
+    concurrencies: Optional[list[int] | str] = Field(
+        None, description="Concurrency levels to test (list of ints or x-delimited string like '1x4x8')"
+    )
     req_rate: Optional[str] = Field("inf", description="Request rate")
 
 

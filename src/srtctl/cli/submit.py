@@ -286,7 +286,11 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
 
                 if bench_type == "sa-bench":
                     concurrencies = benchmark_cfg.get("concurrencies", [])
-                    concurrency_str = "x".join(str(c) for c in concurrencies) if concurrencies else ""
+                    # Handle both list and string formats
+                    if isinstance(concurrencies, list):
+                        concurrency_str = "x".join(str(c) for c in concurrencies) if concurrencies else ""
+                    else:
+                        concurrency_str = str(concurrencies) if concurrencies else ""
                     profiler_metadata.update(
                         {
                             "isl": str(benchmark_cfg.get("isl", "")),
