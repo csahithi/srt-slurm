@@ -17,6 +17,7 @@ import argparse
 import json
 import logging
 import shutil
+import subprocess
 import sys
 import yaml
 from datetime import datetime
@@ -184,9 +185,6 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
         sglang_config_path = backend.generate_config_file()
 
         # Generate SLURM job script using backend
-        import subprocess
-        from datetime import datetime
-
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         script_path, rendered_script = backend.generate_slurm_script(
             config_path=sglang_config_path, timestamp=timestamp
@@ -221,19 +219,14 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
                 f.write(rendered_script)
 
             # Save config
-            import yaml
-
             with open(log_dir / "config.yaml", "w") as f:
                 yaml.dump(config, f, default_flow_style=False)
 
             # Save SGLang config if present
             if sglang_config_path:
-                import shutil
-
                 shutil.copy(sglang_config_path, log_dir / "sglang_config.yaml")
 
             # Generate jobid.json metadata
-            from datetime import datetime as dt
 
             resources = config.get("resources", {})
             backend_cfg = config.get("backend", {})
@@ -243,7 +236,7 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
 
             metadata = {
                 "version": "1.0",
-                "generated_at": dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "run_metadata": {
                     "slurm_job_id": job_id,
                     "run_date": timestamp,
@@ -320,12 +313,10 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
         dry_run: If True, don't submit to SLURM, just validate and save artifacts
     """
     # Import sweep logic from submit_yaml
-    import sys
-
     scripts_path = Path(__file__).parent.parent.parent.parent / "scripts"
     sys.path.insert(0, str(scripts_path))
 
-    from submit_yaml import generate_sweep_configs
+    from submit_yaml import generate_sweep_configs  # noqa: E402 - dynamic import from scripts/
 
     sweep_config = load_config(config_path)
 

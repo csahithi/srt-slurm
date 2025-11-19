@@ -15,6 +15,9 @@ from jinja2 import Template
 from pathlib import Path
 from typing import Any
 
+import srtctl
+from srtctl.core.config import get_srtslurm_setting
+
 from .base import Backend
 
 
@@ -206,8 +209,6 @@ class SGLangBackend(Backend):
         time_limit = self.slurm.get("time_limit", "01:00:00")
 
         # Get resource settings from srtslurm.yaml if available
-        from srtctl.core.config import get_srtslurm_setting
-
         gpus_per_node = get_srtslurm_setting("gpus_per_node", self.resources.get("gpus_per_node"))
         network_interface = get_srtslurm_setting("network_interface", None)
 
@@ -239,8 +240,6 @@ class SGLangBackend(Backend):
 
         # Config directory should point to where deepep_config.json lives
         # This is typically the configs/ directory in the yaml-config repo
-        import srtctl
-
         yaml_config_root = Path(srtctl.__file__).parent.parent.parent
         config_dir_path = yaml_config_root / "configs"
 
@@ -291,8 +290,6 @@ class SGLangBackend(Backend):
 
         # Find template path - templates are in ../infbench/scripts/templates
         # relative to the infbench-yaml-config directory
-        import srtctl
-
         yaml_config_root = Path(srtctl.__file__).parent.parent.parent
         template_path = yaml_config_root.parent / "infbench" / "scripts" / "templates" / template_name
 
