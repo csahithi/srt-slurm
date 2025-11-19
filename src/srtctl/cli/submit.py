@@ -320,11 +320,8 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
         config_path: Path to sweep YAML config
         dry_run: If True, don't submit to SLURM, just validate and save artifacts
     """
-    # Import sweep logic from submit_yaml
-    scripts_path = Path(__file__).parent.parent.parent.parent / "scripts"
-    sys.path.insert(0, str(scripts_path))
-
-    from submit_yaml import generate_sweep_configs  # noqa: E402 - dynamic import from scripts/
+    # Import sweep logic
+    from srtctl.core.sweep import generate_sweep_configs
 
     sweep_config = load_config(config_path)
 

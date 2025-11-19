@@ -6,7 +6,6 @@ name: "gb200-fp8-1p-4d-sweep"
 
 # Sweep parameters - use {param_name} placeholders in config
 sweep:
-  mem_fraction: [0.90, 0.95]
   concurrency: [[256], [256, 512]]
 
 model:
@@ -96,7 +95,7 @@ backend:
       disaggregation-mode: "prefill"
 
       # Memory and token limits - SWEPT PARAMETER
-      mem-fraction-static: "{mem_fraction}"
+      mem-fraction-static: 0.95
       max-total-tokens: 8192
       chunked-prefill-size: 8192
       cuda-graph-max-bs: 128
@@ -143,7 +142,7 @@ backend:
       disaggregation-mode: "decode"
 
       # Memory and token limits - SWEPT PARAMETER
-      mem-fraction-static: "{mem_fraction}"
+      mem-fraction-static: 0.95
       chunked-prefill-size: 8192
       cuda-graph-max-bs: 128
 
