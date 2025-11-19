@@ -50,12 +50,10 @@ setup:
 		aarch64) ARCH_SHORT="arm64" ;; \
 		*) echo "❌ Unsupported architecture: $(ARCH)"; exit 1 ;; \
 	esac; \
-	echo "⬇️  Downloading Python wheels..."; \
-	wget -q --show-progress -P configs https://files.pythonhosted.org/packages/dc/b7/62fb0edaeae0943731d0e1d3e1455b0a8a94ef448aa5bd8ffe33288ab464/ai_dynamo-0.6.1-py3-none-any.whl; \
-	echo "⬇️  Downloading ai_dynamo_runtime for aarch64 (GB200)..."; \
-	wget -q --show-progress -P configs https://files.pythonhosted.org/packages/b8/0c/076268db6ff2c87663a0d70f7ce7a6a1c566ac1383981d9c82437de2ff98/ai_dynamo_runtime-0.6.1-cp310-abi3-manylinux_2_28_aarch64.whl; \
-	echo "⬇️  Downloading ai_dynamo_runtime for x86_64 (H100)..."; \
-	wget -q --show-progress -P configs https://files.pythonhosted.org/packages/99/fc/cd7172407aeb07fc83fa94eb51281280847e5ec7fb3c6aedb1a02cf4e7ea/ai_dynamo_runtime-0.6.1-cp310-abi3-manylinux_2_28_x86_64.whl; \
+	echo "⬇️  Downloading Python wheels (version 0.7.0)..."; \
+	echo "⚠️  Note: Please ensure ai_dynamo-0.7.0-py3-none-any.whl is available in configs/"; \
+	echo "⚠️  Note: Please ensure ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_aarch64.whl is available in configs/"; \
+	echo "⚠️  Note: Please ensure ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_x86_64.whl is available in configs/"; \
 	echo "⬇️  Downloading NATS ($(NATS_VERSION)) for $$ARCH_SHORT..."; \
 	NATS_DEB="nats-server-$(NATS_VERSION)-$$ARCH_SHORT.deb"; \
 	NATS_URL="https://github.com/nats-io/nats-server/releases/download/$(NATS_VERSION)/$$NATS_DEB"; \
