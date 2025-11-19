@@ -85,4 +85,4 @@ class Backend(ABC):
 
     def is_disaggregated(self) -> bool:
         """Check if running in disaggregated mode."""
-        return "agg_nodes" not in self.resources
+        return self.resources.get("agg_nodes") is None
