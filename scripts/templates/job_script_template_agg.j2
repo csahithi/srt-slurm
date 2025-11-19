@@ -261,7 +261,7 @@ for worker_idx in $(seq 0 $((AGG_WORKERS - 1))); do
 {% endraw %}
 {% endif %}
 {% raw %}
-        cmd="srun --overlap $ENROOT_ARGS --nodes=1 --ntasks=1 --nodelist=$node --output=${LOG_DIR}/${node}_agg_w${worker_idx}.out --error=${LOG_DIR}/${node}_agg_w${worker_idx}.err python /scripts/worker_setup.py --leader_ip ${LEADER_IP} --worker_idx ${worker_idx} --local_rank ${local_rank} --nodes_per_worker ${AGG_NODES_PER_WORKER} --worker_type aggregated --gpu_utilization_log /logs/${node}_agg_w${worker_idx}_gpu_utilization.log ${CONFIG_DUMP_ARG} ${WORKER_ARGS}"
+        cmd="srun --overlap $ENROOT_ARGS --nodes=1 --ntasks=1 --nodelist=$node --output=${LOG_DIR}/${node}_agg_w${worker_idx}.out --error=${LOG_DIR}/${node}_agg_w${worker_idx}.err python /scripts/worker_setup.py --leader_ip ${LEADER_IP} --worker_idx ${worker_idx} --local_rank ${local_rank} --nodes_per_worker ${AGG_NODES_PER_WORKER} --worker_type aggregated ${CONFIG_DUMP_ARG} ${WORKER_ARGS}"
         echo "$cmd"
         $cmd &
     done

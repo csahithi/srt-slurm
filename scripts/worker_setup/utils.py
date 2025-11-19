@@ -36,24 +36,6 @@ def setup_logging(level: int = logging.INFO) -> None:
     )
 
 
-def log_gpu_utilization(log_file: Path) -> None:
-    """
-    Log GPU utilization for all GPUs in the node.
-    Format: utilization.gpu [%] x y z
-    """
-    util_script = Path(__file__).parent.parent / "monitor_gpu_utilization.sh"
-    util_process = run_command(
-        f"bash {util_script}",
-        background=True,
-        stdout=open(log_file, "w"),
-        stderr=subprocess.STDOUT,
-    )
-    if not util_process:
-        logging.warning("Failed to start GPU utilization monitoring")
-    else:
-        logging.info("Started GPU utilization monitoring in the background")
-
-
 def check_etcd_health(etcd_url: str) -> bool:
     """Check if etcd is healthy"""
     health_url = f"{etcd_url}/health"

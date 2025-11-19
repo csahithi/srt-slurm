@@ -272,7 +272,7 @@ for worker_idx in $(seq 0 $((PREFILL_WORKERS - 1))); do
 {% endraw %}
 {% endif %}
 {% raw %}
-        cmd="srun --overlap $ENROOT_ARGS --nodes=1 --ntasks=1 --nodelist=$node --output=${LOG_DIR}/${node}_prefill_w${worker_idx}.out --error=${LOG_DIR}/${node}_prefill_w${worker_idx}.err python /scripts/worker_setup.py --leader_ip ${LEADER_IP} --worker_idx ${worker_idx} --local_rank ${local_rank} --nodes_per_worker ${PREFILL_NODES_PER_WORKER} --worker_type prefill --gpu_utilization_log /logs/${node}_prefill_w${worker_idx}_gpu_utilization.log ${WORKER_ARGS} ${CONFIG_DUMP_ARG}"
+        cmd="srun --overlap $ENROOT_ARGS --nodes=1 --ntasks=1 --nodelist=$node --output=${LOG_DIR}/${node}_prefill_w${worker_idx}.out --error=${LOG_DIR}/${node}_prefill_w${worker_idx}.err python /scripts/worker_setup.py --leader_ip ${LEADER_IP} --worker_idx ${worker_idx} --local_rank ${local_rank} --nodes_per_worker ${PREFILL_NODES_PER_WORKER} --worker_type prefill ${WORKER_ARGS} ${CONFIG_DUMP_ARG}"
         echo "$cmd"
         $cmd &
     done
@@ -305,7 +305,7 @@ for worker_idx in $(seq 0 $((DECODE_WORKERS - 1))); do
 {% endraw %}
 {% endif %}
 {% raw %}
-        cmd="srun --overlap $ENROOT_ARGS --nodes=1 --ntasks=1 --nodelist=$node --output=${LOG_DIR}/${node}_decode_w${worker_idx}.out --error=${LOG_DIR}/${node}_decode_w${worker_idx}.err python /scripts/worker_setup.py --leader_ip ${LEADER_IP} --worker_idx ${worker_idx} --local_rank ${local_rank} --nodes_per_worker ${DECODE_NODES_PER_WORKER} --worker_type decode --gpu_utilization_log /logs/${node}_decode_w${worker_idx}_gpu_utilization.log ${CONFIG_DUMP_ARG} ${WORKER_ARGS}"
+        cmd="srun --overlap $ENROOT_ARGS --nodes=1 --ntasks=1 --nodelist=$node --output=${LOG_DIR}/${node}_decode_w${worker_idx}.out --error=${LOG_DIR}/${node}_decode_w${worker_idx}.err python /scripts/worker_setup.py --leader_ip ${LEADER_IP} --worker_idx ${worker_idx} --local_rank ${local_rank} --nodes_per_worker ${DECODE_NODES_PER_WORKER} --worker_type decode ${CONFIG_DUMP_ARG} ${WORKER_ARGS}"
         echo "$cmd"
         $cmd &
     done

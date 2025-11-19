@@ -12,7 +12,6 @@ The script will:
 - Setup the environment
 - Generate the python3 command to run the prefill or decode worker
 - Start dynamo (or sglang)
-- Monitor the GPU utilization
 """
 
 import argparse
@@ -20,7 +19,6 @@ import logging
 import socket
 
 from worker_setup import (
-    log_gpu_utilization,
     setup_aggregated_worker,
     setup_decode_worker,
     setup_env,
@@ -77,12 +75,6 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
         type=int,
         default=8,
         help="Number of GPUs per node (default: 8)",
-    )
-    parser.add_argument(
-        "--gpu_utilization_log",
-        type=str,
-        default=None,
-        help="File to log GPU utilization (default: None)",
     )
 
     parser.add_argument(
@@ -174,9 +166,6 @@ def main(input_args: list[str] | None = None):
     setup_logging()
     args = _parse_command_line_args(input_args)
     _validate_args(args)
-
-    if args.gpu_utilization_log:
-        log_gpu_utilization(args.gpu_utilization_log)
 
     logging.info(f"{args.worker_type.capitalize()} worker setup started")
     logging.info(f"Hostname: {socket.gethostname()}")
