@@ -194,7 +194,6 @@ def main(input_args: list[str] | None = None):
             args.master_ip,
             args.nodes_per_worker,
             args.gpu_type,
-            args.script_variant,
             args.multiple_frontends_enabled,
             args.sglang_torch_profiler,
             args.sglang_config_path,
@@ -207,7 +206,6 @@ def main(input_args: list[str] | None = None):
             args.master_ip,
             args.nodes_per_worker,
             args.gpu_type,
-            args.script_variant,
             args.sglang_torch_profiler,
             args.sglang_config_path,
         )
