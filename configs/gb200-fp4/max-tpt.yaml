@@ -103,7 +103,6 @@ backend:
       load-balance-method: "round_robin"
 
       # Performance optimizations
-      enable-single-batch-overlap: true
       disable-cuda-graph: true
       enable-dp-attention: true
 
@@ -187,3 +186,4 @@ benchmark:
 #   DeepEP merges https://github.com/deepseek-ai/DeepEP/pull/440
 # - nvidia-cutlass-dsl pre-release install needed for integer overflow fix
 # - Removing --enable-single-batch-overlap may relax 12 node requirement
+# for now i remove it from prefill as well
