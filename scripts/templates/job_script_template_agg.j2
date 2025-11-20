@@ -103,6 +103,9 @@ fi
 echo "Frontend hosts: ${frontend_hosts[@]}"
 echo "Frontend IPs: ${frontend_ips[@]}"
 
+{% endraw %}
+{% if total_nodes > 1 %}
+{% raw %}
 # Generate nginx configuration
 # Build a Python list literal of frontend hosts from the bash array
 FRONTEND_LIST=$(printf "'%s'," "${frontend_ips[@]}")
@@ -124,6 +127,9 @@ config = tmpl.render(frontend_hosts=frontend_hosts)
 with open(output_path, 'w') as f:
     f.write(config)
 PY
+{% endraw %}
+{% endif %}
+{% raw %}
 
 {% endraw %}
 {% else %}
@@ -193,11 +199,17 @@ WORKER_ARGS="$WORKER_ARGS --sglang-config-path /logs/sglang_config.yaml"
 {% endraw %}
 {% if enable_multiple_frontends %}
 {% raw %}
+{% endraw %}
+{% if total_nodes > 1 %}
+{% raw %}
 # Launch nginx on node 0
 echo "Launching nginx on ${NGINX_NODE}"
 cmd="srun --overlap $ENROOT_ARGS --nodes=1 --ntasks=1 --nodelist=$NGINX_NODE --output=${LOG_DIR}/${NGINX_NODE}_nginx.out --error=${LOG_DIR}/${NGINX_NODE}_nginx.err python /scripts/worker_setup.py --worker_type nginx --nginx_config /logs/nginx.conf ${WORKER_ARGS}"
 echo "$cmd"
 $cmd &
+{% endraw %}
+{% endif %}
+{% raw %}
 
 # Launch frontend on master node (node 1) - this will also start NATS/ETCD
 echo "Launching frontend + NATS/ETCD on master node ${MASTER_NODE}"
@@ -270,8 +282,19 @@ echo ""
 {% if enable_multiple_frontends %}
 {% raw %}
 echo "Frontend available at: http://${NGINX_NODE}:8000"
+{% endraw %}
+{% if total_nodes > 1 %}
+{% raw %}
 echo "To connect to the nginx node:"
 echo "srun $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${NGINX_NODE} --overlap --pty bash"
+{% endraw %}
+{% else %}
+{% raw %}
+echo "To connect to the master node:"
+echo "srun $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${NGINX_NODE} --overlap --pty bash"
+{% endraw %}
+{% endif %}
+{% raw %}
 echo "To connect to the master node (NATS/ETCD):"
 echo "srun $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${MASTER_NODE} --overlap --pty bash"
 {% endraw %}
