@@ -341,7 +341,7 @@ exit_code=$?
 echo "Profiling script finished at $(date) with exit code ${exit_code}"
 exit $exit_code
 {% endraw %}
-{% if not sglang_torch_profiler %}
+{% else %}
 {% raw %}
 # Wait for first task to complete
 wait -n
