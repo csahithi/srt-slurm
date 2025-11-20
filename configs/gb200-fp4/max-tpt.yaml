@@ -5,8 +5,8 @@
 name: "gb200-fp4-max-tpt"
 
 model:
-  path: "/models/deepseek-r1"
-  container: "/containers/sglang.sqsh"
+  path: "dsfp4"
+  container: "0.5.5.post2"
   precision: "fp4"
 
 resources:
@@ -166,7 +166,7 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: [1024]
+  concurrencies: "1x8x16x32x64x128x256x512x1024x2048x4096"
   req_rate: "inf"
 
 # Notes:

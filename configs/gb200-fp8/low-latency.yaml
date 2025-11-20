@@ -1,8 +1,8 @@
 name: "gb200-fp8-1p-4d-low-latency"
 
 model:
-  path: "deepseek-r1"
-  container: "lmsysorg+sglang+v0.5.4.post3.sqsh"
+  path: "dsfp8"
+  container: "0.5.3.post4"
   precision: "fp8"
 
 resources:

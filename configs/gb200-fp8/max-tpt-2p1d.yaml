@@ -4,8 +4,8 @@
 name: "gb200-fp8-max-tpt"
 
 model:
-  path: "/models/deepseek-r1"
-  container: "/containers/sglang.sqsh"
+  path: "dsfp8"
+  container: "0.5.3.post4"
   precision: "fp8"
 
 resources:
