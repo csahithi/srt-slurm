@@ -45,7 +45,7 @@ class SGLangBackend(Backend):
 
         # Validate that all keys use dashes, not underscores
         for mode in ["prefill", "decode", "aggregated"]:
-            if mode in sglang_cfg:
+            if mode in sglang_cfg and sglang_cfg[mode]:
                 for key in sglang_cfg[mode].keys():
                     if "_" in key:
                         raise ValueError(

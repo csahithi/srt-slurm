@@ -174,11 +174,21 @@ class SGLangDecodeConfig(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class SGLangAggregatedConfig(BaseModel):
+    """SGLang aggregated worker configuration.
+
+    Accepts any SGLang flags - no required fields.
+    """
+
+    model_config = {"extra": "allow"}
+
+
 class SGLangConfig(BaseModel):
     """SGLang backend configuration."""
 
     prefill: Optional[SGLangPrefillConfig] = None
     decode: Optional[SGLangDecodeConfig] = None
+    aggregated: Optional[SGLangAggregatedConfig] = None
 
 
 class BackendConfig(BaseModel):
@@ -192,6 +202,7 @@ class BackendConfig(BaseModel):
     # Environment variables
     prefill_environment: Optional[dict[str, str]] = None
     decode_environment: Optional[dict[str, str]] = None
+    aggregated_environment: Optional[dict[str, str]] = None
 
     # SGLang-specific config
     sglang_config: Optional[SGLangConfig] = None
@@ -230,3 +241,189 @@ class JobConfig(BaseModel):
         # Auto-populate gpu_type from resources (values are already strings due to use_enum_values)
         if self.backend.gpu_type is None:
             self.backend.gpu_type = f"{self.resources.gpu_type}-{self.model.precision}"
+
+        # Validate profiling mode constraints
+        self._validate_profiling_mode()
+
+        # Validate resource allocation
+        self._validate_resources()
+
+    def _validate_profiling_mode(self) -> None:
+        """Validate profiling mode constraints."""
+        if not self.backend or not self.backend.enable_profiling:
+            return
+
+        # Auto-disable config dump when profiling (already handled in backend, but validate here too)
+        if self.enable_config_dump:
+            # This is fine - backend will handle disabling it
+            pass
+
+        # Profiling mode is mutually exclusive with benchmarking
+        if self.benchmark and self.benchmark.type != BenchmarkType.MANUAL:
+            raise ValueError(
+                f"Cannot enable profiling with benchmark type '{self.benchmark.type}'. "
+                "Profiling mode is mutually exclusive with benchmarking."
+            )
+
+        # Profiling mode requires single worker only
+        is_disaggregated = self.resources.prefill_nodes is not None
+
+        if is_disaggregated:
+            if self.resources.prefill_workers and self.resources.prefill_workers > 1:
+                raise ValueError(
+                    f"Profiling mode requires single worker only. "
+                    f"Got prefill_workers={self.resources.prefill_workers}"
+                )
+            if self.resources.decode_workers and self.resources.decode_workers > 1:
+                raise ValueError(
+                    f"Profiling mode requires single worker only. "
+                    f"Got decode_workers={self.resources.decode_workers}"
+                )
+        else:
+            # Aggregated mode
+            if self.resources.agg_workers and self.resources.agg_workers > 1:
+                raise ValueError(
+                    f"Profiling mode requires single worker only. "
+                    f"Got agg_workers={self.resources.agg_workers}"
+                )
+
+    def _validate_resources(self) -> None:
+        """Validate resource allocation and TP size constraints."""
+        if not self.backend or not self.backend.sglang_config:
+            return
+
+        is_disaggregated = self.resources.prefill_nodes is not None
+        gpus_per_node = self.resources.gpus_per_node
+
+        # Validate disaggregated mode
+        if is_disaggregated:
+            # Validate prefill resources
+            if self.backend.sglang_config.prefill:
+                prefill_config = self.backend.sglang_config.prefill
+                self._validate_worker_resources(
+                    mode="prefill",
+                    config=prefill_config,
+                    nodes=self.resources.prefill_nodes,
+                    workers=self.resources.prefill_workers,
+                    gpus_per_node=gpus_per_node,
+                )
+
+            # Validate decode resources
+            if self.backend.sglang_config.decode:
+                decode_config = self.backend.sglang_config.decode
+                self._validate_worker_resources(
+                    mode="decode",
+                    config=decode_config,
+                    nodes=self.resources.decode_nodes,
+                    workers=self.resources.decode_workers,
+                    gpus_per_node=gpus_per_node,
+                )
+        else:
+            # Validate aggregated mode
+            if hasattr(self.backend.sglang_config, "aggregated") and self.backend.sglang_config.aggregated:
+                agg_config = self.backend.sglang_config.aggregated
+                self._validate_worker_resources(
+                    mode="aggregated",
+                    config=agg_config,
+                    nodes=self.resources.agg_nodes,
+                    workers=self.resources.agg_workers,
+                    gpus_per_node=gpus_per_node,
+                )
+            # Aggregated can also use "prefill" section
+            elif self.backend.sglang_config.prefill:
+                prefill_config = self.backend.sglang_config.prefill
+                self._validate_worker_resources(
+                    mode="aggregated",
+                    config=prefill_config,
+                    nodes=self.resources.agg_nodes,
+                    workers=self.resources.agg_workers,
+                    gpus_per_node=gpus_per_node,
+                )
+
+    def _validate_worker_resources(
+        self, mode: str, config: Any, nodes: int, workers: int, gpus_per_node: int
+    ) -> None:
+        """Validate that worker configuration fits available resources.
+
+        Args:
+            mode: Worker mode (prefill, decode, aggregated)
+            config: SGLang config dict for this mode
+            nodes: Number of nodes allocated
+            workers: Number of workers
+            gpus_per_node: GPUs per node
+
+        Raises:
+            ValueError: If resource constraints are violated
+        """
+        if not config or not nodes or not workers:
+            return
+
+        # Get TP and DP sizes from config
+        tp_size = None
+        dp_size = None
+
+        # Config can be a Pydantic model or dict - handle both
+        if hasattr(config, "model_dump"):
+            config_dict = config.model_dump()
+        elif hasattr(config, "__dict__"):
+            config_dict = config.__dict__
+        else:
+            config_dict = config
+
+        if isinstance(config_dict, dict):
+            tp_size = config_dict.get("tensor-parallel-size") or config_dict.get("tensor_parallel_size")
+            dp_size = config_dict.get("data-parallel-size") or config_dict.get("data_parallel_size")
+
+        if not tp_size:
+            # No TP size specified, can't validate
+            return
+
+        # Convert to int if it's a string (can happen during sweep template expansion)
+        try:
+            tp_size = int(tp_size)
+        except (ValueError, TypeError):
+            # Template placeholder like "{tp_size}" - skip validation
+            return
+
+        dp_size = int(dp_size) if dp_size else 1
+
+        # Calculate total GPUs needed
+        total_gpus_available = nodes * gpus_per_node
+        gpus_per_worker = tp_size * dp_size
+        total_gpus_needed = gpus_per_worker * workers
+
+        # Validate: Total GPUs needed <= Total GPUs available
+        if total_gpus_needed > total_gpus_available:
+            raise ValueError(
+                f"{mode.capitalize()} resource mismatch:\n"
+                f"  Workers: {workers}\n"
+                f"  TP size: {tp_size}, DP size: {dp_size}\n"
+                f"  GPUs per worker: {gpus_per_worker}\n"
+                f"  Total GPUs needed: {total_gpus_needed}\n"
+                f"  Total GPUs available: {total_gpus_available} ({nodes} nodes × {gpus_per_node} GPUs/node)\n"
+                f"  → Need {total_gpus_needed - total_gpus_available} more GPUs!"
+            )
+
+        # Validate: Each worker's GPUs fit on the allocated nodes
+        # For multi-node workers, TP size should divide evenly across nodes per worker
+        nodes_per_worker = nodes // workers if workers > 0 else nodes
+
+        if nodes_per_worker == 0:
+            raise ValueError(
+                f"{mode.capitalize()} resource mismatch:\n"
+                f"  Workers: {workers}\n"
+                f"  Nodes: {nodes}\n"
+                f"  → Each worker needs at least 1 node, but {nodes} nodes / {workers} workers = {nodes_per_worker} nodes/worker"
+            )
+
+        gpus_per_worker_from_nodes = nodes_per_worker * gpus_per_node
+
+        if gpus_per_worker > gpus_per_worker_from_nodes:
+            raise ValueError(
+                f"{mode.capitalize()} resource mismatch:\n"
+                f"  Workers: {workers}\n"
+                f"  Nodes per worker: {nodes_per_worker}\n"
+                f"  GPUs per worker (from TP×DP): {gpus_per_worker}\n"
+                f"  GPUs available per worker: {gpus_per_worker_from_nodes} ({nodes_per_worker} nodes × {gpus_per_node} GPUs/node)\n"
+                f"  → Each worker needs {gpus_per_worker - gpus_per_worker_from_nodes} more GPUs!"
+            )
