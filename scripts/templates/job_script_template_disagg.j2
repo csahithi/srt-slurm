@@ -125,8 +125,6 @@ with open(output_path, 'w') as f:
 PY
 
 {% endraw %}
-
-{% endraw %}
 {% else %}
 {% raw %}
 # Traditional architecture - first prefill node handles everything
@@ -177,6 +175,7 @@ ENROOT_ARGS="\
     --no-container-mount-home \
     --container-mounts=${MODEL_DIR}:/model/,${CONFIG_DIR}:/configs/,${SCRIPT_DIR}:/scripts/,${OUTPUT_DIR}:/outputs/,${LOG_DIR}:/logs/ \
 "
+{% endraw %}
 
 # Build common worker arguments
 {% raw %}
