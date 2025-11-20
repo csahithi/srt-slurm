@@ -1,16 +1,8 @@
-# GB200 FP8 1P 4D Parameter Sweep
-# Sweeps over memory fraction and concurrency levels
-# This will generate 4 jobs (2 mem_fraction x 2 concurrency configs)
-
-name: "gb200-fp8-1p-4d-sweep"
-
-# Sweep parameters - use {param_name} placeholders in config
-sweep:
-  concurrency: [[256], [256, 512]]
+name: "gb200-fp8-1p-4d-low-latency"
 
 model:
   path: "deepseek-r1"
-  container: "lmsysorg+sglang+v0.5.5.post2.sqsh"
+  container: "lmsysorg+sglang+v0.5.4.post3.sqsh"
   precision: "fp8"
 
 resources:
@@ -21,13 +13,7 @@ resources:
   decode_workers: 4
   gpus_per_node: 4
 
-slurm:
-  account: "restricted"
-  partition: "batch-aqua"
-  time_limit: "04:00:00"
-
 backend:
-  # Prefill-specific environment variables
   prefill_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
@@ -46,7 +32,6 @@ backend:
     NCCL_MNNVL_ENABLE: "1"
     NCCL_CUMEM_ENABLE: "1"
 
-  # Decode-specific environment variables
   decode_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
@@ -69,94 +54,56 @@ backend:
 
   sglang_config:
     prefill:
-      # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
       model-path: "/model/"
       trust-remote-code: true
-
-      # KV cache and attention
       kv-cache-dtype: "fp8_e4m3"
       attention-backend: "trtllm_mla"
-
-      # Quantization
       quantization: "fp8"
       moe-runner-backend: "flashinfer_trtllm"
-
-      # Radix cache disabled
       disable-radix-cache: true
-
-      # Other flags
       host: "0.0.0.0"
       stream-interval: 10
       watchdog-timeout: 1000000
       context-length: 2200
-
-      # Prefill-specific mode
       disaggregation-mode: "prefill"
-
-      # Memory and token limits - SWEPT PARAMETER
       mem-fraction-static: 0.95
       max-total-tokens: 8192
       chunked-prefill-size: 8192
       cuda-graph-max-bs: 128
-
-      # Request handling
       max-running-requests: 512
       load-balance-method: "round_robin"
       scheduler-recv-interval: 10
-
-      # Performance optimizations
       enable-flashinfer-allreduce-fusion: true
       enable-symm-mem: true
       moe-dense-tp-size: 1
-
-      # Parallelism configuration
       tensor-parallel-size: 4
       data-parallel-size: 1
       expert-parallel-size: 1
 
     decode:
-      # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
       model-path: "/model/"
       trust-remote-code: true
-
-      # KV cache and attention
       kv-cache-dtype: "fp8_e4m3"
       attention-backend: "trtllm_mla"
-
-      # Quantization
       quantization: "fp8"
       moe-runner-backend: "flashinfer_trtllm"
-
-      # Radix cache disabled
       disable-radix-cache: true
-
-      # Other flags
       host: "0.0.0.0"
       stream-interval: 10
       watchdog-timeout: 1000000
       context-length: 2200
-
-      # Decode-specific mode
       disaggregation-mode: "decode"
-
-      # Memory and token limits - SWEPT PARAMETER
       mem-fraction-static: 0.95
       chunked-prefill-size: 8192
       cuda-graph-max-bs: 128
-
-      # Request handling
       max-running-requests: 512
       scheduler-recv-interval: 10
-
-      # Performance optimizations
       enable-flashinfer-allreduce-fusion: true
       enable-symm-mem: true
       moe-dense-tp-size: 1
       prefill-round-robin-balance: true
-
-      # Parallelism configuration
       tensor-parallel-size: 4
       data-parallel-size: 1
       expert-parallel-size: 1
@@ -165,13 +112,5 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: "{concurrency}"  # SWEPT PARAMETER
+  concurrencies: "4x8x32x64x80x96x112x128"
   req_rate: "inf"
-
-# Sweep will generate 4 jobs:
-# 1. mem_fraction=0.90, concurrency=[256]
-# 2. mem_fraction=0.90, concurrency=[256, 512]
-# 3. mem_fraction=0.95, concurrency=[256]
-# 4. mem_fraction=0.95, concurrency=[256, 512]
-#
-# Each job will be named: gb200-fp8-1p-4d-sweep_mem{mem_fraction}_conc{concurrency}

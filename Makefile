@@ -96,14 +96,10 @@ setup:
 		account=$${account:-restricted}; \
 		read -p "Enter SLURM partition [batch]: " partition; \
 		partition=$${partition:-batch}; \
-		read -p "Enter network interface [enP6p9s0np0]: " network; \
-		network=$${network:-enP6p9s0np0}; \
-		read -p "Enter GPUs per node [8]: " gpus_per_node; \
-		gpus_per_node=$${gpus_per_node:-8}; \
+		read -p "Enter GPUs per node [4]: " gpus_per_node; \
+		gpus_per_node=$${gpus_per_node:-4}; \
 		read -p "Enter time limit [4:00:00]: " time_limit; \
 		time_limit=$${time_limit:-4:00:00}; \
-		read -p "Enter container image path (optional): " container; \
-		container=$${container:-}; \
 		echo ""; \
 		echo "# SRT SLURM Configuration" > srtslurm.yaml; \
 		echo "# This file provides cluster-specific defaults and settings for srtctl" >> srtslurm.yaml; \
@@ -115,17 +111,12 @@ setup:
 		echo "" >> srtslurm.yaml; \
 		echo "# Resource defaults" >> srtslurm.yaml; \
 		echo "gpus_per_node: $$gpus_per_node" >> srtslurm.yaml; \
-		echo "network_interface: \"$$network\"" >> srtslurm.yaml; \
+		echo "network_interface: \"\"" >> srtslurm.yaml; \
 		echo "" >> srtslurm.yaml; \
 		echo "# Path to srtctl repo root (where scripts/templates/ lives)" >> srtslurm.yaml; \
 		echo "# Auto-detected from current directory" >> srtslurm.yaml; \
 		echo "srtctl_root: \"$$SRTCTL_ROOT\"" >> srtslurm.yaml; \
 		echo "" >> srtslurm.yaml; \
-		if [ -n "$$container" ]; then \
-			echo "# Default container" >> srtslurm.yaml; \
-			echo "default_container: \"$$container\"" >> srtslurm.yaml; \
-			echo "" >> srtslurm.yaml; \
-		fi; \
 		echo "# Cloud sync settings (optional)" >> srtslurm.yaml; \
 		echo "cloud:" >> srtslurm.yaml; \
 		echo "  endpoint_url: \"\"" >> srtslurm.yaml; \

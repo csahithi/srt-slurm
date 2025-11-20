@@ -97,9 +97,6 @@ def resolve_config_with_defaults(user_config: dict, cluster_config: dict | None)
         resolved_container = cluster_config["containers"][container]
         model["container"] = resolved_container
         logging.debug(f"Resolved container alias '{container}' -> '{resolved_container}'")
-    elif cluster_config and "container" not in model and "default_container" in cluster_config:
-        model["container"] = cluster_config["default_container"]
-        logging.debug(f"Applied default container: {model['container']}")
 
     return config
 

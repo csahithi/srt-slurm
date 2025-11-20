@@ -203,9 +203,9 @@ class SGLangBackend(Backend):
 
         # Get SLURM settings
         job_name = self.config.get("name", "srtctl-job")
-        account = self.slurm.get("account")
-        partition = self.slurm.get("partition")
-        time_limit = self.slurm.get("time_limit", "01:00:00")
+        account = self.slurm.get("account") or get_srtslurm_setting("default_account")
+        partition = self.slurm.get("partition") or get_srtslurm_setting("default_partition")
+        time_limit = self.slurm.get("time_limit") or get_srtslurm_setting("default_time_limit", "04:00:00")
 
         # Get resource settings from srtslurm.yaml if available
         gpus_per_node = get_srtslurm_setting("gpus_per_node", self.resources.get("gpus_per_node"))

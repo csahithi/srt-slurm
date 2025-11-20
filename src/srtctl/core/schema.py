@@ -29,7 +29,6 @@ class ClusterConfig(BaseModel):
     default_account: Optional[str] = Field(None, description="Default SLURM account")
     default_partition: Optional[str] = Field(None, description="Default SLURM partition")
     default_time_limit: Optional[str] = Field(None, description="Default job time limit")
-    default_container: Optional[str] = Field(None, description="Default container path")
 
     # Resource defaults
     gpus_per_node: Optional[int] = Field(None, description="Default GPUs per node")
@@ -137,9 +136,9 @@ class ResourceConfig(BaseModel):
 class SlurmConfig(BaseModel):
     """SLURM job settings."""
 
-    account: str = Field(..., description="SLURM account")
-    partition: str = Field(..., description="SLURM partition")
-    time_limit: str = Field("04:00:00", description="Job time limit (HH:MM:SS)")
+    account: Optional[str] = Field(None, description="SLURM account")
+    partition: Optional[str] = Field(None, description="SLURM partition")
+    time_limit: Optional[str] = Field(None, description="Job time limit (HH:MM:SS)")
 
 
 class BenchmarkConfig(BaseModel):
