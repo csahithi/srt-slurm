@@ -73,6 +73,7 @@ def build_sglang_command_from_yaml(
         f"--dist-init-addr {host_ip}:{port}",
         f"--nnodes {total_nodes}",
         f"--node-rank {rank}",
+        "--host 0.0.0.0",
     ]
 
     # Combine environment exports and command

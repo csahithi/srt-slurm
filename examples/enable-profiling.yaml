@@ -85,7 +85,6 @@ backend:
       disable_radix_cache: true
 
       # Other flags
-      host: "0.0.0.0"
       stream_interval: 10
       watchdog_timeout: 1000000
       context_length: 2200
@@ -127,7 +126,6 @@ backend:
       disable_radix_cache: true
 
       # Other flags
-      host: "0.0.0.0"
       stream_interval: 10
       watchdog_timeout: 1000000
       context_length: 2200
