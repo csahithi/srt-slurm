@@ -82,7 +82,7 @@ backend:
       disable-radix-cache: true
 
       # Other flags
-      host: "0.0.0.0"
+      host: 0.0.0.0
       stream-interval: 50
       max-running-requests: 30000
       context-length: 2200
@@ -135,7 +135,7 @@ backend:
       disable-radix-cache: true
 
       # Other flags
-      host: "0.0.0.0"
+      host: 0.0.0.0
       stream-interval: 50
       decode-log-interval: 1000
       max-running-requests: 45000
