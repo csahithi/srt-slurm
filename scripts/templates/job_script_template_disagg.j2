@@ -63,17 +63,7 @@ done
 # Node 2+: prefill/decode workers + optional additional frontends
 
 NGINX_NODE=${nodes[0]}
-{% endraw %}
-{% if total_nodes > 1 %}
-{% raw %}
 MASTER_NODE=${nodes[1]}
-{% endraw %}
-{% else %}
-{% raw %}
-MASTER_NODE=${nodes[0]}
-{% endraw %}
-{% endif %}
-{% raw %}
 MASTER_IP=$(get_node_ip "$MASTER_NODE" "$SLURM_JOB_ID" "$NETWORK_INTERFACE")
 if [ -z "$MASTER_IP" ]; then
     echo "Error: Could not retrieve IP address for master host $MASTER_NODE"
@@ -112,9 +102,6 @@ fi
 echo "Frontend hosts: ${frontend_hosts[@]}"
 echo "Frontend IPs: ${frontend_ips[@]}"
 
-{% endraw %}
-{% if total_nodes > 1 %}
-{% raw %}
 # Generate nginx configuration
 # Build a Python list literal of frontend hosts from the bash array
 FRONTEND_LIST=$(printf "'%s'," "${frontend_ips[@]}")
@@ -136,9 +123,8 @@ config = tmpl.render(frontend_hosts=frontend_hosts)
 with open(output_path, 'w') as f:
     f.write(config)
 PY
+
 {% endraw %}
-{% endif %}
-{% raw %}
 
 {% endraw %}
 {% else %}
@@ -326,19 +312,8 @@ echo ""
 {% if enable_multiple_frontends %}
 {% raw %}
 echo "Frontend available at: http://${NGINX_NODE}:8000"
-{% endraw %}
-{% if total_nodes > 1 %}
-{% raw %}
 echo "To connect to the nginx node:"
 echo "srun $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${NGINX_NODE} --overlap --pty bash"
-{% endraw %}
-{% else %}
-{% raw %}
-echo "To connect to the master node:"
-echo "srun $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${NGINX_NODE} --overlap --pty bash"
-{% endraw %}
-{% endif %}
-{% raw %}
 echo "To connect to the master node (NATS/ETCD):"
 echo "srun $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${MASTER_NODE} --overlap --pty bash"
 {% endraw %}
