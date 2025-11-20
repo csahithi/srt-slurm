@@ -63,110 +63,108 @@ backend:
   sglang_config:
     prefill:
       # Model configuration
-      served_model_name: "deepseek-ai/DeepSeek-R1"
-      model_path: "/model/"
-      skip_tokenizer_init: true
-      trust_remote_code: true
+      served-model-name: "deepseek-ai/DeepSeek-R1"
+      model-path: "/model/"
+      skip-tokenizer-init: true
+      trust-remote-code: true
 
       # Parallelism
-      tp_size: 8
-      dp_size: 8
-      ep_size: 8 
-      enable_dp_attention: true
+      tp-size: 8
+      dp-size: 8
+      ep-size: 8 
+      enable-dp-attention: true
 
       # KV cache and attention
-      attention_backend: "trtllm_mla"
-      kv_cache_dtype: "fp8_e4m3"
+      attention-backend: "trtllm_mla"
+      kv-cache-dtype: "fp8_e4m3"
 
       # Radix cache disabled
-      disable_radix_cache: true
+      disable-radix-cache: true
 
       # Other flags
       host: "0.0.0.0"
-      stream_interval: 50
-      max_running_requests: 30000
-      context_length: 2200
-      watchdog_timeout: 1000000
-      disable_shared_experts_fusion: true
-      eplb_algorithm: "deepseek"
-      disaggregation_bootstrap_port: 30001
+      stream-interval: 50
+      max-running-requests: 30000
+      context-length: 2200
+      watchdog-timeout: 1000000
+      disable-shared-experts-fusion: true
+      eplb-algorithm: "deepseek"
+      disaggregation-bootstrap-port: 30001
 
       # Prefill-specific mode
-      disaggregation_mode: "prefill"
+      disaggregation-mode: "prefill"
 
       # Memory and token limits
-      mem_fraction_static: 0.75
-      max_total_tokens: 524288
-      chunked_prefill_size: 131072
+      mem-fraction-static: 0.75
+      max-total-tokens: 524288
+      chunked-prefill-size: 131072
 
       # Request handling
-      load_balance_method: "round_robin"
+      load-balance-method: "round_robin"
 
       # Performance optimizations
-      disable_cuda_graph: true
+      disable-cuda-graph: true
 
       # DeepEP configuration
-      moe_a2a_backend: "deepep"
-      deepep_mode: "normal"
-      ep_dispatch_algorithm: "dynamic"
-      moe_dense_tp_size: 1
-      enable_dp_lm_head: true
-      ep_num_redundant_experts: 32
-      deepep_config: "/configs/deepep_config.json"
-      init_expert_location: "/configs/prefill_dsr1-0528_in1000out1000_num40000.json"
+      moe-a2a-backend: "deepep"
+      deepep-mode: "normal"
+      ep-dispatch-algorithm: "dynamic"
+      moe-dense-tp-size: 1
+      enable-dp-lm-head: true
+      ep-num-redundant-experts: 32
+      deepep-config: "/configs/deepep_config.json"
 
     decode:
       # Model configuration
-      served_model_name: "deepseek-ai/DeepSeek-R1"
-      model_path: "/model/"
-      skip_tokenizer_init: true
-      trust_remote_code: true
+      served-model-name: "deepseek-ai/DeepSeek-R1"
+      model-path: "/model/"
+      skip-tokenizer-init: true
+      trust-remote-code: true
 
       # Parallelism
-      tp_size: 32
-      dp_size: 32
-      ep_size: 32
-      enable_dp_attention: true
+      tp-size: 32
+      dp-size: 32
+      ep-size: 32
+      enable-dp-attention: true
 
       # KV cache and attention
-      attention_backend: "trtllm_mla"
-      kv_cache_dtype: "fp8_e4m3"
+      attention-backend: "trtllm_mla"
+      kv-cache-dtype: "fp8_e4m3"
 
       # Radix cache disabled
-      disable_radix_cache: true
+      disable-radix-cache: true
 
       # Other flags
       host: "0.0.0.0"
-      stream_interval: 50
-      decode_log_interval: 1000
-      max_running_requests: 45000
-      context_length: 2200
-      watchdog_timeout: 1000000
-      disable_shared_experts_fusion: true
-      eplb_algorithm: "deepseek"
-      disaggregation_bootstrap_port: 30001
+      stream-interval: 50
+      decode-log-interval: 1000
+      max-running-requests: 45000
+      context-length: 2200
+      watchdog-timeout: 1000000
+      disable-shared-experts-fusion: true
+      eplb-algorithm: "deepseek"
+      disaggregation-bootstrap-port: 30001
 
       # Decode-specific mode
-      disaggregation_mode: "decode"
+      disaggregation-mode: "decode"
 
       # Memory and token limits
-      mem_fraction_static: 0.82
-      chunked_prefill_size: 36864
+      mem-fraction-static: 0.82
+      chunked-prefill-size: 36864
 
       # DeepEP configuration
-      moe_a2a_backend: "deepep"
-      deepep_mode: "low_latency"
-      ep_dispatch_algorithm: "static"
-      moe_dense_tp_size: 1
-      enable_dp_lm_head: true
-      prefill_round_robin_balance: true
-      ep_num_redundant_experts: 32
-      deepep_config: "/configs/deepep_config.json"
-      init_expert_location: "/configs/decode_dsr1-0528_loadgen_in1024out1024_num2000_2p12d.json"
+      moe-a2a-backend: "deepep"
+      deepep-mode: "low_latency"
+      ep-dispatch-algorithm: "static"
+      moe-dense-tp-size: 1
+      enable-dp-lm-head: true
+      prefill-round-robin-balance: true
+      ep-num-redundant-experts: 32
+      deepep-config: "/configs/deepep_config.json"
 
       # CUDA graphs
-      cuda_graph_bs: [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 264, 272, 280, 288, 296, 304, 312, 320, 328, 336, 344, 352, 360, 368, 376, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 736, 768]
-      cuda_graph_max_bs: 768
+      cuda-graph-bs: [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 264, 272, 280, 288, 296, 304, 312, 320, 328, 336, 344, 352, 360, 368, 376, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 736, 768]
+      cuda-graph-max-bs: 768
 
 benchmark:
   type: "sa-bench"
