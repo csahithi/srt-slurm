@@ -107,6 +107,11 @@ backend:
       disable-cuda-graph: true
       enable-dp-attention: true
 
+      # Parallelism
+      tp-size: 4
+      dp-size: 4
+      ep-size: 4
+
     decode:
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
@@ -161,6 +166,11 @@ backend:
       enable-dp-lm-head: true
       prefill-round-robin-balance: true
       enable-dp-attention: true
+
+      # Parallelism
+      tp-size: 32
+      dp-size: 32
+      ep-size: 32
 
 benchmark:
   type: "sa-bench"
