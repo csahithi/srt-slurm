@@ -304,17 +304,17 @@ echo "To connect to the master node:"
 echo "srun $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${nodes[0]} --overlap --pty bash"
 {% endraw %}
 {% endif %}
+
+{% if do_benchmark %}
 {% raw %}
-
-echo ""
-echo "Make sure to cancel the job at the end:"
-echo "scancel $SLURM_JOB_ID"
-
-# Instead of waiting for all tasks to complete, wait for profile.sh to complete and then exit.
-
+BENCHMARK_TYPE={% endraw %}{{ benchmark_type }}{% raw %}
+BENCHMARK_ARGS="{% endraw %}{{ benchmark_arg }}{% raw %}"
+srun --nodes=1 --ntasks=1 $ENROOT_ARGS --jobid $SLURM_JOB_ID -w ${nodes[0]} --output=${LOG_DIR}/benchmark.out --error=${LOG_DIR}/benchmark.err --overlap bash /scripts/benchmarks/${BENCHMARK_TYPE}/bench.sh $AGG_WORKERS 0 0 $DECODE_GPUS ${BENCHMARK_ARGS} &
 {% endraw %}
+{% endif %}
 
 {% if sglang_torch_profiler %}
+
 {% raw %}
 # Torch profiling mode for aggregated workers
 echo "Starting torch profiling on aggregated worker..."
@@ -341,7 +341,7 @@ exit_code=$?
 echo "Profiling script finished at $(date) with exit code ${exit_code}"
 exit $exit_code
 {% endraw %}
-{% else %}
+{% if not sglang_torch_profiler %}
 {% raw %}
 # Wait for first task to complete
 wait -n
@@ -350,4 +350,8 @@ echo "Script finished at $(date) with exit code ${first_exit_code}"
 exit $first_exit_code
 {% endraw %}
 {% endif %}
+
+echo ""
+echo "Make sure to cancel the job at the end:"
+echo "scancel $SLURM_JOB_ID"
 
