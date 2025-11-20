@@ -50,7 +50,7 @@ backend:
       max-total-tokens: 8192
       chunked-prefill-size: 8192
       cuda-graph-max-bs: 128
-      max-running-requests: 512
+      max-running-requests: 6000
       scheduler-recv-interval: 10
       enable-flashinfer-allreduce-fusion: true
       enable-symm-mem: true
