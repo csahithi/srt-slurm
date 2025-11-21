@@ -53,16 +53,22 @@ def setup_prefill_worker(
         # Start frontend in background (traditional mode)
         logging.info("Starting frontend in traditional mode")
         from .command import get_wheel_arch_from_gpu_type
+        
+        # Open log files for frontend
+        frontend_stdout = open('/logs/frontend.out', 'w')
+        frontend_stderr = open('/logs/frontend.err', 'w')
+        
         arch = get_wheel_arch_from_gpu_type(gpu_type)
         frontend_cmd = (
             f"python3 -m pip install /configs/ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_{arch}.whl && "
             f"python3 -m pip install /configs/ai_dynamo-0.7.0-py3-none-any.whl && "
             f"python3 -m dynamo.frontend --http-port=8000"
         )
-        frontend_process = run_command(frontend_cmd, background=True)
+        frontend_process = run_command(frontend_cmd, background=True, stdout=frontend_stdout, stderr=frontend_stderr)
         if not frontend_process:
             raise RuntimeError("Failed to start frontend")
-        logging.info("Frontend started in background")
+        logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
+        logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
     else:
         logging.info(f"Setting up prefill worker {worker_idx}, local rank {local_rank}")
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
@@ -143,16 +149,22 @@ def setup_aggregated_worker(
         # Start frontend in background (traditional mode)
         logging.info("Starting frontend in traditional mode")
         from .command import get_wheel_arch_from_gpu_type
+        
+        # Open log files for frontend
+        frontend_stdout = open('/logs/frontend.out', 'w')
+        frontend_stderr = open('/logs/frontend.err', 'w')
+        
         arch = get_wheel_arch_from_gpu_type(gpu_type)
         frontend_cmd = (
             f"python3 -m pip install /configs/ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_{arch}.whl && "
             f"python3 -m pip install /configs/ai_dynamo-0.7.0-py3-none-any.whl && "
             f"python3 -m dynamo.frontend --http-port=8000"
         )
-        frontend_process = run_command(frontend_cmd, background=True)
+        frontend_process = run_command(frontend_cmd, background=True, stdout=frontend_stdout, stderr=frontend_stderr)
         if not frontend_process:
             raise RuntimeError("Failed to start frontend")
-        logging.info("Frontend started in background")
+        logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
+        logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
     else:
         logging.info(f"Setting up aggregated worker {worker_idx}, local rank {local_rank}")
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
