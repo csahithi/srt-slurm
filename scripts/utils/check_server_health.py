@@ -51,15 +51,19 @@ def check_server_health(expected_n_prefill, expected_n_decode, response):
 
     for instance in decoded_response["instances"]:
         if instance.get("endpoint") == "generate":
-            # In aggregated mode, the component is "backend"
+            # In disaggregated mode: prefill reports as "prefill", decode reports as "backend"
+            # In aggregated mode: workers report as "backend"
             if instance.get("component") == "prefill":
                 expected_n_prefill -= 1
-            if instance.get("component") == "decode":
+            elif instance.get("component") == "decode":
                 expected_n_decode -= 1
-            # In aggregated mode, we just count total workers against prefills
-            # (since aggregated workers do both)
-            if instance.get("component") == "backend":
-                expected_n_prefill -= 1
+            elif instance.get("component") == "backend":
+                # If we're still waiting for decode workers, count backend as decode
+                # Otherwise, count as prefill (aggregated mode)
+                if expected_n_decode > 0:
+                    expected_n_decode -= 1
+                else:
+                    expected_n_prefill -= 1
 
     if expected_n_prefill <= 0 and expected_n_decode <= 0:
         return f"Model is ready. Response: {response}"
