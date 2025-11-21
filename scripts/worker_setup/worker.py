@@ -47,6 +47,22 @@ def setup_prefill_worker(
     # Only setup infrastructure in traditional mode (not multiple frontends)
     if not multiple_frontends_enabled and worker_idx == 0 and local_rank == 0:
         setup_head_prefill_node(master_ip)
+        if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
+            raise RuntimeError("Failed to connect to etcd")
+        
+        # Start frontend in background (traditional mode)
+        logging.info("Starting frontend in traditional mode")
+        from .command import get_wheel_arch_from_gpu_type
+        arch = get_wheel_arch_from_gpu_type(gpu_type)
+        frontend_cmd = (
+            f"python3 -m pip install /configs/ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_{arch}.whl && "
+            f"python3 -m pip install /configs/ai_dynamo-0.7.0-py3-none-any.whl && "
+            f"python3 -m dynamo.frontend --http-port=8000"
+        )
+        frontend_process = run_command(frontend_cmd, background=True)
+        if not frontend_process:
+            raise RuntimeError("Failed to start frontend")
+        logging.info("Frontend started in background")
     else:
         logging.info(f"Setting up prefill worker {worker_idx}, local rank {local_rank}")
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
@@ -121,6 +137,22 @@ def setup_aggregated_worker(
     # Only setup infrastructure in traditional mode (not multiple frontends) on first worker, first node
     if not multiple_frontends_enabled and worker_idx == 0 and local_rank == 0:
         setup_head_prefill_node(master_ip)
+        if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
+            raise RuntimeError("Failed to connect to etcd")
+        
+        # Start frontend in background (traditional mode)
+        logging.info("Starting frontend in traditional mode")
+        from .command import get_wheel_arch_from_gpu_type
+        arch = get_wheel_arch_from_gpu_type(gpu_type)
+        frontend_cmd = (
+            f"python3 -m pip install /configs/ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_{arch}.whl && "
+            f"python3 -m pip install /configs/ai_dynamo-0.7.0-py3-none-any.whl && "
+            f"python3 -m dynamo.frontend --http-port=8000"
+        )
+        frontend_process = run_command(frontend_cmd, background=True)
+        if not frontend_process:
+            raise RuntimeError("Failed to start frontend")
+        logging.info("Frontend started in background")
     else:
         logging.info(f"Setting up aggregated worker {worker_idx}, local rank {local_rank}")
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
