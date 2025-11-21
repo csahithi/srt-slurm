@@ -13,9 +13,6 @@ resources:
   decode_workers: 1
   gpus_per_node: 4
 
-sweep:
-  ep-size: [1, 4]
-
 backend:
 
   prefill_environment:
