@@ -44,31 +44,13 @@ def setup_prefill_worker(
     sglang_config_path: str | None = None,
 ) -> int:
     """Setup the prefill worker."""
-    # Only setup infrastructure in traditional mode (not multiple frontends)
-    if not multiple_frontends_enabled and worker_idx == 0 and local_rank == 0:
+    # Setup infrastructure first (if traditional mode)
+    need_frontend = not multiple_frontends_enabled and worker_idx == 0 and local_rank == 0
+    
+    if need_frontend:
         setup_head_prefill_node(master_ip)
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
             raise RuntimeError("Failed to connect to etcd")
-        
-        # Start frontend in background (traditional mode)
-        logging.info("Starting frontend in traditional mode")
-        from .command import get_wheel_arch_from_gpu_type
-        
-        # Open log files for frontend
-        frontend_stdout = open('/logs/frontend.out', 'w')
-        frontend_stderr = open('/logs/frontend.err', 'w')
-        
-        arch = get_wheel_arch_from_gpu_type(gpu_type)
-        frontend_cmd = (
-            f"python3 -m pip install /configs/ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_{arch}.whl && "
-            f"python3 -m pip install /configs/ai_dynamo-0.7.0-py3-none-any.whl && "
-            f"python3 -m dynamo.frontend --http-port=8000"
-        )
-        frontend_process = run_command(frontend_cmd, background=True, stdout=frontend_stdout, stderr=frontend_stderr)
-        if not frontend_process:
-            raise RuntimeError("Failed to start frontend")
-        logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
-        logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
     else:
         logging.info(f"Setting up prefill worker {worker_idx}, local rank {local_rank}")
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
@@ -76,6 +58,21 @@ def setup_prefill_worker(
 
     # Install dynamo wheels
     install_dynamo_wheels(gpu_type)
+    
+    # Start frontend AFTER installing wheels (traditional mode only)
+    if need_frontend:
+        logging.info("Starting frontend in traditional mode (after wheel installation)")
+        
+        # Open log files for frontend
+        frontend_stdout = open('/logs/frontend.out', 'w')
+        frontend_stderr = open('/logs/frontend.err', 'w')
+        
+        frontend_cmd = "python3 -m dynamo.frontend --http-port=8000"
+        frontend_process = run_command(frontend_cmd, background=True, stdout=frontend_stdout, stderr=frontend_stderr)
+        if not frontend_process:
+            raise RuntimeError("Failed to start frontend")
+        logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
+        logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
     
     # Apply temporary patch
     _patch_sglang_engine(local_rank)
@@ -140,31 +137,13 @@ def setup_aggregated_worker(
     sglang_config_path: str | None = None,
 ) -> int:
     """Setup the aggregated worker."""
-    # Only setup infrastructure in traditional mode (not multiple frontends) on first worker, first node
-    if not multiple_frontends_enabled and worker_idx == 0 and local_rank == 0:
+    # Setup infrastructure first (if traditional mode)
+    need_frontend = not multiple_frontends_enabled and worker_idx == 0 and local_rank == 0
+    
+    if need_frontend:
         setup_head_prefill_node(master_ip)
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
             raise RuntimeError("Failed to connect to etcd")
-        
-        # Start frontend in background (traditional mode)
-        logging.info("Starting frontend in traditional mode")
-        from .command import get_wheel_arch_from_gpu_type
-        
-        # Open log files for frontend
-        frontend_stdout = open('/logs/frontend.out', 'w')
-        frontend_stderr = open('/logs/frontend.err', 'w')
-        
-        arch = get_wheel_arch_from_gpu_type(gpu_type)
-        frontend_cmd = (
-            f"python3 -m pip install /configs/ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_{arch}.whl && "
-            f"python3 -m pip install /configs/ai_dynamo-0.7.0-py3-none-any.whl && "
-            f"python3 -m dynamo.frontend --http-port=8000"
-        )
-        frontend_process = run_command(frontend_cmd, background=True, stdout=frontend_stdout, stderr=frontend_stderr)
-        if not frontend_process:
-            raise RuntimeError("Failed to start frontend")
-        logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
-        logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
     else:
         logging.info(f"Setting up aggregated worker {worker_idx}, local rank {local_rank}")
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
@@ -172,6 +151,21 @@ def setup_aggregated_worker(
 
     # Install dynamo wheels
     install_dynamo_wheels(gpu_type)
+    
+    # Start frontend AFTER installing wheels (traditional mode only)
+    if need_frontend:
+        logging.info("Starting frontend in traditional mode (after wheel installation)")
+        
+        # Open log files for frontend
+        frontend_stdout = open('/logs/frontend.out', 'w')
+        frontend_stderr = open('/logs/frontend.err', 'w')
+        
+        frontend_cmd = "python3 -m dynamo.frontend --http-port=8000"
+        frontend_process = run_command(frontend_cmd, background=True, stdout=frontend_stdout, stderr=frontend_stderr)
+        if not frontend_process:
+            raise RuntimeError("Failed to start frontend")
+        logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
+        logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
     
     # Apply temporary patch
     _patch_sglang_engine(local_rank)
