@@ -293,6 +293,35 @@ class JobConfig(BaseModel):
 
         is_disaggregated = self.resources.prefill_nodes is not None
         gpus_per_node = self.resources.gpus_per_node
+        
+        # Validate that sglang_config sections match resource allocation mode
+        sglang_cfg = self.backend.sglang_config
+        has_prefill_cfg = sglang_cfg.prefill is not None
+        has_decode_cfg = sglang_cfg.decode is not None
+        has_agg_cfg = hasattr(sglang_cfg, "aggregated") and sglang_cfg.aggregated is not None
+        
+        if is_disaggregated:
+            # Disaggregated resources but no prefill/decode config
+            if not has_prefill_cfg and not has_decode_cfg:
+                raise ValueError(
+                    "Disaggregated mode (prefill_nodes/decode_nodes) requires "
+                    "prefill and decode sections in sglang_config. "
+                    f"Found: prefill={has_prefill_cfg}, decode={has_decode_cfg}"
+                )
+            # Has aggregated config but using disaggregated resources
+            if has_agg_cfg:
+                raise ValueError(
+                    "Cannot use aggregated sglang_config section with disaggregated resources. "
+                    "Use prefill and decode sections instead, or switch to agg_nodes/agg_workers."
+                )
+        else:
+            # Aggregated resources but has decode config
+            if has_decode_cfg:
+                raise ValueError(
+                    "Cannot use decode sglang_config section with aggregated resources "
+                    "(agg_nodes/agg_workers). Use disaggregated resources "
+                    "(prefill_nodes/decode_nodes) or use aggregated section in sglang_config."
+                )
 
         # Validate disaggregated mode
         if is_disaggregated:

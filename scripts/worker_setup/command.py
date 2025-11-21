@@ -24,13 +24,8 @@ def build_sglang_command_from_yaml(
     dynamo.sglang supports reading config from YAML:
         python3 -m dynamo.sglang --config file.yaml --config-key prefill
 
-    This builds the command with:
-    - Environment variables from YAML config
-    - Python module (dynamo.sglang or sglang.launch_server)
-    - --config and --config-key flags to read YAML
-    - Coordination flags (dist-init-addr, nnodes, node-rank)
-
-    Parallelism flags (ep-size, tp-size, dp-size) come from the YAML config itself.
+    sglang.launch_server (profiling mode) requires explicit flags:
+        python3 -m sglang.launch_server --model-path /model/ --tp 4 ...
 
     Args:
         worker_type: "prefill", "decode", or "aggregated"
@@ -46,7 +41,7 @@ def build_sglang_command_from_yaml(
     """
     import yaml
 
-    # Load config to extract environment variables
+    # Load config to extract environment variables and mode config
     with open(sglang_config_path) as f:
         sglang_config = yaml.safe_load(f)
 
@@ -64,17 +59,44 @@ def build_sglang_command_from_yaml(
     # Determine Python module based on profiling mode
     python_module = "sglang.launch_server" if use_profiling else "dynamo.sglang"
 
-    # Build command parts - only add coordination flags
-    # All SGLang-specific flags (including ep-size, tp-size, dp-size) come from YAML
-    cmd_parts = [
-        f"python3 -m {python_module}",
-        f"--config {sglang_config_path}",
-        f"--config-key {config_key}",
-        f"--dist-init-addr {host_ip}:{port}",
-        f"--nnodes {total_nodes}",
-        f"--node-rank {rank}",
-        "--host 0.0.0.0",
-    ]
+    if use_profiling:
+        # Profiling mode: inline all flags (sglang.launch_server doesn't support --config)
+        mode_config = sglang_config.get(config_key, {})
+        cmd_parts = [f"python3 -m {python_module}"]
+        
+        # Add all SGLang flags from config
+        for key, value in sorted(mode_config.items()):
+            flag_name = key.replace("_", "-")
+            # Skip disaggregation-mode flag for profiling
+            if flag_name == "disaggregation-mode":
+                continue
+            if isinstance(value, bool):
+                if value:
+                    cmd_parts.append(f"--{flag_name}")
+            elif isinstance(value, list):
+                values_str = " ".join(str(v) for v in value)
+                cmd_parts.append(f"--{flag_name} {values_str}")
+            else:
+                cmd_parts.append(f"--{flag_name} {value}")
+        
+        # Add coordination flags
+        cmd_parts.extend([
+            f"--dist-init-addr {host_ip}:{port}",
+            f"--nnodes {total_nodes}",
+            f"--node-rank {rank}",
+            "--host 0.0.0.0",
+        ])
+    else:
+        # Normal mode: use --config and --config-key (dynamo.sglang supports this)
+        cmd_parts = [
+            f"python3 -m {python_module}",
+            f"--config {sglang_config_path}",
+            f"--config-key {config_key}",
+            f"--dist-init-addr {host_ip}:{port}",
+            f"--nnodes {total_nodes}",
+            f"--node-rank {rank}",
+            "--host 0.0.0.0",
+        ]
 
     # Combine environment exports and command
     full_command = " && ".join(env_exports + [" ".join(cmd_parts)]) if env_exports else " ".join(cmd_parts)
