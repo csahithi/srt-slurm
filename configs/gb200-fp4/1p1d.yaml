@@ -1,4 +1,4 @@
-name: "gb200-fp4-1p1d"
+name: "gb200-fp4-1p1d-cutlass-backend"
 
 model:
   path: "dsfp4"
@@ -35,7 +35,7 @@ backend:
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
     SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
-    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "trtllm" # this might be a bit faster
+    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass" 
 
   decode_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
@@ -54,7 +54,7 @@ backend:
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
     SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
-    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "trtllm" # this might be a bit faster
+    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass" 
 
   sglang_config:
     prefill:
@@ -70,7 +70,7 @@ backend:
       stream-interval: 10
       watchdog-timeout: 1000000
       context-length: 2200
-      mem-fraction-static: 0.90
+      mem-fraction-static: 0.95
       max-total-tokens: 8192
       chunked-prefill-size: 8192
       cuda-graph-max-bs: 128
@@ -95,7 +95,7 @@ backend:
       stream-interval: 10
       watchdog-timeout: 1000000
       context-length: 2200
-      mem-fraction-static: 0.90
+      mem-fraction-static: 0.95
       max-total-tokens: 8192
       chunked-prefill-size: 8192
       cuda-graph-max-bs: 128
@@ -111,5 +111,5 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: "4x8x32x64x128x256x512x1024"
+  concurrencies: "4x8x32x64x112x128"
   req_rate: "inf"
