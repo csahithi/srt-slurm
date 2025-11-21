@@ -1,4 +1,4 @@
-.PHONY: lint test setup-configs dashboard sync-to-cloud sync-run delete-from-cloud cleanup
+.PHONY: lint typecheck test setup-configs dashboard sync-to-cloud sync-run delete-from-cloud cleanup
 
 NATS_VERSION ?= v2.10.28
 ETCD_VERSION ?= v3.5.21
@@ -12,15 +12,15 @@ lint:
 	uvx pre-commit run --all-files
 
 test:
-	cd /Users/idhanani/Desktop/benchmarks/infbench && uv run python -m tests.test_basic && uv run python -m tests.test_aggregations
+	uv run pytest tests/
 
 dashboard:
-	uv run streamlit run dashboard/app.py
+	uv run streamlit run analysis/dashboard/app.py
 
 sync-to-cloud:
 	@echo "☁️  Syncing benchmark results to cloud storage..."
 	@echo "📁 Logs directory: $(LOGS_DIR)"
-	@uv run python -m srtslurm.sync_results --logs-dir $(LOGS_DIR) push-all
+	@uv run python -m analysis.srtlog.sync_results --logs-dir $(LOGS_DIR) push-all
 	@echo "✅ Sync complete!"
 
 sync-run:
@@ -30,7 +30,7 @@ sync-run:
 		exit 1; \
 	fi
 	@echo "☁️  Syncing run $(RUN_ID) to cloud storage..."
-	@uv run python -m srtslurm.sync_results --logs-dir $(LOGS_DIR) push $(LOGS_DIR)/$(RUN_ID)
+	@uv run python -m analysis.srtlog.sync_results --logs-dir $(LOGS_DIR) push $(LOGS_DIR)/$(RUN_ID)
 	@echo "✅ Sync complete!"
 
 delete-from-cloud:
@@ -39,7 +39,7 @@ delete-from-cloud:
 		echo "Usage: make delete-from-cloud RUN_ID=3667_1P_1D_20251110_192145"; \
 		exit 1; \
 	fi
-	@uv run python -m srtslurm.sync_results delete $(RUN_ID)
+	@uv run python -m analysis.srtlog.sync_results delete $(RUN_ID)
 
 setup:
 	@echo "📦 Setting up configs and logs directories..."
@@ -50,12 +50,10 @@ setup:
 		aarch64) ARCH_SHORT="arm64" ;; \
 		*) echo "❌ Unsupported architecture: $(ARCH)"; exit 1 ;; \
 	esac; \
-	echo "⬇️  Downloading Python wheels..."; \
-	wget -q --show-progress -P configs https://files.pythonhosted.org/packages/dc/b7/62fb0edaeae0943731d0e1d3e1455b0a8a94ef448aa5bd8ffe33288ab464/ai_dynamo-0.6.1-py3-none-any.whl; \
-	echo "⬇️  Downloading ai_dynamo_runtime for aarch64 (GB200)..."; \
-	wget -q --show-progress -P configs https://files.pythonhosted.org/packages/b8/0c/076268db6ff2c87663a0d70f7ce7a6a1c566ac1383981d9c82437de2ff98/ai_dynamo_runtime-0.6.1-cp310-abi3-manylinux_2_28_aarch64.whl; \
-	echo "⬇️  Downloading ai_dynamo_runtime for x86_64 (H100)..."; \
-	wget -q --show-progress -P configs https://files.pythonhosted.org/packages/99/fc/cd7172407aeb07fc83fa94eb51281280847e5ec7fb3c6aedb1a02cf4e7ea/ai_dynamo_runtime-0.6.1-cp310-abi3-manylinux_2_28_x86_64.whl; \
+	echo "⬇️  Downloading Python wheels (version 0.7.0)..."; \
+	echo "⚠️  Note: Please ensure ai_dynamo-0.7.0-py3-none-any.whl is available in configs/"; \
+	echo "⚠️  Note: Please ensure ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_aarch64.whl is available in configs/"; \
+	echo "⚠️  Note: Please ensure ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_x86_64.whl is available in configs/"; \
 	echo "⬇️  Downloading NATS ($(NATS_VERSION)) for $$ARCH_SHORT..."; \
 	NATS_DEB="nats-server-$(NATS_VERSION)-$$ARCH_SHORT.deb"; \
 	NATS_URL="https://github.com/nats-io/nats-server/releases/download/$(NATS_VERSION)/$$NATS_DEB"; \
@@ -91,35 +89,41 @@ setup:
 	else \
 		echo "Creating srtslurm.yaml with your cluster settings..."; \
 		echo ""; \
+		SRTCTL_ROOT=$$(pwd); \
+		echo "📍 Auto-detected srtctl root: $$SRTCTL_ROOT"; \
+		echo ""; \
 		read -p "Enter SLURM account [restricted]: " account; \
 		account=$${account:-restricted}; \
 		read -p "Enter SLURM partition [batch]: " partition; \
 		partition=$${partition:-batch}; \
-		read -p "Enter network interface [enP6p9s0np0]: " network; \
-		network=$${network:-enP6p9s0np0}; \
-		read -p "Enter GPUs per node [8]: " gpus_per_node; \
-		gpus_per_node=$${gpus_per_node:-8}; \
+		read -p "Enter GPUs per node [4]: " gpus_per_node; \
+		gpus_per_node=$${gpus_per_node:-4}; \
 		read -p "Enter time limit [4:00:00]: " time_limit; \
 		time_limit=$${time_limit:-4:00:00}; \
-		read -p "Enter container image path (optional): " container; \
-		container=$${container:-}; \
 		echo ""; \
 		echo "# SRT SLURM Configuration" > srtslurm.yaml; \
+		echo "# This file provides cluster-specific defaults and settings for srtctl" >> srtslurm.yaml; \
 		echo "" >> srtslurm.yaml; \
-		echo "cluster:" >> srtslurm.yaml; \
-		echo "  account: \"$$account\"" >> srtslurm.yaml; \
-		echo "  partition: \"$$partition\"" >> srtslurm.yaml; \
-		echo "  network_interface: \"$$network\"" >> srtslurm.yaml; \
-		echo "  gpus_per_node: $$gpus_per_node" >> srtslurm.yaml; \
-		echo "  time_limit: \"$$time_limit\"" >> srtslurm.yaml; \
-		echo "  container_image: \"$$container\"" >> srtslurm.yaml; \
+		echo "# Default SLURM settings" >> srtslurm.yaml; \
+		echo "default_account: \"$$account\"" >> srtslurm.yaml; \
+		echo "default_partition: \"$$partition\"" >> srtslurm.yaml; \
+		echo "default_time_limit: \"$$time_limit\"" >> srtslurm.yaml; \
 		echo "" >> srtslurm.yaml; \
+		echo "# Resource defaults" >> srtslurm.yaml; \
+		echo "gpus_per_node: $$gpus_per_node" >> srtslurm.yaml; \
+		echo "network_interface: \"\"" >> srtslurm.yaml; \
+		echo "" >> srtslurm.yaml; \
+		echo "# Path to srtctl repo root (where scripts/templates/ lives)" >> srtslurm.yaml; \
+		echo "# Auto-detected from current directory" >> srtslurm.yaml; \
+		echo "srtctl_root: \"$$SRTCTL_ROOT\"" >> srtslurm.yaml; \
+		echo "" >> srtslurm.yaml; \
+		echo "# Cloud sync settings (optional)" >> srtslurm.yaml; \
 		echo "cloud:" >> srtslurm.yaml; \
 		echo "  endpoint_url: \"\"" >> srtslurm.yaml; \
 		echo "  bucket: \"\"" >> srtslurm.yaml; \
 		echo "  prefix: \"benchmark-results/\"" >> srtslurm.yaml; \
 		echo "✅ Created srtslurm.yaml"; \
-		echo "   You can edit it anytime or run: cp srtslurm.yaml.example srtslurm.yaml"; \
+		echo "   You can edit it anytime to add model_paths, containers, etc."; \
 	fi
 
 cleanup:
