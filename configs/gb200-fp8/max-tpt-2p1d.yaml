@@ -16,11 +16,6 @@ resources:
   decode_workers: 1
   gpus_per_node: 4
 
-slurm:
-  account: null
-  partition: null
-  time_limit: null
-
 backend:
 
   # Prefill-specific environment variables
