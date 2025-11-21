@@ -317,7 +317,7 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
 
                 metadata["profiler_metadata"] = profiler_metadata
 
-            with open(log_dir / "jobid.json", "w") as f:
+            with open(log_dir / f"{job_id}.json", "w") as f:
                 json.dump(metadata, f, indent=2)
 
             logging.info(f"📁 Logs directory: {log_dir}")

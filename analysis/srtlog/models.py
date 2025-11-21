@@ -31,6 +31,9 @@ class RunMetadata:
     gpu_type: str = ""
     enable_multiple_frontends: bool = False
     num_additional_frontends: int = 0
+    # Aggregated mode fields
+    agg_nodes: int = 0
+    agg_workers: int = 0
 
     @classmethod
     def from_json(cls, json_data: dict, run_path: str) -> "RunMetadata":
@@ -44,6 +47,7 @@ class RunMetadata:
             RunMetadata instance
         """
         run_meta = json_data.get("run_metadata", {})
+        mode = run_meta.get("mode", "disaggregated")
 
         return cls(
             job_id=run_meta.get("slurm_job_id", ""),
@@ -54,7 +58,7 @@ class RunMetadata:
             decode_nodes=run_meta.get("decode_nodes", 0),
             prefill_workers=run_meta.get("prefill_workers", 0),
             decode_workers=run_meta.get("decode_workers", 0),
-            mode=run_meta.get("mode", "disaggregated"),
+            mode=mode,
             job_name=run_meta.get("job_name", ""),
             partition=run_meta.get("partition", ""),
             model_dir=run_meta.get("model_dir", ""),
@@ -62,12 +66,32 @@ class RunMetadata:
             gpu_type=run_meta.get("gpu_type", ""),
             enable_multiple_frontends=run_meta.get("enable_multiple_frontends", False),
             num_additional_frontends=run_meta.get("num_additional_frontends", 0),
+            agg_nodes=run_meta.get("agg_nodes", 0),
+            agg_workers=run_meta.get("agg_workers", 0),
         )
 
     @property
+    def is_aggregated(self) -> bool:
+        """Check if this is an aggregated mode run."""
+        return self.mode == "aggregated" or self.agg_nodes > 0
+
+    @property
     def total_gpus(self) -> int:
-        """Calculate total GPU count."""
+        """Calculate total GPU count for both modes."""
+        if self.is_aggregated:
+            return self.agg_nodes * self.gpus_per_node
         return (self.prefill_nodes + self.decode_nodes) * self.gpus_per_node
+
+    @property
+    def topology_label(self) -> str:
+        """Get topology label appropriate for the mode.
+        
+        Returns:
+            "XP/YD" for disaggregated, "XA" for aggregated
+        """
+        if self.is_aggregated:
+            return f"{self.agg_workers}A"
+        return f"{self.prefill_workers}P/{self.decode_workers}D"
 
     @property
     def formatted_date(self) -> str:

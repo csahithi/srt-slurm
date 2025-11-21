@@ -82,7 +82,7 @@ def render_sidebar(logs_dir, runs):
     with st.sidebar.expander("🔧 Topology", expanded=False):
         topologies = set()
         for run in sorted_runs:
-            topology = f"{run.metadata.prefill_workers}P/{run.metadata.decode_workers}D"
+            topology = run.metadata.topology_label
             topologies.add(topology)
 
         if topologies:
@@ -98,7 +98,7 @@ def render_sidebar(logs_dir, runs):
                 sorted_runs = [
                     r
                     for r in sorted_runs
-                    if f"{r.metadata.prefill_workers}P/{r.metadata.decode_workers}D" in selected_topologies
+                    if r.metadata.topology_label in selected_topologies
                 ]
         else:
             st.caption("No topology information available")
@@ -180,7 +180,7 @@ def render_sidebar(logs_dir, runs):
     label_to_run = {}
 
     for run in sorted_runs:
-        topology = f"{run.metadata.prefill_workers}P/{run.metadata.decode_workers}D"
+        topology = run.metadata.topology_label
         isl = run.profiler.isl
         osl = run.profiler.osl
         gpu_type = run.metadata.gpu_type
@@ -265,27 +265,39 @@ def render_sidebar(logs_dir, runs):
             )
 
     # Extract run IDs for graph lookups
-    selected_runs = [
-        f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
-        for run in filtered_runs
-    ]
+    selected_runs = []
+    for run in filtered_runs:
+        if run.metadata.is_aggregated:
+            run_id = f"{run.job_id}_{run.metadata.agg_workers}A_{run.metadata.run_date}"
+        else:
+            run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+        selected_runs.append(run_id)
 
     # Build legend labels for graphs
     run_legend_labels = {}
     for run in filtered_runs:
-        run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
-
-        # Calculate from metadata (straight from {jobid}.json)
-        prefill_gpus = run.metadata.prefill_nodes * run.metadata.gpus_per_node
-        decode_gpus = run.metadata.decode_nodes * run.metadata.gpus_per_node
-
-        # Format: id | xPyD | numgpusP/numgpusD | isl/osl | gputype
-        label = (
-            f"{run.job_id} | "
-            f"{run.metadata.prefill_workers}P{run.metadata.decode_workers}D | "
-            f"{prefill_gpus}/{decode_gpus} | "
-            f"{run.profiler.isl}/{run.profiler.osl}"
-        )
+        if run.metadata.is_aggregated:
+            run_id = f"{run.job_id}_{run.metadata.agg_workers}A_{run.metadata.run_date}"
+            total_gpus = run.metadata.agg_nodes * run.metadata.gpus_per_node
+            # Format: id | xA | numgpus | isl/osl | gputype
+            label = (
+                f"{run.job_id} | "
+                f"{run.metadata.agg_workers}A | "
+                f"{total_gpus} GPUs | "
+                f"{run.profiler.isl}/{run.profiler.osl}"
+            )
+        else:
+            run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            # Calculate from metadata (straight from {jobid}.json)
+            prefill_gpus = run.metadata.prefill_nodes * run.metadata.gpus_per_node
+            decode_gpus = run.metadata.decode_nodes * run.metadata.gpus_per_node
+            # Format: id | xPyD | numgpusP/numgpusD | isl/osl | gputype
+            label = (
+                f"{run.job_id} | "
+                f"{run.metadata.prefill_workers}P{run.metadata.decode_workers}D | "
+                f"{prefill_gpus}/{decode_gpus} | "
+                f"{run.profiler.isl}/{run.profiler.osl}"
+            )
 
         if run.metadata.gpu_type:
             label += f" | {run.metadata.gpu_type}"

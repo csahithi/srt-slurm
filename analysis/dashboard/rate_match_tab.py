@@ -29,10 +29,26 @@ def render(filtered_runs: list, logs_dir: str):
     - Decode rate above prefill = prefill bottleneck (decode nodes underutilized)
     """)
 
+    # Filter out aggregated runs (rate matching doesn't apply to aggregated mode)
+    disagg_runs = [run for run in filtered_runs if not run.metadata.is_aggregated]
+    agg_runs = [run for run in filtered_runs if run.metadata.is_aggregated]
+
+    if agg_runs:
+        agg_count = len(agg_runs)
+        st.info(
+            f"ℹ️ Rate match analysis is not applicable to aggregated mode. "
+            f"Skipping {agg_count} aggregated run(s): "
+            + ", ".join([f"Job {r.job_id}" for r in agg_runs])
+        )
+
+    if not disagg_runs:
+        st.warning("No disaggregated runs selected. Rate match analysis requires disaggregated (prefill/decode) runs.")
+        return
+
     st.divider()
 
     # Render each run in its own section
-    for idx, run in enumerate(filtered_runs):
+    for idx, run in enumerate(disagg_runs):
         run_path = run.metadata.path
 
         # Load node metrics
@@ -69,7 +85,7 @@ def render(filtered_runs: list, logs_dir: str):
             st.plotly_chart(rate_fig, width="stretch", key=f"rate_match_{run.job_id}")
 
         # Add divider between runs except for the last one
-        if idx < len(filtered_runs) - 1:
+        if idx < len(disagg_runs) - 1:
             st.divider()
 
 

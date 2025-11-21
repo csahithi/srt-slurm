@@ -618,17 +618,26 @@ def get_node_label(node_data: dict) -> str:
     # If we have run metadata, use it for context
     if run_metadata:
         job_id = run_metadata.get("job_id", "")
-        prefill_workers = run_metadata.get("prefill_workers", 0)
-        decode_workers = run_metadata.get("decode_workers", 0)
+        is_aggregated = run_metadata.get("is_aggregated", False)
         gpus_per_node = run_metadata.get("gpus_per_node", 0)
-        prefill_nodes = run_metadata.get("prefill_nodes", 0)
-        decode_nodes = run_metadata.get("decode_nodes", 0)
 
-        prefill_gpus = prefill_nodes * gpus_per_node
-        decode_gpus = decode_nodes * gpus_per_node
+        if is_aggregated:
+            agg_workers = run_metadata.get("agg_workers", 0)
+            agg_nodes = run_metadata.get("agg_nodes", 0)
+            total_gpus = agg_nodes * gpus_per_node
+            # Format: id | xA | total_gpus | node
+            return f"{job_id} | {agg_workers}A | {total_gpus} GPUs | {node_short}"
+        else:
+            prefill_workers = run_metadata.get("prefill_workers", 0)
+            decode_workers = run_metadata.get("decode_workers", 0)
+            prefill_nodes = run_metadata.get("prefill_nodes", 0)
+            decode_nodes = run_metadata.get("decode_nodes", 0)
 
-        # Format: id | xPyD | prefill_gpus/decode_gpus | node
-        return f"{job_id} | {prefill_workers}P{decode_workers}D | {prefill_gpus}/{decode_gpus} | {node_short}"
+            prefill_gpus = prefill_nodes * gpus_per_node
+            decode_gpus = decode_nodes * gpus_per_node
+
+            # Format: id | xPyD | prefill_gpus/decode_gpus | node
+            return f"{job_id} | {prefill_workers}P{decode_workers}D | {prefill_gpus}/{decode_gpus} | {node_short}"
     else:
         # Fallback for old code without metadata
         return node_short
