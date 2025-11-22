@@ -1,10 +1,6 @@
-# Monitoring Jobs
-
-This guide covers how to monitor running jobs and understand the log structure produced by srtctl.
+# Monitoring
 
 ## Checking Job Status
-
-### SLURM Commands
 
 ```bash
 # List your running jobs
@@ -17,7 +13,7 @@ scontrol show job <job_id>
 scancel <job_id>
 ```
 
-### Watching Logs
+## Log Directory
 
 After submission, `srtctl` tells you where logs are stored:
 ```
@@ -25,84 +21,63 @@ Submitted batch job 4459
 Logs: logs/4459_4P_1D_20251122_041341/
 ```
 
-Watch the main log in real-time:
-```bash
-tail -f logs/4459_4P_1D_20251122_041341/log.out
-```
+The directory name follows the pattern: `{job_id}_{prefill}P_{decode}D_{timestamp}`
 
-## Log Directory Structure
-
-Each job creates a directory with this naming pattern:
-```
-logs/{job_id}_{prefill}P_{decode}D_{timestamp}/
-```
-
-For example: `logs/4459_4P_1D_20251122_041341/` means:
-- Job ID: 4459
-- 4 Prefill workers, 1 Decode worker
-- Started: Nov 22, 2025 at 04:13:41
-
-### Directory Contents
+## Log Structure
 
 ```
 logs/4459_4P_1D_20251122_041341/
-├── config.yaml                    # Resolved job configuration
-├── sglang_config.yaml             # SGLang worker configuration
-├── sbatch_script.sh               # Generated SLURM script
-├── 4459.json                      # Job metadata
-├── nginx.conf                     # Load balancer configuration
 │
-├── log.out                        # Main job stdout
-├── log.err                        # Main job stderr
-├── benchmark.out                  # Benchmark results stdout
-├── benchmark.err                  # Benchmark stderr
+├── config.yaml                              # Resolved job configuration
+├── sglang_config.yaml                       # SGLang worker configuration
+├── sbatch_script.sh                         # Generated SLURM script
+├── nginx.conf                               # Load balancer configuration
+├── 4459.json                                # Job metadata
 │
-├── {node}_prefill_w{n}.out        # Prefill worker stdout
-├── {node}_prefill_w{n}.err        # Prefill worker stderr
-├── {node}_decode_w{n}.out         # Decode worker stdout
-├── {node}_decode_w{n}.err         # Decode worker stderr
-├── {node}_frontend_{n}.out        # Frontend stdout
-├── {node}_frontend_{n}.err        # Frontend stderr
-├── {node}_nginx.out               # Nginx stdout
-├── {node}_nginx.err               # Nginx stderr
+├── log.out                                  # Main orchestration stdout
+├── log.err                                  # Main orchestration stderr
+├── benchmark.out                            # Benchmark results
+├── benchmark.err                            # Benchmark errors
 │
-├── {node}_config.json             # Per-node SGLang config dump
+├── {node}_prefill_w{n}.out                  # Prefill worker stdout
+├── {node}_prefill_w{n}.err                  # Prefill worker stderr (SGLang logs)
+├── {node}_decode_w{n}.out                   # Decode worker stdout
+├── {node}_decode_w{n}.err                   # Decode worker stderr (SGLang logs)
+├── {node}_frontend_{n}.out                  # Frontend stdout
+├── {node}_frontend_{n}.err                  # Frontend stderr
+├── {node}_nginx.out                         # Nginx stdout
+├── {node}_nginx.err                         # Nginx stderr
+├── {node}_config.json                       # Per-node SGLang config dump
 │
-├── cached_assets/                 # Cached model assets
-└── sa-bench_isl_{isl}_osl_{osl}/  # Benchmark results directory
+├── cached_assets/                           # Cached model assets
+└── sa-bench_isl_1024_osl_1024/              # Benchmark results
+    ├── isl_1024_osl_1024_concurrency_128_req_rate_inf.json
+    ├── isl_1024_osl_1024_concurrency_512_req_rate_inf.json
+    └── ...
 ```
 
-## Understanding Key Log Files
+## Key Files
 
-### log.out - Main Job Log
+### log.out
 
-Shows the orchestration process:
+The main orchestration log showing node assignments, worker launches, and the frontend URL:
 
 ```
 Node 0: watchtower-aqua-cn01
 Node 1: watchtower-aqua-cn02
-Node 2: watchtower-aqua-cn03
 ...
 Master IP address (node 1): 10.30.1.49
 Nginx node (node 0): watchtower-aqua-cn01
-Additional frontend 1 on node 2: watchtower-aqua-cn03 (10.30.1.106)
 ...
 Prefill worker 0 leader: watchtower-aqua-cn01 (10.30.1.163)
 Launching prefill worker 0, node 0 (local_rank 0): watchtower-aqua-cn01
 ...
 Decode worker 0 leader: watchtower-aqua-cn05 (10.30.1.153)
-Launching decode worker 0, node 4 (local_rank 0): watchtower-aqua-cn05
 ...
 Frontend available at: http://watchtower-aqua-cn01:8000
 ```
 
-Key information:
-- Node assignments
-- IP addresses for debugging
-- Worker launch commands
-- Frontend URL for manual testing
-
-### benchmark.out - Benchmark Results
+### benchmark.out
 
 Shows benchmark progress and results:
 
@@ -128,68 +103,33 @@ P99 TPOT (ms):                           22.36
 ==================================================
 ```
 
-Key metrics:
-- **Request throughput** - Requests per second
-- **Output token throughput** - Tokens generated per second
-- **TTFT** - Time to first token (latency to start generating)
-- **TPOT** - Time per output token (generation speed)
-- **ITL** - Inter-token latency
-- **E2EL** - End-to-end latency
+### Worker Logs ({node}_prefill_w0.err, {node}_decode_w0.err)
 
-### Worker Logs
+SGLang worker logs showing model loading, memory allocation, and runtime info. Check these for debugging CUDA errors, OOM issues, or NCCL failures.
 
-Worker logs (`{node}_prefill_w0.err`, `{node}_decode_w0.err`) show SGLang worker initialization and runtime logs. Useful for debugging:
+### config.yaml
 
-- Model loading progress
-- Memory allocation
-- CUDA errors
-- NCCL communication issues
+The fully resolved configuration showing exactly what ran, with all aliases expanded and defaults applied.
 
-### config.yaml - Resolved Configuration
-
-The fully resolved configuration with all defaults applied. Useful to verify what actually ran.
-
-## Benchmark Results Directory
-
-Benchmark JSON files are saved in a subdirectory:
-```
-sa-bench_isl_1024_osl_1024/
-├── isl_1024_osl_1024_concurrency_128_req_rate_inf.json
-├── isl_1024_osl_1024_concurrency_512_req_rate_inf.json
-└── ...
-```
-
-Each JSON file contains detailed per-request metrics for analysis.
-
-## Common Monitoring Workflows
-
-### Check if workers are ready
+## Common Commands
 
 ```bash
-# Look for "Model is ready" in benchmark output
-grep -i "ready" logs/4459_*/benchmark.out
+# Watch main log
+tail -f logs/4459_*/log.out
 
-# Or check health endpoint (from log.out, find frontend URL)
-curl http://<frontend-node>:8000/health
-```
+# Watch benchmark progress
+tail -f logs/4459_*/benchmark.out
 
-### Debug a failing worker
-
-```bash
-# Find which worker failed
+# Check for errors across all workers
 grep -l "Error\|Exception\|CUDA" logs/4459_*/*.err
 
 # Check specific worker
-cat logs/4459_*/watchtower-aqua-cn05_decode_w0.err | tail -100
-```
+cat logs/4459_*/*_decode_w0.err | tail -100
 
-### Compare benchmark runs
-
-```bash
-# Extract throughput from multiple runs
+# Compare throughput across runs
 for dir in logs/*/; do
   echo "=== $dir ==="
-  grep "Output token throughput" "$dir/benchmark.out"
+  grep "Output token throughput" "$dir/benchmark.out" 2>/dev/null
 done
 ```
 
@@ -201,24 +141,6 @@ The log.out file includes commands to connect to running nodes:
 # Connect to nginx node
 srun --jobid 4459 -w watchtower-aqua-cn01 --overlap --pty bash
 
-# Connect to master node (NATS/ETCD)
+# Connect to master node
 srun --jobid 4459 -w watchtower-aqua-cn02 --overlap --pty bash
-```
-
-From inside the container, you can:
-- Check process status with `ps aux`
-- Test endpoints with `curl`
-- Inspect GPU memory with `nvidia-smi`
-
-## Cleaning Up
-
-```bash
-# Cancel running job
-scancel 4459
-
-# Archive old logs
-tar -czvf logs_archive.tar.gz logs/
-
-# Remove old logs
-rm -rf logs/old_job_*/
 ```
