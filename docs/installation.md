@@ -25,13 +25,13 @@ uname -m
 
 This returns either `x86_64` (AMD/Intel) or `aarch64` (ARM). The setup downloads architecture-specific binaries for NATS and ETCD.
 
+**Important:** The login node architecture sometimes differs from the compute nodes. For example, you might be on a Grace Hopper cluster with ARM compute nodes, but your login node could be x86_64. Always check with `uname -m` and use the architecture that matches your **compute nodes**.
+
 Then run setup with your architecture:
 ```bash
-make setup ARCH=aarch64  # For ARM systems (aarch64)
-make setup ARCH=x86_64   # For AMD/Intel systems (x86_64)
+make setup ARCH=aarch64  # For ARM systems (e.g., Grace Hopper)
+make setup ARCH=x86_64   # For AMD/Intel systems
 ```
-
-Note: `make setup` without `ARCH` defaults to your current shell's architecture, but it's best to specify it explicitly to avoid issues.
 
 The setup will:
 1. Download NATS and ETCD binaries for your architecture
