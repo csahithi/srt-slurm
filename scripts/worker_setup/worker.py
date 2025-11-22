@@ -75,8 +75,9 @@ def setup_prefill_worker(
         logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
         logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
     
-    # Apply temporary patch
-    _patch_sglang_engine(local_rank)
+    # Apply temporary patch (only for gb200, not gb300)
+    if gpu_type.startswith("gb200") and not gpu_type.startswith("gb300"):
+        _patch_sglang_engine(local_rank)
 
     # Build and execute SGLang command from YAML config
     cmd_to_run = get_gpu_command(
@@ -112,8 +113,9 @@ def setup_decode_worker(
     # Install dynamo wheels
     install_dynamo_wheels(gpu_type)
     
-    # Apply temporary patch
-    _patch_sglang_engine(local_rank)
+    # Apply temporary patch (only for gb200, not gb300)
+    if gpu_type.startswith("gb200") and not gpu_type.startswith("gb300"):
+        _patch_sglang_engine(local_rank)
 
     # Build and execute SGLang command from YAML config
     cmd_to_run = get_gpu_command(
@@ -172,8 +174,9 @@ def setup_aggregated_worker(
         logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
         logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
     
-    # Apply temporary patch
-    _patch_sglang_engine(local_rank)
+    # Apply temporary patch (only for gb200, not gb300)
+    if gpu_type.startswith("gb200") and not gpu_type.startswith("gb300"):
+        _patch_sglang_engine(local_rank)
 
     # Build and execute SGLang command from YAML config
     cmd_to_run = get_gpu_command(
