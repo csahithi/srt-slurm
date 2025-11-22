@@ -25,16 +25,13 @@ uname -m
 
 This returns either `x86_64` (AMD/Intel) or `aarch64` (ARM). The setup downloads architecture-specific binaries for NATS and ETCD.
 
-Then run setup:
+Then run setup with your architecture:
 ```bash
-make setup
+make setup ARCH=aarch64  # For ARM systems (aarch64)
+make setup ARCH=x86_64   # For AMD/Intel systems (x86_64)
 ```
 
-If your architecture isn't auto-detected correctly, specify it explicitly:
-```bash
-make setup ARCH=aarch64  # For ARM systems
-make setup ARCH=x86_64   # For AMD/Intel systems
-```
+Note: `make setup` without `ARCH` defaults to your current shell's architecture, but it's best to specify it explicitly to avoid issues.
 
 The setup will:
 1. Download NATS and ETCD binaries for your architecture
