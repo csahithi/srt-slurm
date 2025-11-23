@@ -19,7 +19,12 @@ def get_wheel_arch_from_gpu_type(gpu_type: str) -> str:
     Returns:
         "aarch64" for GB200/GB300, "x86_64" for H100
     """
-    if gpu_type.startswith("gb200") or gpu_type.startswith("gb300"):
+    aarch64_gpu_types = (
+        "gb200",
+        "gb300",
+        "gh200",
+    )
+    if gpu_type.startswith(aarch64_gpu_types):
         return "aarch64"
     elif gpu_type.startswith("h100"):
         return "x86_64"
