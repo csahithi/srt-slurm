@@ -26,7 +26,14 @@ Running large language models across multiple GPUs and nodes requires orchestrat
 
 ## How It Works
 
-When you run `srtctl config.yaml`, the tool validates your configuration, resolves any aliases from your cluster config, generates a SLURM batch script and SGLang configuration files, then submits to SLURM. Once allocated, workers launch inside containers, discover each other through ETCD and NATS, and begin serving. If you've configured a benchmark, it runs automatically against the serving endpoint and saves results to the log directory.
+When you run `srtctl apply -f config.yaml`, the tool validates your configuration, resolves any aliases from your cluster config, generates a SLURM batch script and SGLang configuration files, then submits to SLURM. Once allocated, workers launch inside containers, discover each other through ETCD and NATS, and begin serving. If you've configured a benchmark, it runs automatically against the serving endpoint and saves results to the log directory.
+
+## Commands
+
+- `srtctl apply -f <config>` - Submit job(s) to SLURM (auto-detects sweep configs)
+- `srtctl apply -f <config> --setup-script <script>` - Submit with custom setup script
+- `srtctl dry-run -f <config>` - Validate and preview without submitting
+- `srtctl validate -f <config>` - Alias for dry-run
 
 ## Next Steps
 

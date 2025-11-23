@@ -147,7 +147,7 @@ class DryRunContext:
         print("\n" + "=" * 60 + "\n")
 
 
-def submit_single(config_path: Path = None, config: dict = None, dry_run: bool = False):
+def submit_single(config_path: Path = None, config: dict = None, dry_run: bool = False, setup_script: str = None):
     """
     Submit a single job from YAML config.
 
@@ -155,6 +155,7 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
         config_path: Path to YAML config file (or None if config provided)
         config: Pre-loaded config dict (or None if loading from path)
         dry_run: If True, don't submit to SLURM, just validate and save artifacts
+        setup_script: Optional custom setup script name in configs directory
     """
     # Load config if needed
     if config is None:
@@ -173,7 +174,7 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
         # Create backend instance
         backend_type = config.get("backend", {}).get("type")
         if backend_type == "sglang":
-            backend = SGLangBackend(config)
+            backend = SGLangBackend(config, setup_script=setup_script)
             sglang_config_path = backend.generate_config_file()
             ctx.save_sglang_config(sglang_config_path)
 
@@ -197,7 +198,7 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
     # Create backend and generate config
     backend_type = config.get("backend", {}).get("type")
     if backend_type == "sglang":
-        backend = SGLangBackend(config)
+        backend = SGLangBackend(config, setup_script=setup_script)
         sglang_config_path = backend.generate_config_file()
 
         # Generate SLURM job script using backend
@@ -332,13 +333,24 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
         raise ValueError(f"Unknown backend type: {backend_type}")
 
 
-def submit_sweep(config_path: Path, dry_run: bool = False):
+def is_sweep_config(config_path: Path) -> bool:
+    """Check if config file is a sweep config by looking for 'sweep' section."""
+    try:
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+        return "sweep" in config if config else False
+    except Exception:
+        return False
+
+
+def submit_sweep(config_path: Path, dry_run: bool = False, setup_script: str = None):
     """
     Submit parameter sweep.
 
     Args:
         config_path: Path to sweep YAML config
         dry_run: If True, don't submit to SLURM, just validate and save artifacts
+        setup_script: Optional custom setup script name in configs directory
     """
     # Load YAML directly without validation (sweep configs have extra 'sweep' field)
     with open(config_path) as f:
@@ -376,7 +388,7 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
 
             # Generate SGLang config and commands
             if config.get("backend", {}).get("type") == "sglang":
-                backend = SGLangBackend(config)
+                backend = SGLangBackend(config, setup_script=setup_script)
                 sglang_config_path = backend.generate_config_file(params)
                 if sglang_config_path:
                     shutil.copy(sglang_config_path, job_dir / "sglang_config.yaml")
@@ -404,7 +416,7 @@ def submit_sweep(config_path: Path, dry_run: bool = False):
     for i, (config, params) in enumerate(configs, 1):
         logging.info(f"\n[{i}/{len(configs)}] Submitting: {config['name']}")
         logging.info(f"  Parameters: {params}")
-        submit_single(config=config, dry_run=False)
+        submit_single(config=config, dry_run=False, setup_script=setup_script)
 
 
 def main():
@@ -416,27 +428,65 @@ def main():
         epilog="""
 Examples:
   # Submit from YAML config
-  srtctl config.yaml
+  srtctl apply -f config.yaml
 
-  # Submit sweep
-  srtctl sweep.yaml --sweep
+  # Submit sweep (auto-detected from config)
+  srtctl apply -f sweep.yaml
+
+  # Submit with custom setup script
+  srtctl apply -f config.yaml --setup-script custom-setup.sh
 
   # Dry-run (validate without submitting)
-  srtctl config.yaml --dry-run
+  srtctl dry-run -f config.yaml
 
-  # Dry-run sweep (generate all configs without submitting)
-  srtctl sweep.yaml --sweep --dry-run
+  # Validate alias
+  srtctl validate -f config.yaml
+
+  # Force sweep mode (if auto-detection fails)
+  srtctl apply -f config.yaml --sweep
         """,
     )
 
-    # Primary argument: config file
-    parser.add_argument("config", type=Path, help="YAML config file")
+    # Subcommands
+    subparsers = parser.add_subparsers(dest="command", help="Command to run", required=True)
 
-    # Mode flags
-    parser.add_argument("--sweep", action="store_true", help="Treat as sweep config (multiple jobs)")
+    # Apply command
+    apply_parser = subparsers.add_parser("apply", help="Submit job(s) to SLURM")
+    apply_parser.add_argument(
+        "-f", "--file", type=Path, required=True, dest="config", help="YAML config file"
+    )
+    apply_parser.add_argument(
+        "--sweep",
+        action="store_true",
+        help="Force sweep mode (usually auto-detected)",
+    )
+    apply_parser.add_argument(
+        "--setup-script",
+        type=str,
+        default=None,
+        help="Custom setup script name in configs directory (e.g., 'custom-setup.sh')",
+    )
 
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Validate and generate artifacts without submitting to SLURM"
+    # Dry-run command
+    dry_run_parser = subparsers.add_parser("dry-run", help="Validate and generate artifacts without submitting")
+    dry_run_parser.add_argument(
+        "-f", "--file", type=Path, required=True, dest="config", help="YAML config file"
+    )
+    dry_run_parser.add_argument(
+        "--sweep",
+        action="store_true",
+        help="Force sweep mode (usually auto-detected)",
+    )
+
+    # Validate command (alias for dry-run)
+    validate_parser = subparsers.add_parser("validate", help="Alias for dry-run")
+    validate_parser.add_argument(
+        "-f", "--file", type=Path, required=True, dest="config", help="YAML config file"
+    )
+    validate_parser.add_argument(
+        "--sweep",
+        action="store_true",
+        help="Force sweep mode (usually auto-detected)",
     )
 
     args = parser.parse_args()
@@ -446,11 +496,24 @@ Examples:
         logging.error(f"Config file not found: {args.config}")
         sys.exit(1)
 
+    # Determine if dry-run mode
+    is_dry_run = args.command in ("dry-run", "validate")
+
+    # Auto-detect sweep unless explicitly set
+    is_sweep = args.sweep
+    if not is_sweep:
+        try:
+            is_sweep = is_sweep_config(args.config)
+            if is_sweep:
+                logging.info("Auto-detected sweep config")
+        except Exception as e:
+            logging.warning(f"Could not auto-detect sweep mode: {e}")
+
     try:
-        if args.sweep:
-            submit_sweep(args.config, dry_run=args.dry_run)
+        if is_sweep:
+            submit_sweep(args.config, dry_run=is_dry_run, setup_script=getattr(args, "setup_script", None))
         else:
-            submit_single(args.config, dry_run=args.dry_run)
+            submit_single(args.config, dry_run=is_dry_run, setup_script=getattr(args, "setup_script", None))
     except Exception as e:
         logging.exception(f"Error: {e}")
         sys.exit(1)

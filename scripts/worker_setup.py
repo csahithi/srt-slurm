@@ -115,6 +115,13 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
         help="Path to sglang_config.yaml for YAML-based configs (enables direct command execution)",
     )
 
+    parser.add_argument(
+        "--setup-script",
+        type=str,
+        default=None,
+        help="Custom setup script name in /configs directory (e.g., 'custom-setup.sh')",
+    )
+
     return parser.parse_args(args)
 
 
@@ -178,6 +185,7 @@ def main(input_args: list[str] | None = None):
             args.sglang_torch_profiler,
             args.sglang_config_path,
             args.dump_config_path,
+            args.setup_script,
         )
     elif args.worker_type == "decode":
         setup_decode_worker(
@@ -190,6 +198,7 @@ def main(input_args: list[str] | None = None):
             args.sglang_torch_profiler,
             args.sglang_config_path,
             args.dump_config_path,
+            args.setup_script,
         )
     elif args.worker_type == "aggregated":
         setup_aggregated_worker(
@@ -203,6 +212,7 @@ def main(input_args: list[str] | None = None):
             args.sglang_torch_profiler,
             args.sglang_config_path,
             args.dump_config_path,
+            args.setup_script,
         )
 
     logging.info(f"{args.worker_type.capitalize()} worker setup complete")

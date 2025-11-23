@@ -6,8 +6,9 @@
 import logging
 import os
 
+from .command import install_dynamo_wheels
 from .environment import ETCD_CLIENT_PORT, ETCD_LISTEN_ADDR, ETCD_PEER_PORT
-from .utils import get_wheel_arch_from_gpu_type, run_command, wait_for_etcd
+from .utils import run_command, wait_for_etcd
 
 
 def setup_head_prefill_node(prefill_host_ip: str) -> None:
@@ -56,11 +57,9 @@ def setup_frontend_worker(worker_idx: int, master_ip: str, gpu_type: str) -> int
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
             raise RuntimeError("Failed to connect to etcd")
 
-    # Install wheels and run frontend
-    arch = get_wheel_arch_from_gpu_type(gpu_type)
-    frontend_cmd = (
-        f"python3 -m pip install /configs/ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_{arch}.whl && "
-        f"python3 -m pip install /configs/ai_dynamo-0.7.0-py3-none-any.whl && "
-        f"python3 -m dynamo.frontend --http-port=8000"
-    )
+    # Install dynamo wheels
+    install_dynamo_wheels(gpu_type)
+
+    # Run frontend
+    frontend_cmd = "python3 -m dynamo.frontend --http-port=8000"
     return run_command(frontend_cmd)

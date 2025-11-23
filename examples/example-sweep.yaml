@@ -70,5 +70,5 @@ benchmark:
 #   4. example-sweep_chunked_prefill_size8192_max_total_tokens16384
 #
 # Usage:
-#   uv run srtctl example-sweep.yaml --sweep --dry-run  # Preview jobs
-#   uv run srtctl example-sweep.yaml --sweep            # Submit all jobs
+#   uv run srtctl dry-run -f example-sweep.yaml  # Preview jobs (sweep auto-detected)
+#   uv run srtctl apply -f example-sweep.yaml    # Submit all jobs (sweep auto-detected)

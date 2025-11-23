@@ -9,13 +9,16 @@ YAML-based toolkit for distributed LLM inference benchmarks on SLURM clusters us
 make setup ARCH=aarch64  # or ARCH=x86_64
 
 # Submit a job
-uv run srtctl configs/example.yaml
+uv run srtctl apply -f configs/example.yaml
 
 # Validate without submitting
-uv run srtctl configs/example.yaml --dry-run
+uv run srtctl dry-run -f configs/example.yaml
 
-# Parameter sweep
-uv run srtctl configs/example-sweep.yaml --sweep
+# Parameter sweep (auto-detected from config)
+uv run srtctl apply -f configs/example-sweep.yaml
+
+# Submit with custom setup script
+uv run srtctl apply -f configs/example.yaml --setup-script custom-setup.sh
 ```
 
 ## Example Config
@@ -60,6 +63,7 @@ benchmark:
 - **Parameter sweeps** - Grid search with `{placeholder}` syntax
 - **Dry-run validation** - Preview before submitting
 - **Auto-generated SLURM scripts** - SGLang configs and job scripts generated automatically
+- **Custom setup scripts** - Run custom initialization on worker nodes before starting workers
 
 ## Configuration
 

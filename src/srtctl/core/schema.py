@@ -396,7 +396,12 @@ class JobConfig(BaseModel):
             config_dict = config
 
         if isinstance(config_dict, dict):
-            tp_size = config_dict.get("tensor-parallel-size") or config_dict.get("tensor_parallel_size")
+            tp_size = (
+                config_dict.get("tensor-parallel-size")
+                or config_dict.get("tensor_parallel_size")
+                or config_dict.get("tp-size")
+                or config_dict.get("tp_size")
+            )
 
         if not tp_size:
             # No TP size specified, can't validate

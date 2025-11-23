@@ -78,5 +78,5 @@ benchmark:
 # Notes:
 # - All SGLang flags are passed directly to the SGLang CLI (--flag-name value)
 # - For full list of SGLang flags, see SGLang documentation
-# - Use dry-run mode to preview generated commands: uv run srtctl example.yaml --dry-run
+# - Use dry-run mode to preview generated commands: uv run srtctl dry-run -f example.yaml
 # - Logs saved to: logs/{JOB_ID}_{WORKERS}_{TIMESTAMP}/

@@ -129,7 +129,13 @@ benchmark:
 Always validate before submitting:
 
 ```bash
-srtctl configs/my-job.yaml --dry-run
+srtctl dry-run -f configs/my-job.yaml
+```
+
+Or use the `validate` alias:
+
+```bash
+srtctl validate -f configs/my-job.yaml
 ```
 
 This validates your config, resolves aliases, generates all files, and saves them to `dry-runs/` without submitting to SLURM.
@@ -137,7 +143,7 @@ This validates your config, resolves aliases, generates all files, and saves the
 ## Submit the Job
 
 ```bash
-srtctl configs/my-job.yaml
+srtctl apply -f configs/my-job.yaml
 ```
 
 Output:
@@ -148,3 +154,39 @@ Logs: logs/12345_1P_4D_20251122_143052/
 ```
 
 See [Monitoring](monitoring.md) for how to monitor your job and understand the detailed log structure.
+
+## Custom Setup Scripts
+
+You can run custom initialization scripts on worker nodes before starting SGLang workers. This is useful for:
+
+- Setting up custom environment variables
+- Installing additional dependencies
+- Configuring system settings
+- Running pre-flight checks
+
+### Creating a Setup Script
+
+1. Create your setup script in the `configs/` directory:
+
+   ```bash
+   # configs/custom-setup.sh
+   #!/bin/bash
+   export CUSTOM_VAR="value"
+   echo "Running custom setup..."
+   # Your initialization code here
+   ```
+
+2. Make it executable:
+
+   ```bash
+   chmod +x configs/custom-setup.sh
+   ```
+
+3. Submit with the `--setup-script` flag:
+   ```bash
+   srtctl apply -f configs/my-job.yaml --setup-script custom-setup.sh
+   ```
+
+The script will be executed on each worker node (prefill, decode, and aggregated) before installing Dynamo wheels and starting the SGLang workers. The script must be located in the `configs/` directory, which is mounted into containers at `/configs/`.
+
+**Note**: If you don't specify `--setup-script`, the system will look for `setup-script.sh` in the configs directory. If neither exists, setup script execution is skipped.
