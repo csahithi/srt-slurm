@@ -47,7 +47,7 @@ def setup_prefill_worker(
     """Setup the prefill worker."""
     # Setup infrastructure first (if traditional mode)
     need_frontend = not multiple_frontends_enabled and worker_idx == 0 and local_rank == 0
-    
+
     if need_frontend:
         setup_head_prefill_node(master_ip)
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
@@ -59,22 +59,22 @@ def setup_prefill_worker(
 
     # Install dynamo wheels
     install_dynamo_wheels(gpu_type)
-    
+
     # Start frontend AFTER installing wheels (traditional mode only)
     if need_frontend:
         logging.info("Starting frontend in traditional mode (after wheel installation)")
-        
+
         # Open log files for frontend
-        frontend_stdout = open('/logs/frontend.out', 'w')
-        frontend_stderr = open('/logs/frontend.err', 'w')
-        
+        frontend_stdout = open("/logs/frontend.out", "w")
+        frontend_stderr = open("/logs/frontend.err", "w")
+
         frontend_cmd = "python3 -m dynamo.frontend --http-port=8000"
         frontend_process = run_command(frontend_cmd, background=True, stdout=frontend_stdout, stderr=frontend_stderr)
         if not frontend_process:
             raise RuntimeError("Failed to start frontend")
         logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
         logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
-    
+
     # Apply temporary patch (only for gb200, not gb300)
     if gpu_type.startswith("gb200") and not gpu_type.startswith("gb300"):
         _patch_sglang_engine(local_rank)
@@ -112,7 +112,7 @@ def setup_decode_worker(
 
     # Install dynamo wheels
     install_dynamo_wheels(gpu_type)
-    
+
     # Apply temporary patch (only for gb200, not gb300)
     if gpu_type.startswith("gb200") and not gpu_type.startswith("gb300"):
         _patch_sglang_engine(local_rank)
@@ -146,7 +146,7 @@ def setup_aggregated_worker(
     """Setup the aggregated worker."""
     # Setup infrastructure first (if traditional mode)
     need_frontend = not multiple_frontends_enabled and worker_idx == 0 and local_rank == 0
-    
+
     if need_frontend:
         setup_head_prefill_node(master_ip)
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
@@ -158,22 +158,22 @@ def setup_aggregated_worker(
 
     # Install dynamo wheels
     install_dynamo_wheels(gpu_type)
-    
+
     # Start frontend AFTER installing wheels (traditional mode only)
     if need_frontend:
         logging.info("Starting frontend in traditional mode (after wheel installation)")
-        
+
         # Open log files for frontend
-        frontend_stdout = open('/logs/frontend.out', 'w')
-        frontend_stderr = open('/logs/frontend.err', 'w')
-        
+        frontend_stdout = open("/logs/frontend.out", "w")
+        frontend_stderr = open("/logs/frontend.err", "w")
+
         frontend_cmd = "python3 -m dynamo.frontend --http-port=8000"
         frontend_process = run_command(frontend_cmd, background=True, stdout=frontend_stdout, stderr=frontend_stderr)
         if not frontend_process:
             raise RuntimeError("Failed to start frontend")
         logging.info(f"Frontend started in background (PID: {frontend_process.pid})")
         logging.info("Frontend logs: /logs/frontend.out and /logs/frontend.err")
-    
+
     # Apply temporary patch (only for gb200, not gb300)
     if gpu_type.startswith("gb200") and not gpu_type.startswith("gb300"):
         _patch_sglang_engine(local_rank)

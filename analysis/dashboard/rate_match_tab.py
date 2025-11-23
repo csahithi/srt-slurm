@@ -37,8 +37,7 @@ def render(filtered_runs: list, logs_dir: str):
         agg_count = len(agg_runs)
         st.info(
             f"ℹ️ Rate match analysis is not applicable to aggregated mode. "
-            f"Skipping {agg_count} aggregated run(s): "
-            + ", ".join([f"Job {r.job_id}" for r in agg_runs])
+            f"Skipping {agg_count} aggregated run(s): " + ", ".join([f"Job {r.job_id}" for r in agg_runs])
         )
 
     if not disagg_runs:

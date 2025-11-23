@@ -31,8 +31,10 @@ def render(filtered_runs: list):
         if run.metadata.is_aggregated:
             run_id = f"{run.job_id}_{run.metadata.agg_workers}A_{run.metadata.run_date}"
         else:
-            run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
-        
+            run_id = (
+                f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            )
+
         run_path = run.metadata.path
         run_date = run.metadata.formatted_date
 

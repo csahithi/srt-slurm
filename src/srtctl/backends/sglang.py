@@ -176,13 +176,13 @@ class SGLangBackend(Backend):
         """
         # Get value from config (defaults to True in schema)
         enable_config_dump = self.config.get("enable_config_dump", True)
-        
+
         # Auto-disable when profiling is enabled (unless explicitly set to True)
         if self.backend_config.get("enable_profiling", False):
             # When profiling, disable config dump by default
             # User can explicitly set enable_config_dump: true to override
             return False
-        
+
         return enable_config_dump
 
     def generate_slurm_script(self, config_path: Path = None, timestamp: str = None) -> tuple[Path, str]:

@@ -64,7 +64,7 @@ def build_sglang_command_from_yaml(
         # Profiling mode: inline all flags (sglang.launch_server doesn't support --config)
         mode_config = sglang_config.get(config_key, {})
         cmd_parts = [f"python3 -m {python_module}"]
-        
+
         # Add all SGLang flags from config
         for key, value in sorted(mode_config.items()):
             flag_name = key.replace("_", "-")
@@ -79,14 +79,16 @@ def build_sglang_command_from_yaml(
                 cmd_parts.append(f"--{flag_name} {values_str}")
             else:
                 cmd_parts.append(f"--{flag_name} {value}")
-        
+
         # Add coordination flags
-        cmd_parts.extend([
-            f"--dist-init-addr {host_ip}:{port}",
-            f"--nnodes {total_nodes}",
-            f"--node-rank {rank}",
-            "--host 0.0.0.0",
-        ])
+        cmd_parts.extend(
+            [
+                f"--dist-init-addr {host_ip}:{port}",
+                f"--nnodes {total_nodes}",
+                f"--node-rank {rank}",
+                "--host 0.0.0.0",
+            ]
+        )
     else:
         # Normal mode: use --config and --config-key (dynamo.sglang supports this)
         cmd_parts = [

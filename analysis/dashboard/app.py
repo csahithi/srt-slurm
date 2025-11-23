@@ -95,11 +95,7 @@ def render_sidebar(logs_dir, runs):
             )
 
             if selected_topologies:
-                sorted_runs = [
-                    r
-                    for r in sorted_runs
-                    if r.metadata.topology_label in selected_topologies
-                ]
+                sorted_runs = [r for r in sorted_runs if r.metadata.topology_label in selected_topologies]
         else:
             st.caption("No topology information available")
 
@@ -270,7 +266,9 @@ def render_sidebar(logs_dir, runs):
         if run.metadata.is_aggregated:
             run_id = f"{run.job_id}_{run.metadata.agg_workers}A_{run.metadata.run_date}"
         else:
-            run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            run_id = (
+                f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            )
         selected_runs.append(run_id)
 
     # Build legend labels for graphs
@@ -287,7 +285,9 @@ def render_sidebar(logs_dir, runs):
                 f"{run.profiler.isl}/{run.profiler.osl}"
             )
         else:
-            run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            run_id = (
+                f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
+            )
             # Calculate from metadata (straight from {jobid}.json)
             prefill_gpus = run.metadata.prefill_nodes * run.metadata.gpus_per_node
             decode_gpus = run.metadata.decode_nodes * run.metadata.gpus_per_node

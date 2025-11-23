@@ -9,7 +9,6 @@ Tests verify that the generated commands.sh files contain the expected
 flags and environment variables for both aggregated and disaggregated modes.
 """
 
-import tempfile
 from pathlib import Path
 
 from srtctl.backends.sglang import SGLangBackend
@@ -22,35 +21,27 @@ def test_basic_disaggregated_commands():
     # Create minimal disaggregated config
     config = {
         "name": "test-disagg",
-        "model": {
-            "path": "/models/test-model",
-            "container": "test.sqsh",
-            "precision": "fp8"
-        },
+        "model": {"path": "/models/test-model", "container": "test.sqsh", "precision": "fp8"},
         "resources": {
             "gpu_type": "gb200",
             "prefill_nodes": 1,
             "decode_nodes": 4,
             "prefill_workers": 1,
             "decode_workers": 4,
-            "gpus_per_node": 4
+            "gpus_per_node": 4,
         },
-        "slurm": {
-            "account": "test-account",
-            "partition": "test-partition",
-            "time_limit": "01:00:00"
-        },
+        "slurm": {"account": "test-account", "partition": "test-partition", "time_limit": "01:00:00"},
         "backend": {
             "type": "sglang",
             "prefill_environment": {
                 "TORCH_DISTRIBUTED_DEFAULT_TIMEOUT": "1800",
                 "PYTHONUNBUFFERED": "1",
-                "SGLANG_ENABLE_FLASHINFER_GEMM": "1"
+                "SGLANG_ENABLE_FLASHINFER_GEMM": "1",
             },
             "decode_environment": {
                 "TORCH_DISTRIBUTED_DEFAULT_TIMEOUT": "1800",
                 "PYTHONUNBUFFERED": "1",
-                "SGLANG_ENABLE_FLASHINFER_GEMM": "1"
+                "SGLANG_ENABLE_FLASHINFER_GEMM": "1",
             },
             "sglang_config": {
                 "prefill": {
@@ -64,7 +55,7 @@ def test_basic_disaggregated_commands():
                     "max-total-tokens": 8192,
                     "chunked-prefill-size": 8192,
                     "tensor-parallel-size": 4,
-                    "data-parallel-size": 1
+                    "data-parallel-size": 1,
                 },
                 "decode": {
                     "served-model-name": "test-model",
@@ -76,13 +67,11 @@ def test_basic_disaggregated_commands():
                     "disaggregation-mode": "decode",
                     "chunked-prefill-size": 8192,
                     "tensor-parallel-size": 4,
-                    "data-parallel-size": 1
-                }
-            }
+                    "data-parallel-size": 1,
+                },
+            },
         },
-        "benchmark": {
-            "type": "manual"
-        }
+        "benchmark": {"type": "manual"},
     }
 
     # Create backend and generate config
@@ -136,28 +125,15 @@ def test_basic_aggregated_commands():
     # Create minimal aggregated config
     config = {
         "name": "test-agg",
-        "model": {
-            "path": "/models/test-model",
-            "container": "test.sqsh",
-            "precision": "fp8"
-        },
-        "resources": {
-            "gpu_type": "gb200",
-            "agg_nodes": 4,
-            "agg_workers": 4,
-            "gpus_per_node": 4
-        },
-        "slurm": {
-            "account": "test-account",
-            "partition": "test-partition",
-            "time_limit": "01:00:00"
-        },
+        "model": {"path": "/models/test-model", "container": "test.sqsh", "precision": "fp8"},
+        "resources": {"gpu_type": "gb200", "agg_nodes": 4, "agg_workers": 4, "gpus_per_node": 4},
+        "slurm": {"account": "test-account", "partition": "test-partition", "time_limit": "01:00:00"},
         "backend": {
             "type": "sglang",
             "aggregated_environment": {
                 "TORCH_DISTRIBUTED_DEFAULT_TIMEOUT": "1800",
                 "PYTHONUNBUFFERED": "1",
-                "SGLANG_ENABLE_FLASHINFER_GEMM": "1"
+                "SGLANG_ENABLE_FLASHINFER_GEMM": "1",
             },
             "sglang_config": {
                 "aggregated": {
@@ -170,13 +146,11 @@ def test_basic_aggregated_commands():
                     "max-total-tokens": 16384,
                     "chunked-prefill-size": 8192,
                     "tensor-parallel-size": 4,
-                    "data-parallel-size": 1
+                    "data-parallel-size": 1,
                 }
-            }
+            },
         },
-        "benchmark": {
-            "type": "manual"
-        }
+        "benchmark": {"type": "manual"},
     }
 
     # Create backend and generate config
@@ -214,34 +188,21 @@ def test_environment_variable_handling():
     # Config with no environment variables
     config = {
         "name": "test-no-env",
-        "model": {
-            "path": "/models/test",
-            "container": "test.sqsh",
-            "precision": "fp8"
-        },
+        "model": {"path": "/models/test", "container": "test.sqsh", "precision": "fp8"},
         "resources": {
             "gpu_type": "gb200",
             "prefill_nodes": 1,
             "decode_nodes": 1,
             "prefill_workers": 1,
             "decode_workers": 1,
-            "gpus_per_node": 4
+            "gpus_per_node": 4,
         },
-        "slurm": {
-            "account": "test",
-            "partition": "test",
-            "time_limit": "01:00:00"
-        },
+        "slurm": {"account": "test", "partition": "test", "time_limit": "01:00:00"},
         "backend": {
             "type": "sglang",
-            "sglang_config": {
-                "prefill": {
-                    "model-path": "/model/",
-                    "tensor-parallel-size": 4
-                }
-            }
+            "sglang_config": {"prefill": {"model-path": "/model/", "tensor-parallel-size": 4}},
         },
-        "benchmark": {"type": "manual"}
+        "benchmark": {"type": "manual"},
     }
 
     backend = SGLangBackend(config)
@@ -273,36 +234,24 @@ def test_profiling_mode():
 
     config = {
         "name": "test-profiling",
-        "model": {
-            "path": "/models/test",
-            "container": "test.sqsh",
-            "precision": "fp8"
-        },
+        "model": {"path": "/models/test", "container": "test.sqsh", "precision": "fp8"},
         "resources": {
             "gpu_type": "gb200",
             "prefill_nodes": 1,
             "decode_nodes": 1,
             "prefill_workers": 1,
             "decode_workers": 1,
-            "gpus_per_node": 4
+            "gpus_per_node": 4,
         },
-        "slurm": {
-            "account": "test",
-            "partition": "test",
-            "time_limit": "01:00:00"
-        },
+        "slurm": {"account": "test", "partition": "test", "time_limit": "01:00:00"},
         "backend": {
             "type": "sglang",
             "enable_profiling": True,  # Enable profiling
             "sglang_config": {
-                "prefill": {
-                    "model-path": "/model/",
-                    "tensor-parallel-size": 4,
-                    "disaggregation-mode": "prefill"
-                }
-            }
+                "prefill": {"model-path": "/model/", "tensor-parallel-size": 4, "disaggregation-mode": "prefill"}
+            },
         },
-        "benchmark": {"type": "manual"}
+        "benchmark": {"type": "manual"},
     }
 
     backend = SGLangBackend(config)

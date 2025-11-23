@@ -29,11 +29,11 @@ def render(filtered_runs: list, logs_dir: str):
         logs_dir: Path to logs directory
     """
     st.subheader("Node-Level Metrics")
-    
+
     # Check if any runs are aggregated
     has_aggregated = any(run.metadata.is_aggregated for run in filtered_runs)
     has_disaggregated = any(not run.metadata.is_aggregated for run in filtered_runs)
-    
+
     if has_aggregated and has_disaggregated:
         st.markdown("""
         Runtime metrics extracted from log files. Mixed mode (aggregated + disaggregated runs selected).
@@ -55,9 +55,7 @@ def render(filtered_runs: list, logs_dir: str):
             if run.metadata.is_aggregated:
                 run_id = f"{run.job_id}_{run.metadata.agg_workers}A_{run.metadata.run_date}"
             else:
-                run_id = (
-                    f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
-                )
+                run_id = f"{run.job_id}_{run.metadata.prefill_workers}P_{run.metadata.decode_workers}D_{run.metadata.run_date}"
             if run_path and os.path.exists(run_path):
                 node_metrics = load_node_metrics(run_path)
                 for node_data in node_metrics:
@@ -90,7 +88,9 @@ def render(filtered_runs: list, logs_dir: str):
     decode_nodes = [n for n in all_node_metrics if n["node_info"]["worker_type"] == "decode"]
     agg_nodes = [n for n in all_node_metrics if n["node_info"]["worker_type"] in ["agg", "aggregated"]]
 
-    st.caption(f"📊 Found {len(prefill_nodes)} prefill nodes, {len(decode_nodes)} decode nodes, {len(agg_nodes)} aggregated nodes")
+    st.caption(
+        f"📊 Found {len(prefill_nodes)} prefill nodes, {len(decode_nodes)} decode nodes, {len(agg_nodes)} aggregated nodes"
+    )
 
     # Add toggle for aggregation
     aggregation_mode = st.radio(
@@ -169,7 +169,9 @@ def _render_agg_metrics(agg_nodes, group_by_dp, aggregate_all):
     kv_fig.update_xaxes(showgrid=True)
     kv_fig.update_yaxes(showgrid=True)
     st.plotly_chart(kv_fig, width="stretch", key="agg_kv_util")
-    st.caption("Percentage of KV cache memory currently in use - helps tune max-total-tokens and identify memory pressure")
+    st.caption(
+        "Percentage of KV cache memory currently in use - helps tune max-total-tokens and identify memory pressure"
+    )
 
     queue_fig = create_queue_depth_graph(agg_nodes, group_by_dp=group_by_dp, aggregate_all=aggregate_all)
     queue_fig.update_layout(title="Queued Requests")

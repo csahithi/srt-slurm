@@ -85,7 +85,7 @@ class RunMetadata:
     @property
     def topology_label(self) -> str:
         """Get topology label appropriate for the mode.
-        
+
         Returns:
             "XP/YD" for disaggregated, "XA" for aggregated
         """

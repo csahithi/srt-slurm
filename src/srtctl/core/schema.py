@@ -283,8 +283,7 @@ class JobConfig(BaseModel):
             # Aggregated mode
             if self.resources.agg_workers and self.resources.agg_workers > 1:
                 raise ValueError(
-                    f"Profiling mode requires single worker only. "
-                    f"Got agg_workers={self.resources.agg_workers}"
+                    f"Profiling mode requires single worker only. " f"Got agg_workers={self.resources.agg_workers}"
                 )
 
     def _validate_resources(self) -> None:
@@ -294,13 +293,13 @@ class JobConfig(BaseModel):
 
         is_disaggregated = self.resources.prefill_nodes is not None
         gpus_per_node = self.resources.gpus_per_node
-        
+
         # Validate that sglang_config sections match resource allocation mode
         sglang_cfg = self.backend.sglang_config
         has_prefill_cfg = sglang_cfg.prefill is not None
         has_decode_cfg = sglang_cfg.decode is not None
         has_agg_cfg = hasattr(sglang_cfg, "aggregated") and sglang_cfg.aggregated is not None
-        
+
         if is_disaggregated:
             # Disaggregated resources but no prefill/decode config
             if not has_prefill_cfg and not has_decode_cfg:
@@ -369,9 +368,7 @@ class JobConfig(BaseModel):
                     gpus_per_node=gpus_per_node,
                 )
 
-    def _validate_worker_resources(
-        self, mode: str, config: Any, nodes: int, workers: int, gpus_per_node: int
-    ) -> None:
+    def _validate_worker_resources(self, mode: str, config: Any, nodes: int, workers: int, gpus_per_node: int) -> None:
         """Validate that worker configuration fits available resources.
 
         Args:
