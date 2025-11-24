@@ -17,11 +17,6 @@ resources:
   decode_workers: 1
   gpus_per_node: 4
 
-slurm:
-  account: "your-account"
-  partition: "gpu"
-  time_limit: "02:00:00"
-
 backend:
   # Enable profiling mode - uses sglang.launch_server instead of dynamo.sglang
   enable_profiling: true

@@ -22,11 +22,6 @@ resources:
   decode_workers: 4
   gpus_per_node: 4
 
-slurm:
-  account: "your-account"
-  partition: "batch"
-  time_limit: "04:00:00"
-
 backend:
   prefill_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"

@@ -26,12 +26,6 @@ resources:
 
   gpus_per_node: 4     # GPUs per node (typically 4 for GB200, 8 for H100)
 
-# SLURM configuration (these override srtslurm.yaml defaults)
-slurm:
-  account: "your-account"      # SLURM account
-  partition: "batch"           # SLURM partition
-  time_limit: "04:00:00"       # Wall time limit (HH:MM:SS)
-
 # Backend configuration
 backend:
   # Optional: Environment variables for prefill workers
