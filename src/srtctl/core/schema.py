@@ -33,6 +33,11 @@ class ClusterConfig(BaseModel):
     # Resource defaults
     gpus_per_node: Optional[int] = Field(None, description="Default GPUs per node")
     network_interface: Optional[str] = Field(None, description="Network interface (e.g., enP6p9s0np0)")
+    
+    # SLURM directive compatibility
+    use_gpus_per_node_directive: Optional[bool] = Field(
+        True, description="Include #SBATCH --gpus-per-node directive (set False for incompatible clusters)"
+    )
 
     # Path settings
     srtctl_root: Optional[str] = Field(
