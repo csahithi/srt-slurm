@@ -18,6 +18,7 @@ Running large language models across multiple GPUs and nodes requires orchestrat
 `srtctl` orchestrates distributed inference using SGLang workers in either **disaggregated** or **aggregated** mode.
 
 **Disaggregated Mode** separates prefill and decode into specialized workers:
+
 - Prefill workers handle the initial prompt processing
 - Decode workers handle token generation
 - An nginx load balancer distributes requests across frontends
@@ -33,7 +34,6 @@ When you run `srtctl apply -f config.yaml`, the tool validates your configuratio
 - `srtctl apply -f <config>` - Submit job(s) to SLURM (auto-detects sweep configs)
 - `srtctl apply -f <config> --setup-script <script>` - Submit with custom setup script
 - `srtctl dry-run -f <config>` - Validate and preview without submitting
-- `srtctl validate -f <config>` - Alias for dry-run
 
 ## Next Steps
 
