@@ -41,6 +41,9 @@ The setup will:
    - Time limit (default: `4:00:00`)
 3. Create `srtslurm.yaml` with your settings
 
+> [!NOTE]
+> Until Dynamo 0.7.0 is released you will need to manually build the wheels and place them in the `configs/` directory.
+
 ## Configure srtslurm.yaml
 
 After setup, edit `srtslurm.yaml` to add model paths and containers:
@@ -153,12 +156,6 @@ Always validate before submitting:
 srtctl dry-run -f configs/my-job.yaml
 ```
 
-Or use the `validate` alias:
-
-```bash
-srtctl validate -f configs/my-job.yaml
-```
-
 This validates your config, resolves aliases, generates all files, and saves them to `dry-runs/` without submitting to SLURM.
 
 ## Submit the Job
@@ -182,8 +179,7 @@ You can run custom initialization scripts on worker nodes before starting SGLang
 
 - Setting up custom environment variables
 - Installing additional dependencies
-- Configuring system settings
-- Running pre-flight checks
+- Checking out custom code
 
 ### Creating a Setup Script
 
@@ -191,10 +187,15 @@ You can run custom initialization scripts on worker nodes before starting SGLang
 
    ```bash
    # configs/custom-setup.sh
+   # Example of checking out a specific branch of SGLang
    #!/bin/bash
-   export CUSTOM_VAR="value"
-   echo "Running custom setup..."
-   # Your initialization code here
+    cd /sgl-workspace/
+    rm -rf sglang
+    git clone https://github.com/sgl-project/sglang.git
+    cd sglang
+    git checkout origin/cheng/refactor/sbo
+    git config --global --add safe.directory "*"
+    pip install -e "python"
    ```
 
 2. Make it executable:
