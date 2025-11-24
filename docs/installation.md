@@ -75,6 +75,27 @@ enroot import docker://lmsysorg/sglang:v0.5.5
 mv lmsysorg+sglang+v0.5.5.sqsh /mnt/containers/
 ```
 
+### Cluster Compatibility Settings
+
+Some SLURM clusters don't support certain SBATCH directives. If you encounter errors during job submission, you may need to adjust these settings:
+
+#### GPU Resource Specification
+
+If you see this error when submitting jobs:
+
+```
+sbatch: error: Invalid generic resource (gres) specification
+```
+
+Your cluster doesn't support the `--gpus-per-node` directive. Disable it in `srtslurm.yaml`:
+
+```yaml
+# SLURM directive compatibility
+use_gpus_per_node_directive: false
+```
+
+This will omit the `#SBATCH --gpus-per-node` directive from generated job scripts while keeping all other functionality intact.
+
 ## Create a Job Config
 
 Create `configs/my-job.yaml`:
