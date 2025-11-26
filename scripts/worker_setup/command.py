@@ -91,7 +91,11 @@ def build_sglang_command_from_yaml(
         )
     else:
         # Normal mode: use --config and --config-key (dynamo.sglang supports this)
+        profile_path = dump_config_path.replace("_config.json", "_profile")
         cmd_parts = [
+            f"nsys profile --trace-fork-before-exec=true",
+            f"--cuda-graph-trace=node -o {profile_path}",
+            f"--delay 2100 --duration 15",
             f"python3 -m {python_module}",
             f"--config {sglang_config_path}",
             f"--config-key {config_key}",

@@ -16,6 +16,8 @@ resources:
   gpus_per_node: 4
 
 backend:
+  # Enable profiling mode - uses sglang.launch_server instead of dynamo.sglang
+  #enable_profiling: true
 
   # Prefill-specific environment variables
   prefill_environment:
@@ -54,9 +56,9 @@ backend:
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
     SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
+    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
     SGLANG_CUTEDSL_MOE_NVFP4_DISPATCH: "1"
-    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
 
   sglang_config:
     prefill:
@@ -172,5 +174,8 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: "1x128x512x2048x4096x8192x12000x15000"
+  concurrencies: "15000"
   req_rate: "inf"
+
+#benchmark:
+#type: "manual"  # Profiling runs without benchmarks

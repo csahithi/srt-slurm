@@ -5,8 +5,10 @@
 name: "gb200-fp8-profiling"
 
 model:
-  path: "/models/deepseek-r1"
-  container: "/containers/sglang.sqsh"
+  #path: "/models/deepseek-r1"
+  path: "deepseek-r1"  # Alias from srtslurm.yaml or full path like "/models/deepseek-r1"
+  #container: "/containers/sglang.sqsh"
+  container: "0.5.5.post2"
   precision: "fp8"
 
 resources:
