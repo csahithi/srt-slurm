@@ -33,7 +33,7 @@ make setup
 
 The setup will:
 
-1. Download Dynamo wheels and NATS/ETCD binaries
+1. Download NATS/ETCD binaries
 2. Prompt you for cluster settings:
    - SLURM account (default: `restricted`)
    - SLURM partition (default: `batch`)
@@ -41,8 +41,7 @@ The setup will:
    - Time limit (default: `4:00:00`)
 3. Create `srtslurm.yaml` with your settings
 
-> [!NOTE]
-> Until Dynamo 0.7.0 is released you will need to manually build the wheels and place them in the `configs/` directory.
+Dynamo 0.7.0 is now available on PyPI and will be installed automatically from pip when workers start.
 
 ## Configure srtslurm.yaml
 
@@ -209,6 +208,6 @@ You can run custom initialization scripts on worker nodes before starting SGLang
    srtctl apply -f configs/my-job.yaml --setup-script custom-setup.sh
    ```
 
-The script will be executed on each worker node (prefill, decode, and aggregated) before installing Dynamo wheels and starting the SGLang workers. The script must be located in the `configs/` directory, which is mounted into containers at `/configs/`.
+The script will be executed on each worker node (prefill, decode, and aggregated) before installing Dynamo from PyPI and starting the SGLang workers. The script must be located in the `configs/` directory, which is mounted into containers at `/configs/`.
 
 **Note**: Setup scripts only run when you explicitly specify `--setup-script`. No default setup script will run if this flag is omitted.

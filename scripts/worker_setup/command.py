@@ -7,8 +7,6 @@ import logging
 import os
 import subprocess
 
-from .utils import get_wheel_arch_from_gpu_type
-
 
 def build_sglang_command_from_yaml(
     worker_type: str,
@@ -112,31 +110,30 @@ def build_sglang_command_from_yaml(
 
 
 def install_dynamo_wheels(gpu_type: str) -> None:
-    """Install dynamo wheels.
+    """Install dynamo from PyPI.
 
     Args:
-        gpu_type: GPU type to determine architecture (e.g., "gb200-fp8", "h100-fp8")
+        gpu_type: GPU type (unused - pip auto-selects correct architecture)
     """
-    arch = get_wheel_arch_from_gpu_type(gpu_type)
-    logging.info(f"Installing dynamo wheels for architecture: {arch}")
+    logging.info("Installing dynamo 0.7.0 from PyPI")
 
-    # Install runtime wheel
-    runtime_whl = f"/configs/ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_{arch}.whl"
-    logging.info(f"Installing {runtime_whl}")
-    result = subprocess.run(["python3", "-m", "pip", "install", runtime_whl], capture_output=True, text=True)
+    # Install ai-dynamo-runtime (pip auto-selects x86_64 or aarch64 wheel)
+    runtime_package = "ai-dynamo-runtime==0.7.0"
+    logging.info(f"Installing {runtime_package}")
+    result = subprocess.run(["python3", "-m", "pip", "install", runtime_package], capture_output=True, text=True)
     if result.returncode != 0:
-        logging.error(f"Failed to install runtime wheel: {result.stderr}")
-        raise RuntimeError(f"Failed to install {runtime_whl}")
+        logging.error(f"Failed to install runtime package: {result.stderr}")
+        raise RuntimeError(f"Failed to install {runtime_package}")
 
-    # Install dynamo wheel
-    dynamo_whl = "/configs/ai_dynamo-0.7.0-py3-none-any.whl"
-    logging.info(f"Installing {dynamo_whl}")
-    result = subprocess.run(["python3", "-m", "pip", "install", dynamo_whl], capture_output=True, text=True)
+    # Install ai-dynamo
+    dynamo_package = "ai-dynamo==0.7.0"
+    logging.info(f"Installing {dynamo_package}")
+    result = subprocess.run(["python3", "-m", "pip", "install", dynamo_package], capture_output=True, text=True)
     if result.returncode != 0:
-        logging.error(f"Failed to install dynamo wheel: {result.stderr}")
-        raise RuntimeError(f"Failed to install {dynamo_whl}")
+        logging.error(f"Failed to install dynamo package: {result.stderr}")
+        raise RuntimeError(f"Failed to install {dynamo_package}")
 
-    logging.info("Successfully installed dynamo wheels")
+    logging.info("Successfully installed dynamo from PyPI")
 
 
 def get_gpu_command(

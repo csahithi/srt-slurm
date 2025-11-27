@@ -81,12 +81,12 @@ def setup_prefill_worker(
     # Run custom setup script if provided
     _run_setup_script(setup_script)
 
-    # Install dynamo wheels
+    # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
 
-    # Start frontend AFTER installing wheels (traditional mode only)
+    # Start frontend AFTER installing dynamo (traditional mode only)
     if need_frontend:
-        logging.info("Starting frontend in traditional mode (after wheel installation)")
+        logging.info("Starting frontend in traditional mode (after dynamo installation)")
 
         # Open log files for frontend
         frontend_stdout = open("/logs/frontend.out", "w")
@@ -138,7 +138,7 @@ def setup_decode_worker(
     # Run custom setup script if provided
     _run_setup_script(setup_script)
 
-    # Install dynamo wheels
+    # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
 
     # Apply temporary patch (only for gb200, not gb300)
@@ -188,12 +188,12 @@ def setup_aggregated_worker(
     # Run custom setup script if provided
     _run_setup_script(setup_script)
 
-    # Install dynamo wheels
+    # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
 
-    # Start frontend AFTER installing wheels (traditional mode only)
+    # Start frontend AFTER installing dynamo (traditional mode only)
     if need_frontend:
-        logging.info("Starting frontend in traditional mode (after wheel installation)")
+        logging.info("Starting frontend in traditional mode (after dynamo installation)")
 
         # Open log files for frontend
         frontend_stdout = open("/logs/frontend.out", "w")

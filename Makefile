@@ -50,10 +50,7 @@ setup:
 		aarch64) ARCH_SHORT="arm64" ;; \
 		*) echo "❌ Unsupported architecture: $(ARCH)"; exit 1 ;; \
 	esac; \
-	echo "⬇️  Downloading Python wheels (version 0.7.0)..."; \
-	echo "⚠️  Note: Please ensure ai_dynamo-0.7.0-py3-none-any.whl is available in configs/"; \
-	echo "⚠️  Note: Please ensure ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_aarch64.whl is available in configs/"; \
-	echo "⚠️  Note: Please ensure ai_dynamo_runtime-0.7.0-cp310-abi3-manylinux_2_28_x86_64.whl is available in configs/"; \
+	echo "ℹ️  Dynamo 0.7.0 will be installed from PyPI when workers start"; \
 	echo "⬇️  Downloading NATS ($(NATS_VERSION)) for $$ARCH_SHORT..."; \
 	NATS_DEB="nats-server-$(NATS_VERSION)-$$ARCH_SHORT.deb"; \
 	NATS_URL="https://github.com/nats-io/nats-server/releases/download/$(NATS_VERSION)/$$NATS_DEB"; \

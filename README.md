@@ -4,7 +4,7 @@ Command-line tool for distributed LLM inference benchmarks on SLURM clusters usi
 
 ## Setup
 
-Please run the following command to setup the srtctl tool. This repo currently requires Dynamo 0.7.0 or later. You will have to build this yourself for now since official wheels are not yet available on PyPi.
+Please run the following command to setup the srtctl tool. This repo requires Dynamo 0.7.0 or later, which is now available on PyPI.
 
 ```bash
 # One-time setup

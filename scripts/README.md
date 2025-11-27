@@ -63,4 +63,4 @@ You can provide custom setup scripts that run on each worker node before startin
 srtctl apply -f config.yaml --setup-script my-setup.sh
 ```
 
-The script will be executed from `/configs/` inside the container. If no custom script is specified, the system looks for `setup-script.sh` by default. Setup scripts run before Dynamo wheel installation and worker startup, making them ideal for environment configuration and dependency installation.
+The script will be executed from `/configs/` inside the container. If no custom script is specified, the system looks for `setup-script.sh` by default. Setup scripts run before Dynamo installation from PyPI and worker startup, making them ideal for environment configuration and dependency installation.

@@ -57,7 +57,7 @@ def setup_frontend_worker(worker_idx: int, master_ip: str, gpu_type: str) -> int
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
             raise RuntimeError("Failed to connect to etcd")
 
-    # Install dynamo wheels
+    # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
 
     # Run frontend
