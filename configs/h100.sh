@@ -1,7 +1,5 @@
 #!/bin/bash
 
-pip install nixl-cu13
-
 cd /sgl-workspace
 
 rm -rf sglang
