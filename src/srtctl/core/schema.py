@@ -223,6 +223,12 @@ class BackendConfig(BaseModel):
         description="Enable torch profiling mode (uses sglang.launch_server instead of dynamo.sglang)",
     )
 
+    # Router mode settings
+    use_sglang_router: bool = Field(
+        False,
+        description="Use sglang_router.launch_router instead of dynamo stack (enables sglang.launch_server)",
+    )
+
 
 class JobConfig(BaseModel):
     """Complete job configuration."""

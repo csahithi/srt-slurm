@@ -26,6 +26,7 @@ from worker_setup import (
     setup_logging,
     setup_nginx_worker,
     setup_prefill_worker,
+    setup_sglang_router,
 )
 
 
@@ -66,7 +67,7 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
     )
     parser.add_argument(
         "--worker_type",
-        choices=["decode", "prefill", "frontend", "nginx", "aggregated"],
+        choices=["decode", "prefill", "frontend", "nginx", "aggregated", "router"],
         required=True,
         help="Type of worker to run",
     )
@@ -89,6 +90,25 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
         help="Path to nginx configuration file (required for nginx worker type)",
     )
 
+    # Router-specific arguments
+    parser.add_argument(
+        "--prefill_ip",
+        type=str,
+        action="append",
+        help="Prefill worker leader IP (can be specified multiple times, required for router worker type)",
+    )
+    parser.add_argument(
+        "--decode_ip",
+        type=str,
+        action="append",
+        help="Decode worker leader IP (can be specified multiple times, required for router worker type)",
+    )
+    parser.add_argument(
+        "--prefill_bootstrap_port",
+        type=int,
+        help="Prefill bootstrap port (required for router worker type)",
+    )
+
     parser.add_argument(
         "--multiple-frontends-enabled",
         action="store_true",
@@ -106,6 +126,12 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
         "--sglang-torch-profiler",
         action="store_true",
         help="Enable torch profiling mode: use sglang.launch_server and skip --disaggregation-mode",
+    )
+
+    parser.add_argument(
+        "--use-sglang-router",
+        action="store_true",
+        help="Use sglang_router.launch_router instead of dynamo stack (uses sglang.launch_server)",
     )
 
     parser.add_argument(
@@ -150,6 +176,15 @@ def _validate_args(args: argparse.Namespace) -> None:
     if args.worker_type == "nginx" and not args.nginx_config:
         raise ValueError("--nginx_config is required for nginx worker type")
 
+    # Validate router-specific arguments
+    if args.worker_type == "router":
+        if not args.prefill_ip or len(args.prefill_ip) == 0:
+            raise ValueError("--prefill_ip is required for router worker type (can be specified multiple times)")
+        if not args.decode_ip or len(args.decode_ip) == 0:
+            raise ValueError("--decode_ip is required for router worker type (can be specified multiple times)")
+        if not args.prefill_bootstrap_port:
+            raise ValueError("--prefill_bootstrap_port is required for router worker type")
+
 
 def main(input_args: list[str] | None = None):
     setup_logging()
@@ -171,6 +206,12 @@ def main(input_args: list[str] | None = None):
         if not args.nginx_config:
             raise ValueError("--nginx_config is required for nginx worker type")
         setup_nginx_worker(args.nginx_config)
+    elif args.worker_type == "router":
+        setup_sglang_router(
+            args.prefill_ip,  # List of prefill IPs
+            args.decode_ip,   # List of decode IPs
+            args.prefill_bootstrap_port,
+        )
     elif args.worker_type == "frontend":
         setup_frontend_worker(args.worker_idx, args.master_ip, args.gpu_type)
     elif args.worker_type == "prefill":
@@ -183,6 +224,7 @@ def main(input_args: list[str] | None = None):
             args.gpu_type,
             args.multiple_frontends_enabled,
             args.sglang_torch_profiler,
+            args.use_sglang_router,
             args.sglang_config_path,
             args.dump_config_path,
             args.setup_script,
@@ -196,6 +238,7 @@ def main(input_args: list[str] | None = None):
             args.nodes_per_worker,
             args.gpu_type,
             args.sglang_torch_profiler,
+            args.use_sglang_router,
             args.sglang_config_path,
             args.dump_config_path,
             args.setup_script,
@@ -210,6 +253,7 @@ def main(input_args: list[str] | None = None):
             args.gpu_type,
             args.multiple_frontends_enabled,
             args.sglang_torch_profiler,
+            args.use_sglang_router,
             args.sglang_config_path,
             args.dump_config_path,
             args.setup_script,

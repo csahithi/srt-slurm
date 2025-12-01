@@ -308,6 +308,7 @@ class SGLangBackend(Backend):
             "enable_config_dump": self._get_enable_config_dump(),
             "log_dir_prefix": str(log_dir_path),  # Absolute path to logs directory
             "sglang_torch_profiler": self.backend_config.get("enable_profiling", False),
+            "use_sglang_router": self.backend_config.get("use_sglang_router", False),
             "setup_script": self.setup_script,
             "use_gpus_per_node_directive": get_srtslurm_setting("use_gpus_per_node_directive", True),
             "extra_container_mounts": ",".join(self.config.get("extra_mount") or []),

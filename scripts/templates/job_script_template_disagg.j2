@@ -196,6 +196,12 @@ WORKER_ARGS="$WORKER_ARGS --multiple-frontends-enabled"
 WORKER_ARGS="$WORKER_ARGS --sglang-torch-profiler"
 {% endraw %}
 {% endif %}
+{% if use_sglang_router %}
+{% raw %}
+# Enable sglang_router mode
+WORKER_ARGS="$WORKER_ARGS --use-sglang-router"
+{% endraw %}
+{% endif %}
 {% raw %}
 # Add SGLang config path (mounted in container at /logs/)
 WORKER_ARGS="$WORKER_ARGS --sglang-config-path /logs/sglang_config.yaml"
@@ -207,7 +213,53 @@ WORKER_ARGS="$WORKER_ARGS --setup-script {{ setup_script }}"
 {% raw %}
 
 {% endraw %}
-{% if enable_multiple_frontends %}
+{% if use_sglang_router %}
+{% raw %}
+# ============================
+# SGLang Router Mode
+# ============================
+# Collect all prefill leader IPs
+PREFILL_LEADER_IPS=()
+PREFILL_BOOTSTRAP_PORTS=()
+for worker_idx in $(seq 0 $((PREFILL_WORKERS - 1))); do
+    leader_idx=${prefill_leaders[$worker_idx]}
+    leader_node=${nodes[$leader_idx]}
+    leader_ip=$(get_node_ip "$leader_node" "$SLURM_JOB_ID" "$NETWORK_INTERFACE")
+    PREFILL_LEADER_IPS+=("$leader_ip")
+    PREFILL_BOOTSTRAP_PORTS+=(30001)
+    echo "Prefill worker $worker_idx leader: $leader_node ($leader_ip)"
+done
+
+# Collect all decode leader IPs
+DECODE_LEADER_IPS=()
+for worker_idx in $(seq 0 $((DECODE_WORKERS - 1))); do
+    leader_idx=${decode_leaders[$worker_idx]}
+    leader_node=${nodes[$leader_idx]}
+    leader_ip=$(get_node_ip "$leader_node" "$SLURM_JOB_ID" "$NETWORK_INTERFACE")
+    DECODE_LEADER_IPS+=("$leader_ip")
+    echo "Decode worker $worker_idx leader: $leader_node ($leader_ip)"
+done
+
+# Build router command with all prefill and decode endpoints
+ROUTER_NODE=${nodes[0]}
+echo "Launching sglang_router on ${ROUTER_NODE}"
+
+# Build prefill and decode arguments
+PREFILL_ARGS=""
+for i in "${!PREFILL_LEADER_IPS[@]}"; do
+    PREFILL_ARGS="$PREFILL_ARGS --prefill_ip ${PREFILL_LEADER_IPS[$i]}"
+done
+
+DECODE_ARGS=""
+for i in "${!DECODE_LEADER_IPS[@]}"; do
+    DECODE_ARGS="$DECODE_ARGS --decode_ip ${DECODE_LEADER_IPS[$i]}"
+done
+
+cmd="srun --overlap $ENROOT_ARGS --nodes=1 --ntasks=1 --nodelist=$ROUTER_NODE --output=${LOG_DIR}/${ROUTER_NODE}_router.out --error=${LOG_DIR}/${ROUTER_NODE}_router.err python /scripts/worker_setup.py --worker_type router --master_ip ${PREFILL_LEADER_IPS[0]} --prefill_bootstrap_port 30001 ${PREFILL_ARGS} ${DECODE_ARGS}"
+echo "$cmd"
+$cmd &
+{% endraw %}
+{% elif enable_multiple_frontends %}
 {% raw %}
 {% endraw %}
 {% if total_nodes > 1 %}

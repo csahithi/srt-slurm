@@ -16,6 +16,7 @@ def build_sglang_command_from_yaml(
     total_nodes: int,
     rank: int,
     use_profiling: bool = False,
+    use_sglang_router: bool = False,
     dump_config_path: str | None = None,
 ) -> str:
     """Build SGLang command using native YAML config support.
@@ -23,7 +24,7 @@ def build_sglang_command_from_yaml(
     dynamo.sglang supports reading config from YAML:
         python3 -m dynamo.sglang --config file.yaml --config-key prefill
 
-    sglang.launch_server (profiling mode) requires explicit flags:
+    sglang.launch_server (profiling mode or sglang_router mode) requires explicit flags:
         python3 -m sglang.launch_server --model-path /model/ --tp 4 ...
 
     Args:
@@ -34,6 +35,7 @@ def build_sglang_command_from_yaml(
         total_nodes: Total number of nodes
         rank: Node rank (0-indexed)
         use_profiling: Whether to use sglang.launch_server (profiling mode)
+        use_sglang_router: Whether to use sglang.launch_server (sglang_router mode)
 
     Returns:
         Full command string ready to execute
@@ -57,11 +59,12 @@ def build_sglang_command_from_yaml(
     if use_profiling:
         env_exports.append(f"export SGLANG_TORCH_PROFILER_DIR=/logs/profiles/{config_key}")
 
-    # Determine Python module based on profiling mode
-    python_module = "sglang.launch_server" if use_profiling else "dynamo.sglang"
+    # Determine Python module based on mode
+    use_launch_server = use_profiling or use_sglang_router
+    python_module = "sglang.launch_server" if use_launch_server else "dynamo.sglang"
 
-    if use_profiling:
-        # Profiling mode: inline all flags (sglang.launch_server doesn't support --config)
+    if use_launch_server:
+        # sglang.launch_server mode: inline all flags (doesn't support --config)
         mode_config = sglang_config.get(config_key, {})
         cmd_parts = [f"python3 -m {python_module}"]
 
@@ -87,6 +90,7 @@ def build_sglang_command_from_yaml(
                 f"--nnodes {total_nodes}",
                 f"--node-rank {rank}",
                 "--host 0.0.0.0",
+                "--port 30001",
             ]
         )
     else:
@@ -146,6 +150,7 @@ def get_gpu_command(
     total_nodes: int,
     rank: int,
     use_profiling: bool = False,
+    use_sglang_router: bool = False,
     dump_config_path: str | None = None,
 ) -> str:
     """Generate command to run SGLang worker using YAML config.
@@ -158,6 +163,7 @@ def get_gpu_command(
         total_nodes: Total number of nodes
         rank: Node rank (0-indexed)
         use_profiling: Whether to use sglang.launch_server (profiling mode)
+        use_sglang_router: Whether to use sglang.launch_server (sglang_router mode)
 
     Returns:
         Command string to execute
@@ -167,5 +173,5 @@ def get_gpu_command(
 
     logging.info(f"Building command from YAML config: {sglang_config_path}")
     return build_sglang_command_from_yaml(
-        worker_type, sglang_config_path, host_ip, port, total_nodes, rank, use_profiling, dump_config_path
+        worker_type, sglang_config_path, host_ip, port, total_nodes, rank, use_profiling, use_sglang_router, dump_config_path
     )

@@ -63,3 +63,51 @@ def setup_frontend_worker(worker_idx: int, master_ip: str, gpu_type: str) -> int
     # Run frontend
     frontend_cmd = "python3 -m dynamo.frontend --http-port=8000"
     return run_command(frontend_cmd)
+
+
+def setup_sglang_router(
+    prefill_ips: list[str],
+    decode_ips: list[str],
+    prefill_bootstrap_port: int,
+    port: int = 8000,
+) -> int:
+    """Setup sglang_router instead of dynamo.frontend
+
+    Args:
+        prefill_ips: List of prefill worker leader IP addresses
+        decode_ips: List of decode worker leader IP addresses
+        prefill_bootstrap_port: Bootstrap port for prefill workers
+        port: Port for router to listen on (default: 8000)
+
+    Returns:
+        Exit code from router command
+    """
+    logging.info(f"Setting up sglang_router on port {port}")
+
+    # Log all prefill endpoints
+    for i, ip in enumerate(prefill_ips):
+        logging.info(f"Prefill worker {i}: http://{ip}:30000 (bootstrap: {prefill_bootstrap_port})")
+
+    # Log all decode endpoints
+    for i, ip in enumerate(decode_ips):
+        logging.info(f"Decode worker {i}: http://{ip}:30001")
+
+    # Build router command with multiple --prefill and --decode arguments
+    router_cmd_parts = [
+        "python3 -m sglang_router.launch_router",
+        "--pd-disaggregation",
+        "--host 0.0.0.0",
+        f"--port {port}",
+    ]
+
+    # Add all prefill endpoints
+    for ip in prefill_ips:
+        router_cmd_parts.append(f"--prefill http://{ip}:30000 {prefill_bootstrap_port}")
+
+    # Add all decode endpoints
+    for ip in decode_ips:
+        router_cmd_parts.append(f"--decode http://{ip}:30001")
+
+    router_cmd = " ".join(router_cmd_parts)
+
+    return run_command(router_cmd)

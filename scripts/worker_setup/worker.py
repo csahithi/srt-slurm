@@ -61,6 +61,7 @@ def setup_prefill_worker(
     gpu_type: str,
     multiple_frontends_enabled: bool = False,
     sglang_torch_profiler: bool = False,
+    use_sglang_router: bool = False,
     sglang_config_path: str | None = None,
     dump_config_path: str | None = None,
     setup_script: str | None = None,
@@ -112,6 +113,7 @@ def setup_prefill_worker(
         total_nodes=nodes_per_worker,
         rank=local_rank,
         use_profiling=sglang_torch_profiler,
+        use_sglang_router=use_sglang_router,
         dump_config_path=dump_config_path,
     )
     return run_command(cmd_to_run)
@@ -125,6 +127,7 @@ def setup_decode_worker(
     nodes_per_worker: int,
     gpu_type: str,
     sglang_torch_profiler: bool = False,
+    use_sglang_router: bool = False,
     sglang_config_path: str | None = None,
     dump_config_path: str | None = None,
     setup_script: str | None = None,
@@ -154,6 +157,7 @@ def setup_decode_worker(
         total_nodes=nodes_per_worker,
         rank=local_rank,
         use_profiling=sglang_torch_profiler,
+        use_sglang_router=use_sglang_router,
         dump_config_path=dump_config_path,
     )
     return run_command(cmd_to_run)
@@ -168,6 +172,7 @@ def setup_aggregated_worker(
     gpu_type: str,
     multiple_frontends_enabled: bool = False,
     sglang_torch_profiler: bool = False,
+    use_sglang_router: bool = False,
     sglang_config_path: str | None = None,
     dump_config_path: str | None = None,
     setup_script: str | None = None,
@@ -219,6 +224,7 @@ def setup_aggregated_worker(
         total_nodes=nodes_per_worker,
         rank=local_rank,
         use_profiling=sglang_torch_profiler,
+        use_sglang_router=use_sglang_router,
         dump_config_path=dump_config_path,
     )
     return run_command(cmd_to_run)
