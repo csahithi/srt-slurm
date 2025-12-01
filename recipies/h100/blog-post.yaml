@@ -12,7 +12,7 @@ resources:
   decode_nodes: 9
   prefill_workers: 1
   decode_workers: 1
-  gpus_per_node: 4
+  gpus_per_node: 8
 
 backend:
 
