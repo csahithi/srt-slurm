@@ -6,10 +6,11 @@ model:
   precision: "fp8"
 
 # same config as blog post
+# but rn keeping it at 2 nodes per worker for pipecleaning
 resources:
   gpu_type: "h100"
-  prefill_nodes: 4
-  decode_nodes: 9
+  prefill_nodes: 2
+  decode_nodes: 2
   prefill_workers: 1
   decode_workers: 1
   gpus_per_node: 8
@@ -53,9 +54,9 @@ backend:
       disaggregation-mode: "prefill"
 
       # Parallelism
-      tp-size: 32
-      dp-size: 32
-      ep-size: 32
+      tp-size: 16
+      dp-size: 16
+      ep-size: 16
       enable-dp-attention: true
 
       # network
@@ -91,9 +92,9 @@ backend:
       disaggregation-mode: "decode"
       
       # Parallelism
-      tp-size: 72
-      dp-size: 72
-      ep-size: 72
+      tp-size: 16
+      dp-size: 16
+      ep-size: 16
       enable-dp-attention: true
 
       # network
@@ -105,7 +106,7 @@ backend:
       disable-radix-cache: true
       enable-two-batch-overlap: true
       mem-fraction-static: 0.835
-      cuda-graph-bs: 128
+      cuda-graph-bs: 8
 
       # max-running-requests 18432
       # context-length 4500
