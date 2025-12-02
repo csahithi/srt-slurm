@@ -93,7 +93,7 @@ backend:
       disable-radix-cache: true
       enable-two-batch-overlap: true
       mem-fraction-static: 0.835
-      cuda-graph-bs: 8
+      cuda-graph-bs: 64
 
       # moe
       moe-a2a-backend: "deepep"
