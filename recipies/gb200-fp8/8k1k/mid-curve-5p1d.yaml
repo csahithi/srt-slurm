@@ -161,4 +161,4 @@ benchmark:
   isl: 8192 
   osl: 1024
   concurrencies: "512x1024x2048x6144"
-  req_rate: "inf"
+  req_rate: "300"
