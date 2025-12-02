@@ -110,6 +110,15 @@ backend:
       mem-fraction-static: 0.835
       cuda-graph-bs: 8
 
+      # moe
+      moe-a2a-backend: "deepep"
+      deepep-mode: "low_latency"
+      ep-dispatch-algorithm: "static"
+      moe-dense-tp-size: 1
+      enable-dp-lm-head: true
+      ep-num-redundant-experts: 32
+      eplb-algorithm: "deepseek"
+
       # max-running-requests 18432
       # context-length 4500
 
