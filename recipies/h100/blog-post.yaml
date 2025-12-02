@@ -52,6 +52,7 @@ backend:
       skip-tokenizer-init: true
       trust-remote-code: true
       disaggregation-mode: "prefill"
+      load-balance-method: "round_robin"
 
       # Parallelism
       tp-size: 16
@@ -90,6 +91,7 @@ backend:
       skip-tokenizer-init: true
       trust-remote-code: true
       disaggregation-mode: "decode"
+      prefill-round-robin-balance: true
       
       # Parallelism
       tp-size: 16
