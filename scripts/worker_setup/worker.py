@@ -52,6 +52,26 @@ def _run_setup_script(setup_script: str | None = None):
     else:
         logging.warning(f"Setup script not found: {script_path}")
 
+
+def _precompile_deepgemm():
+    """
+    Precompile deepgemm kernels using sglang.compile_deepgemm.
+    
+    This runs python3 -m sglang.compile_deepgemm to precompile kernels
+    before starting the workers, which can improve startup time.
+    """
+    logging.info("Precompiling deepgemm kernels...")
+    compile_cmd = "python3 -m sglang.compile_deepgemm"
+    result = subprocess.run(compile_cmd, shell=True, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        logging.info("Successfully precompiled deepgemm kernels")
+        if result.stdout:
+            logging.debug(f"Compile output: {result.stdout}")
+    else:
+        logging.warning(f"Deepgemm compilation failed (non-fatal): {result.stderr}")
+        # Don't raise error, just warn - this is an optimization, not required
+
 def setup_prefill_worker(
     worker_idx: int,
     local_rank: int,
@@ -64,6 +84,7 @@ def setup_prefill_worker(
     sglang_config_path: str | None = None,
     dump_config_path: str | None = None,
     setup_script: str | None = None,
+    precompile_deepgemm: bool = False,
 ) -> int:
     """Setup the prefill worker."""
     # Setup infrastructure first (if traditional mode)
@@ -83,6 +104,10 @@ def setup_prefill_worker(
 
     # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
+    
+    # Precompile deepgemm if requested
+    if precompile_deepgemm:
+        _precompile_deepgemm()
 
     # Start frontend AFTER installing dynamo (traditional mode only)
     if need_frontend:
@@ -128,6 +153,7 @@ def setup_decode_worker(
     sglang_config_path: str | None = None,
     dump_config_path: str | None = None,
     setup_script: str | None = None,
+    precompile_deepgemm: bool = False,
 ) -> int:
     """Setup the decode worker."""
     logging.info(f"Setting up decode worker {worker_idx}, local rank {local_rank}")
@@ -140,6 +166,10 @@ def setup_decode_worker(
 
     # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
+    
+    # Precompile deepgemm if requested
+    if precompile_deepgemm:
+        _precompile_deepgemm()
 
     # Apply temporary patch (only for gb200, not gb300)
     if gpu_type.startswith("gb200") and not gpu_type.startswith("gb300"):
@@ -171,6 +201,7 @@ def setup_aggregated_worker(
     sglang_config_path: str | None = None,
     dump_config_path: str | None = None,
     setup_script: str | None = None,
+    precompile_deepgemm: bool = False,
 ) -> int:
     """Setup the aggregated worker."""
     # Setup infrastructure first (if traditional mode)
@@ -190,6 +221,10 @@ def setup_aggregated_worker(
 
     # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
+    
+    # Precompile deepgemm if requested
+    if precompile_deepgemm:
+        _precompile_deepgemm()
 
     # Start frontend AFTER installing dynamo (traditional mode only)
     if need_frontend:

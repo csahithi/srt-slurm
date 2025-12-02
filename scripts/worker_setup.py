@@ -122,6 +122,12 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
         help="Custom setup script name in /configs directory (e.g., 'custom-setup.sh')",
     )
 
+    parser.add_argument(
+        "--precompile-deepgemm",
+        action="store_true",
+        help="Precompile deepgemm kernels before starting workers (runs python3 -m sglang.compile_deepgemm)",
+    )
+
     return parser.parse_args(args)
 
 
@@ -186,6 +192,7 @@ def main(input_args: list[str] | None = None):
             args.sglang_config_path,
             args.dump_config_path,
             args.setup_script,
+            args.precompile_deepgemm,
         )
     elif args.worker_type == "decode":
         setup_decode_worker(
@@ -199,6 +206,7 @@ def main(input_args: list[str] | None = None):
             args.sglang_config_path,
             args.dump_config_path,
             args.setup_script,
+            args.precompile_deepgemm,
         )
     elif args.worker_type == "aggregated":
         setup_aggregated_worker(
@@ -213,6 +221,7 @@ def main(input_args: list[str] | None = None):
             args.sglang_config_path,
             args.dump_config_path,
             args.setup_script,
+            args.precompile_deepgemm,
         )
 
     logging.info(f"{args.worker_type.capitalize()} worker setup complete")

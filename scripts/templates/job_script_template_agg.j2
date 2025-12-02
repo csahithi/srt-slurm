@@ -203,6 +203,10 @@ WORKER_ARGS="$WORKER_ARGS --sglang-config-path /logs/sglang_config.yaml"
 # Add custom setup script if provided
 WORKER_ARGS="$WORKER_ARGS --setup-script {{ setup_script }}"
 {% endif %}
+{% if precompile_deepgemm %}
+# Enable deepgemm precompilation
+WORKER_ARGS="$WORKER_ARGS --precompile-deepgemm"
+{% endif %}
 {% raw %}
 
 {% endraw %}

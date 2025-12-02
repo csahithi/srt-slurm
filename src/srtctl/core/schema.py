@@ -222,6 +222,12 @@ class BackendConfig(BaseModel):
         False,
         description="Enable torch profiling mode (uses sglang.launch_server instead of dynamo.sglang)",
     )
+    
+    # Compilation settings
+    precompile_deepgemm: bool = Field(
+        False,
+        description="Precompile deepgemm kernels before starting workers (runs python3 -m sglang.compile_deepgemm)",
+    )
 
 
 class JobConfig(BaseModel):
