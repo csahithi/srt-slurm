@@ -22,5 +22,12 @@ def setup_env(master_ip: str):
     os.environ["NATS_SERVER"] = nats_server
     os.environ["ETCD_ENDPOINTS"] = etcd_endpoints
 
+    # TEMP
+    os.environ["PATH"] = os.environ.get("PATH", "") + ":/usr/local/cuda/bin:/usr/local/cuda/nvvm/bin"
+    cicc_path = os.popen("which cicc").read().strip()
+    nvcc_version = os.popen("nvcc --version").read().strip()
+    logging.info(f"which cicc: {cicc_path}")
+    logging.info(f"nvcc --version:\n{nvcc_version}")
+
     logging.info(f"set NATS_SERVER: {nats_server}")
     logging.info(f"set ETCD_ENDPOINTS: {etcd_endpoints}")
