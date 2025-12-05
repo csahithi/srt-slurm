@@ -13,10 +13,29 @@ from .infrastructure import setup_head_prefill_node
 from .utils import run_command, wait_for_etcd
 
 
+def _get_sglang_version() -> str | None:
+    """Get the installed sglang version."""
+    try:
+        result = subprocess.run(
+            ["python", "-c", "import sglang; print(sglang.__version__)"],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception as e:
+        logging.warning(f"Failed to get sglang version: {e}")
+    return None
+
+
 # TODO: this can be removed once we sync GB200 to > 0.5.5.post2
 def _patch_sglang_engine():
-    """Temporary patch to fix send_to_rpc initialization."""
-    logging.info("Applying temporary patch to engine.py")
+    """Temporary patch to fix send_to_rpc initialization. Only applies to 0.5.5.post2."""
+    version = _get_sglang_version()
+    if version != "0.5.5.post2":
+        logging.info(f"Skipping patch - sglang version {version} != 0.5.5.post2")
+        return
+    
+    logging.info("Applying temporary patch to engine.py (sglang 0.5.5.post2)")
     sed_cmd = (
         "sed -i '/self.send_to_rpc = get_zmq_socket(/,/^        )/c\\"
         "        if self.server_args.node_rank == 0:\\n"
