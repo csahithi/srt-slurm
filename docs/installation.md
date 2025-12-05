@@ -153,28 +153,25 @@ benchmark:
 
 ## Profiling (torch / nsys)
 
-You can enable profiling via a top-level `profiling` section in your job YAML. Profiling and benchmarking do not run at the same time; when profiling is enabled, set `benchmark.type: "manual"` (or omit the benchmark) to avoid conflicts.
-
-Example:
+You can enable profiling via a top-level `profiling` section in your job YAML:
 
 ```yaml
 profiling:
-  type: "nsys"   # one of: "none", "torch", "nsys"
+  type: "torch"   # one of: "none", "torch", "nsys"
   prefill:
-    isl: 1024     # input sequence length
-    osl: 2        # output sequence length
+    isl: 1024
+    osl: 128
     concurrency: 24
-    start_step: 0 
-    stop_step: 16
   decode:
-    isl: 8
-    osl: 16
-    concurrency: 1024
-    start_step: 0
-    stop_step: 16
+    isl: 1024
+    osl: 128
+    concurrency: 256
+
+benchmark:
+  type: "manual"  # Required - profiling and benchmarking are mutually exclusive
 ```
 
-When `type: none`, normal serving runs with `dynamo.sglang`. Otherwise, serving uses `sglang.launch_server`.
+See [Profiling](profiling.md) for detailed configuration options, constraints, and output file locations.
 
 ## Validate with Dry Run
 

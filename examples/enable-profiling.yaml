@@ -17,10 +17,18 @@ resources:
   decode_workers: 1
   gpus_per_node: 4
 
-backend:
-  # Enable profiling mode - uses sglang.launch_server instead of dynamo.sglang
-  enable_profiling: true
+profiling:
+  type: "torch"  # Options: "none", "torch", "nsys"
+  prefill:
+    isl: 1024
+    osl: 128
+    concurrency: 1
+  decode:
+    isl: 1024
+    osl: 128
+    concurrency: 1
 
+backend:
   # Prefill-specific environment variables
   prefill_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"

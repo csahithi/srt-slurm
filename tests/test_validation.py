@@ -97,9 +97,9 @@ def test_invalid_profiling_with_multiple_workers():
         },
         "slurm": {"account": "test", "partition": "test"},
         "backend": {
-            "enable_profiling": True,
             "sglang_config": {"prefill": {"tensor-parallel-size": 4}, "decode": {"tensor-parallel-size": 4}},
         },
+        "profiling": {"type": "torch"},
     }
 
     with pytest.raises(ValueError, match="Profiling mode requires single worker only.*prefill_workers=2"):
@@ -121,9 +121,9 @@ def test_invalid_profiling_with_benchmark():
         },
         "slurm": {"account": "test", "partition": "test"},
         "backend": {
-            "enable_profiling": True,
             "sglang_config": {"prefill": {"tensor-parallel-size": 4}, "decode": {"tensor-parallel-size": 4}},
         },
+        "profiling": {"type": "torch"},
         "benchmark": {
             "type": "sa-bench",  # ERROR: Can't benchmark while profiling
             "isl": 1024,
@@ -131,7 +131,7 @@ def test_invalid_profiling_with_benchmark():
         },
     }
 
-    with pytest.raises(ValidationError, match="Cannot enable profiling with benchmark type"):
+    with pytest.raises(ValueError, match="Cannot enable profiling with benchmark type"):
         JobConfig(**config)
 
 
@@ -162,7 +162,8 @@ def test_invalid_aggregated_profiling_multi_worker():
             "gpus_per_node": 4,
         },
         "slurm": {"account": "test", "partition": "test"},
-        "backend": {"enable_profiling": True, "sglang_config": {"aggregated": {"tensor-parallel-size": 4}}},
+        "backend": {"sglang_config": {"aggregated": {"tensor-parallel-size": 4}}},
+        "profiling": {"type": "torch"},
     }
 
     with pytest.raises(ValueError, match="Profiling mode requires single worker only.*agg_workers=4"):

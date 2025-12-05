@@ -246,11 +246,11 @@ def test_profiling_mode():
         "slurm": {"account": "test", "partition": "test", "time_limit": "01:00:00"},
         "backend": {
             "type": "sglang",
-            "enable_profiling": True,  # Enable profiling
             "sglang_config": {
                 "prefill": {"model-path": "/model/", "tensor-parallel-size": 4, "disaggregation-mode": "prefill"}
             },
         },
+        "profiling": {"type": "torch"},  # Enable profiling
         "benchmark": {"type": "manual"},
     }
 

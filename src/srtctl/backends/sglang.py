@@ -102,7 +102,7 @@ class SGLangBackend(Backend):
             lines.append(f"{key}={val} \\")
 
         # Python command - use sglang.launch_server when profiler != none, dynamo.sglang otherwise
-        profiling_type = (self.config.get("profiling") or {}).get("type", "none")
+        profiling_type = (self.config.get("profiling") or {}).get("type") or "none"
         nsys_prefix = "nsys profile -t cuda,nvtx --cuda-graph-trace=node -c cudaProfilerApi --capture-range-end stop --force-overwrite true"
         if profiling_type == "nsys":
             lines.append(f"{nsys_prefix} python3 -m sglang.launch_server \\")
@@ -136,7 +136,7 @@ class SGLangBackend(Backend):
             List of flag strings with backslash continuations
         """
         lines = []
-        profiling_type = (self.config.get("profiling") or {}).get("type", "none")
+        profiling_type = (self.config.get("profiling") or {}).get("type") or "none"
 
         for key, value in sorted(config.items()):
             # Convert underscores to hyphens
@@ -191,7 +191,7 @@ class SGLangBackend(Backend):
         enable_config_dump = self.config.get("enable_config_dump", True)
 
         # Auto-disable when profiling is enabled (unless explicitly set to True)
-        profiling_type = (self.config.get("profiling") or {}).get("type", "none")
+        profiling_type = (self.config.get("profiling") or {}).get("type") or "none"
         if profiling_type != "none":
             # When profiling, disable config dump by default
             # User can explicitly set enable_config_dump: true to override
@@ -303,7 +303,7 @@ class SGLangBackend(Backend):
         prefill_profile_env = build_env_str(prefill_cfg)
         decode_profile_env = build_env_str(decode_cfg)
 
-        profiler_mode = profiling_cfg.get("type", "none")
+        profiler_mode = profiling_cfg.get("type") or "none"
 
         # Template variables
         template_vars = {
