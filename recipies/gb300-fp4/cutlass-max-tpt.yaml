@@ -1,4 +1,4 @@
-# 4P1D, with 8 Decode Nodes. Better per-gpu throughput with worse latency.
+# 4P1D, with 8 Decode Nodes
 # Diff bteween gb200-fp4
 #   - decode moe runner to flashinfer_cutlass
 #   - decode moe a2a backend to none
@@ -23,7 +23,7 @@ backend:
 
   # Prefill-specific environment variables
   prefill_environment:
-    SGLANG_CUTEDSL_MOE_NVFP4_DISPATCH: "true"
+    SGLANG_MOE_NVFP4_DISPATCH: "true"
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
@@ -60,7 +60,7 @@ backend:
     SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
     SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
-    SGLANG_CUTEDSL_MOE_NVFP4_DISPATCH: "1"
+    SGLANG_MOE_NVFP4_DISPATCH: "true"
     SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
 
   sglang_config:

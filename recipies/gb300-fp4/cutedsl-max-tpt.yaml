@@ -4,7 +4,7 @@ name: "gb200-fp4-max-tpt-2"
 
 model:
   path: "dsfp4"
-  container: "docker://ishandhanani/sglang:rt-cu13-14483"
+  container: "rt-cu13-14483"
   precision: "fp4"
 
 resources:
