@@ -4,7 +4,7 @@ name: "gb200-fp4-max-tpt-2"
 
 model:
   path: "dsfp4"
-  container: "0.5.5.post2"
+  container: "rt-cu13-14483"
   precision: "fp4"
 
 resources:
@@ -19,6 +19,7 @@ backend:
 
   # Prefill-specific environment variables
   prefill_environment:
+    FLASHINFER_DISABLE_VERSION_CHECK: "1"
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
@@ -39,6 +40,7 @@ backend:
 
   # Decode-specific environment variables
   decode_environment:
+    FLASHINFER_DISABLE_VERSION_CHECK: "1"
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
@@ -61,6 +63,7 @@ backend:
 
   sglang_config:
     prefill:
+      disaggregation-transfer-backend: "nixl"
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
       model-path: "/model/"
@@ -111,6 +114,7 @@ backend:
       ep-size: 4
 
     decode:
+      disaggregation-transfer-backend: "nixl"
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
       model-path: "/model/"
