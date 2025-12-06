@@ -2,7 +2,7 @@ name: "gb300-fp4-1p1d-128k"
 
 model:
   path: "dsfp4"
-  container: "default-cu13"
+  container: "yam"
   precision: "fp4"
 
 resources:
@@ -13,15 +13,11 @@ resources:
   decode_workers: 1
   gpus_per_node: 4
 
-
-extra_mount: 
-- "/home/weiliangl/sglang:/sgl-workspace/sglang"
-- "/home/weiliangl/flashinfer:/sgl-workspace/flashinfer"
-- "/home/weiliangl/.cache:/root/.cache/"
-
 backend:
 
   prefill_environment:
+    FLASHINFER_WORKSPACE_BASE: "/configs/flashinfer-cache"
+    FLASHINFER_DISABLE_VERSION_CHECK: "1"
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
@@ -36,9 +32,11 @@ backend:
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-    SGLANG_ENABLE_FLASHINFER_GEMM: "true" 
+    SGLANG_ENABLE_FLASHINFER_GEMM: "true"
 
   decode_environment:
+    FLASHINFER_WORKSPACE_BASE: "/configs/flashinfer-cache"
+    FLASHINFER_DISABLE_VERSION_CHECK: "1"
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
@@ -53,7 +51,7 @@ backend:
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-    SGLANG_ENABLE_FLASHINFER_GEMM: "true" 
+    SGLANG_ENABLE_FLASHINFER_GEMM: "true"
 
   sglang_config:
     prefill:
@@ -117,7 +115,9 @@ backend:
       expert-parallel-size: 4
       pipeline-parallel-size: 1
 
-
-# manually run benchmark against this since it doesnt use the sa-client
 benchmark:
-  type: "manual" 
+  type: "sa-bench"
+  isl: 128000
+  osl: 8000
+  concurrencies: "1x4x8x16x32x64x128x256x512x1024x2048x4096x8192"
+  req_rate: "inf"
