@@ -1,4 +1,5 @@
-# 4P1D, with 8 Decode Nodes. Better per-gpu throughput with worse latency.
+# 4P1D, with 8 Decode Nodes. Does not use single batch overlap but allows us to currently drive higher 
+# per gpu throughput
 
 name: "gb200-fp4-max-tpt-2"
 
