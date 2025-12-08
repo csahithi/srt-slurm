@@ -1,4 +1,4 @@
-name: "gb300-fp4-1p1d-128k"
+name: "gb300-fp4-1p1d-128k-long-ctx"
 
 model:
   path: "dsfp4"

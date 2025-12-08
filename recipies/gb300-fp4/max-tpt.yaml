@@ -1,6 +1,6 @@
 # 4P1D, with 8 Decode Nodes. Better per-gpu throughput with worse latency.
 
-name: "gb200-fp4-max-tpt-2"
+name: "gb300-fp4-max-tpt-no-sbo"
 
 model:
   path: "dsfp4"
@@ -10,7 +10,7 @@ model:
 resources:
   gpu_type: "gb300"
   prefill_nodes: 4
-  decode_nodes: 12
+  decode_nodes: 8
   prefill_workers: 4
   decode_workers: 1
   gpus_per_node: 4
@@ -19,7 +19,6 @@ backend:
 
   # Prefill-specific environment variables
   prefill_environment:
-    SGLANG_MOE_NVFP4_DISPATCH: "1"
     FLASHINFER_DISABLE_VERSION_CHECK: "1"
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
@@ -36,6 +35,7 @@ backend:
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
+    SGLANG_MOE_NVFP4_DISPATCH: "1"
     SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
 
   # Decode-specific environment variables
@@ -159,7 +159,7 @@ backend:
       ep-num-redundant-experts: 32
 
       # CUDA graphs (extensive batch size list)
-      cuda-graph-bs: [1, 2, 4, 8, 16, 24, 32]
+      cuda-graph-bs: [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 264, 272, 280, 288, 296, 304, 312, 320, 328, 336, 344, 352, 360, 368, 376, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 1024]
       num-reserved-decode-tokens: 112
 
       # Additional decode optimizations
@@ -169,9 +169,9 @@ backend:
       enable-dp-attention: true
 
       # Parallelism
-      tp-size: 48
-      dp-size: 48
-      ep-size: 48
+      tp-size: 32
+      dp-size: 32
+      ep-size: 32
 
 benchmark:
   type: "sa-bench"
