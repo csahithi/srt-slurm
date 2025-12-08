@@ -1,4 +1,4 @@
-# 4P1D, with 12 Decode Nodes. Can reach a good balance between throughput and latency.
+# 4P1D, with 12 Decode Nodes. Uses single batch overlap
 
 name: "gb200-fp4-max-tpt"
 
