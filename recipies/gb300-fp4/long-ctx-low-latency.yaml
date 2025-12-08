@@ -33,8 +33,7 @@ backend:
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
     # performance tuning
-    SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1"
-    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
+    #SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1" i think this causes ima
 
 
 
@@ -56,8 +55,7 @@ backend:
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
     # performance tuning
-    SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1"
-    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
+    #SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1" i think this causes ima
 
   sglang_config:
     prefill:
@@ -83,7 +81,7 @@ backend:
       chunked-prefill-size: -1
       max-total-tokens: 544000
       context-length: 136000
-      max-running-requests: 4
+      #max-running-requests: 4
       stream-interval: 10
       # other
       watchdog-timeout: 1000000
@@ -119,7 +117,7 @@ backend:
       mem-fraction-static: 0.95
       cuda-graph-max-bs: 256
       chunked-prefill-size: -1 # why disable chunked prefill if we have dp attn?
-      max-running-requests: 4
+      #max-running-requests: 4
       # other
       watchdog-timeout: 1000000
       scheduler-recv-interval: 1
@@ -135,5 +133,5 @@ benchmark:
   type: "sa-bench"
   isl: 128000
   osl: 8000
-  concurrencies: "1x4x8x16x32x64x128x256x512"
+  concurrencies: "1x8x16x64x128x256"
   req_rate: "inf"
