@@ -1,0 +1,144 @@
+name: "gb300-fp4-1p1d-128k-long-ctx"
+
+model:
+  path: "dsfp4"
+  container: "yam"
+  precision: "fp4"
+
+resources:
+  gpu_type: "gb300"
+  prefill_nodes: 1
+  decode_nodes: 8
+  prefill_workers: 1
+  decode_workers: 1
+  gpus_per_node: 4
+
+backend:
+
+  prefill_environment:
+    FLASHINFER_WORKSPACE_BASE: "/configs/flashinfer-cache"
+    FLASHINFER_DISABLE_VERSION_CHECK: "1"
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
+    PYTHONUNBUFFERED: "1"
+    DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
+    SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
+    SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
+    SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
+    SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
+    SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
+    SGLANG_DECODE_BOOTSTRAP_TIMEOUT: "1000"
+    MC_FORCE_MNNVL: "1"
+    NCCL_MNNVL_ENABLE: "1"
+    NCCL_CUMEM_ENABLE: "1"
+    SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
+    SGLANG_ENABLE_JIT_DEEPGEMM: "false"
+    SGLANG_MOE_NVFP4_DISPATCH: "1"
+
+  # Decode-specific environment variables
+  decode_environment:
+    FLASHINFER_DISABLE_VERSION_CHECK: "1"
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
+    PYTHONUNBUFFERED: "1"
+    DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
+    SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2: "1"
+    SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
+    SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
+    SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
+    SGLANG_HACK_SEQ_BOOTSTRAP_ROOM: "1"
+    MC_TE_METRIC: "true"
+    MC_FORCE_MNNVL: "1"
+    NCCL_MNNVL_ENABLE: "1"
+    NCCL_CUMEM_ENABLE: "1"
+    SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
+    SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
+    SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
+    SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
+    SGLANG_MOE_NVFP4_DISPATCH: "1"
+    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
+    FLASHINFER_WORKSPACE_BASE: "/configs/flashinfer-cache"
+
+  sglang_config:
+    prefill:
+      # disagg
+      disaggregation-transfer-backend: "nixl"
+      load-balance-method: "round_robin"
+      disaggregation-bootstrap-port: 30001
+      disaggregation-mode: "prefill"
+      # model
+      served-model-name: "deepseek-ai/DeepSeek-R1"
+      model-path: "/model/"
+      quantization: "modelopt_fp4"
+      trust-remote-code: true
+      # attn
+      disable-radix-cache: true
+      kv-cache-dtype: "fp8_e4m3"
+      attention-backend: "trtllm_mla"
+      enable-symm-mem: true
+      # moe
+      moe-runner-backend: "flashinfer_trtllm"
+      # sizing
+      mem-fraction-static: 0.95
+      chunked-prefill-size: -1
+      max-total-tokens: 544000
+      context-length: 136000
+      #max-running-requests: 4
+      stream-interval: 10
+      # other
+      watchdog-timeout: 1000000
+      scheduler-recv-interval: 1
+      # parallelism
+      data-parallel-size: 1
+      tensor-parallel-size: 1
+      expert-parallel-size: 1
+      pipeline-parallel-size: 4
+      moe-dense-tp-size: 1
+
+    decode:
+      # disagg
+      prefill-round-robin-balance: true
+      disaggregation-transfer-backend: "nixl"
+      disaggregation-mode: "decode"
+      disaggregation-bootstrap-port: 30001
+      # model
+      model-path: "/model/"
+      trust-remote-code: true
+      served-model-name: "deepseek-ai/DeepSeek-R1"
+      quantization: "modelopt_fp4"
+      # attn
+      disable-radix-cache: true
+      kv-cache-dtype: "fp8_e4m3"
+      attention-backend: "trtllm_mla"
+      enable-symm-mem: true
+      # moe
+      moe-runner-backend: "flashinfer_cutedsl"
+      stream-interval: 10
+      # sizing
+      context-length: 136000
+      mem-fraction-static: 0.83
+
+      cuda-graph-bs: [16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 264, 272, 280, 288, 296, 304, 312, 320, 328, 336, 344, 352, 360, 368, 376, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 736, 768]
+      chunked-prefill-size: -1 # why disable chunked prefill if we have dp attn?
+      #max-running-requests: 4
+      # other
+      watchdog-timeout: 1000000
+      scheduler-recv-interval: 1
+      # parallelism
+      enable-dp-lm-head: true
+      moe-dense-tp-size: 1
+      tensor-parallel-size: 32
+      data-parallel-size: 32
+      enable-dp-attention: true
+      expert-parallel-size: 32
+
+      # adding wideep bits
+      moe-a2a-backend: "deepep"
+      deepep-mode: "low_latency"
+      ep-dispatch-algorithm: "static"
+      ep-num-redundant-experts: 32
+
+benchmark:
+  type: "sa-bench"
+  isl: 128000
+  osl: 8000
+  concurrencies: "16x32x64x128x256x512x644x768"
+  req_rate: "inf"
