@@ -97,11 +97,11 @@ def setup_prefill_worker(
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
             raise RuntimeError("Failed to connect to etcd")
 
-    # Run custom setup script if provided
-    _run_setup_script(setup_script)
-
     # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
+
+    # Run custom setup script if provided
+    _run_setup_script(setup_script)
 
     # Start frontend AFTER installing dynamo (traditional mode only)
     if need_frontend:
@@ -154,11 +154,11 @@ def setup_decode_worker(
     if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
         raise RuntimeError("Failed to connect to etcd")
 
-    # Run custom setup script if provided
-    _run_setup_script(setup_script)
-
     # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
+
+    # Run custom setup script if provided
+    _run_setup_script(setup_script)
 
     # Apply temporary patch (for gb200 (not gb300) and h100)
     if (gpu_type.startswith("gb200") and not gpu_type.startswith("gb300")) or gpu_type.startswith("h100"):
@@ -204,11 +204,11 @@ def setup_aggregated_worker(
         if not wait_for_etcd(f"http://{master_ip}:{ETCD_CLIENT_PORT}"):
             raise RuntimeError("Failed to connect to etcd")
 
-    # Run custom setup script if provided
-    _run_setup_script(setup_script)
-
     # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
+
+    # Run custom setup script if provided
+    _run_setup_script(setup_script)
 
     # Start frontend AFTER installing dynamo (traditional mode only)
     if need_frontend:
