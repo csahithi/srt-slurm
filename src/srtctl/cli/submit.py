@@ -147,7 +147,7 @@ class DryRunContext:
         print("\n" + "=" * 60 + "\n")
 
 
-def submit_single(config_path: Path = None, config: dict = None, dry_run: bool = False, setup_script: str = None):
+def submit_single(config_path: Path = None, config: dict = None, dry_run: bool = False, setup_script: str = None, tags: list[str] = None):
     """
     Submit a single job from YAML config.
 
@@ -156,6 +156,7 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
         config: Pre-loaded config dict (or None if loading from path)
         dry_run: If True, don't submit to SLURM, just validate and save artifacts
         setup_script: Optional custom setup script name in configs directory
+        tags: Optional list of tags to apply to the run
     """
     # Load config if needed
     if config is None:
@@ -318,6 +319,10 @@ def submit_single(config_path: Path = None, config: dict = None, dry_run: bool =
 
                 metadata["profiler_metadata"] = profiler_metadata
 
+            # Add tags if provided
+            if tags:
+                metadata["tags"] = tags
+
             with open(log_dir / f"{job_id}.json", "w") as f:
                 json.dump(metadata, f, indent=2)
 
@@ -343,7 +348,7 @@ def is_sweep_config(config_path: Path) -> bool:
         return False
 
 
-def submit_sweep(config_path: Path, dry_run: bool = False, setup_script: str = None):
+def submit_sweep(config_path: Path, dry_run: bool = False, setup_script: str = None, tags: list[str] = None):
     """
     Submit parameter sweep.
 
@@ -351,6 +356,7 @@ def submit_sweep(config_path: Path, dry_run: bool = False, setup_script: str = N
         config_path: Path to sweep YAML config
         dry_run: If True, don't submit to SLURM, just validate and save artifacts
         setup_script: Optional custom setup script name in configs directory
+        tags: Optional list of tags to apply to all runs in the sweep
     """
     # Load YAML directly without validation (sweep configs have extra 'sweep' field)
     with open(config_path) as f:
@@ -416,7 +422,7 @@ def submit_sweep(config_path: Path, dry_run: bool = False, setup_script: str = N
     for i, (config, params) in enumerate(configs, 1):
         logging.info(f"\n[{i}/{len(configs)}] Submitting: {config['name']}")
         logging.info(f"  Parameters: {params}")
-        submit_single(config=config, dry_run=False, setup_script=setup_script)
+        submit_single(config=config, dry_run=False, setup_script=setup_script, tags=tags)
 
 
 def main():
@@ -435,6 +441,9 @@ Examples:
 
   # Submit with custom setup script
   srtctl apply -f config.yaml --setup-script custom-setup.sh
+
+  # Submit with tags
+  srtctl apply -f config.yaml --tags experiment,baseline,v2
 
   # Dry-run (validate without submitting)
   srtctl dry-run -f config.yaml
@@ -465,6 +474,12 @@ Examples:
         type=str,
         default=None,
         help="Custom setup script name in configs directory (e.g., 'custom-setup.sh')",
+    )
+    apply_parser.add_argument(
+        "--tags",
+        type=str,
+        default=None,
+        help="Comma-separated tags to apply to the run (e.g., 'experiment,baseline,v2')",
     )
 
     # Dry-run command
@@ -509,11 +524,18 @@ Examples:
         except Exception as e:
             logging.warning(f"Could not auto-detect sweep mode: {e}")
 
+    # Parse tags if provided
+    tags = None
+    if hasattr(args, "tags") and args.tags:
+        tags = [t.strip() for t in args.tags.split(",") if t.strip()]
+        if tags:
+            logging.info(f"🏷️  Tags: {', '.join(tags)}")
+
     try:
         if is_sweep:
-            submit_sweep(args.config, dry_run=is_dry_run, setup_script=getattr(args, "setup_script", None))
+            submit_sweep(args.config, dry_run=is_dry_run, setup_script=getattr(args, "setup_script", None), tags=tags)
         else:
-            submit_single(args.config, dry_run=is_dry_run, setup_script=getattr(args, "setup_script", None))
+            submit_single(args.config, dry_run=is_dry_run, setup_script=getattr(args, "setup_script", None), tags=tags)
     except Exception as e:
         logging.exception(f"Error: {e}")
         sys.exit(1)

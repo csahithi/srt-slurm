@@ -22,6 +22,11 @@ def render(filtered_runs: list, logs_dir: str):
     Compare prefill input rate vs decode generation rate to verify proper node ratio.
     """)
 
+    # Toggle for request rate approximation
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        show_request_rate = st.toggle("Show Request Rate", value=False, help="Convert tokens/s to requests/s using ISL/OSL")
+
     st.caption("""
     **What to look for:**
     - Lines should align when system is balanced
@@ -80,7 +85,12 @@ def render(filtered_runs: list, logs_dir: str):
                 st.metric("ISL/OSL", f"{run.profiler.isl}/{run.profiler.osl}")
 
             # Create rate match graph
-            rate_fig = _create_rate_match_graph(prefill_nodes, decode_nodes, run.job_id)
+            isl = int(run.profiler.isl) if run.profiler.isl else None
+            osl = int(run.profiler.osl) if run.profiler.osl else None
+            rate_fig = _create_rate_match_graph(
+                prefill_nodes, decode_nodes, run.job_id,
+                show_request_rate=show_request_rate, isl=isl, osl=osl
+            )
             st.plotly_chart(rate_fig, width="stretch", key=f"rate_match_{run.job_id}")
 
         # Add divider between runs except for the last one
@@ -88,11 +98,24 @@ def render(filtered_runs: list, logs_dir: str):
             st.divider()
 
 
-def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id=""):
-    """Create rate matching graph comparing prefill input vs decode generation."""
+def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id="", show_request_rate=False, isl=None, osl=None):
+    """Create rate matching graph comparing prefill input vs decode generation.
+    
+    Args:
+        prefill_nodes: List of prefill node metrics
+        decode_nodes: List of decode node metrics
+        job_id: Job identifier for title
+        show_request_rate: If True, convert tokens/s to requests/s using ISL/OSL
+        isl: Input sequence length for conversion
+        osl: Output sequence length for conversion
+    """
     rate_fig = go.Figure()
 
     title_suffix = f" - Job {job_id}" if job_id else ""
+    
+    # Determine divisors for request rate conversion
+    prefill_divisor = isl if (show_request_rate and isl) else 1
+    decode_divisor = osl if (show_request_rate and osl) else 1
 
     # Get prefill input throughput over time
     if prefill_nodes:
@@ -112,18 +135,19 @@ def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id=""):
         for ts in sorted(all_prefill_batches.keys()):
             avg = sum(all_prefill_batches[ts]) / len(all_prefill_batches[ts])
             timestamps.append(ts)
-            avg_input_tps.append(avg)
+            avg_input_tps.append(avg / prefill_divisor)
 
         if timestamps:
             first_time = datetime.strptime(timestamps[0], "%Y-%m-%d %H:%M:%S")
             elapsed = [(datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") - first_time).total_seconds() for ts in timestamps]
 
+            unit = "req/s" if show_request_rate else "tok/s"
             rate_fig.add_trace(
                 go.Scatter(
                     x=elapsed,
                     y=avg_input_tps,
                     mode="lines+markers",
-                    name=f"Prefill Input Rate (avg {len(prefill_nodes)} nodes)",
+                    name=f"Prefill Input Rate [{unit}] (avg {len(prefill_nodes)} nodes)",
                     line={"color": "orange", "width": 3},
                     marker={"size": 6},
                 )
@@ -147,27 +171,29 @@ def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id=""):
         for ts in sorted(all_decode_batches.keys()):
             avg = sum(all_decode_batches[ts]) / len(all_decode_batches[ts])
             timestamps.append(ts)
-            avg_gen_tps.append(avg)
+            avg_gen_tps.append(avg / decode_divisor)
 
         if timestamps:
             first_time = datetime.strptime(timestamps[0], "%Y-%m-%d %H:%M:%S")
             elapsed = [(datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") - first_time).total_seconds() for ts in timestamps]
 
+            unit = "req/s" if show_request_rate else "tok/s"
             rate_fig.add_trace(
                 go.Scatter(
                     x=elapsed,
                     y=avg_gen_tps,
                     mode="lines+markers",
-                    name=f"Decode Gen Rate (avg {len(decode_nodes)} nodes)",
+                    name=f"Decode Gen Rate [{unit}] (avg {len(decode_nodes)} nodes)",
                     line={"color": "green", "width": 3},
                     marker={"size": 6},
                 )
             )
 
+    y_unit = "requests/s" if show_request_rate else "tokens/s"
     rate_fig.update_layout(
         title=f"Rate Match: Prefill Input vs Decode Generation{title_suffix}",
         xaxis_title="Time Elapsed (seconds)",
-        yaxis_title="Average Throughput (tokens/s per node)",
+        yaxis_title=f"Average Throughput ({y_unit} per node)",
         hovermode="x unified",
         height=500,
         showlegend=True,
