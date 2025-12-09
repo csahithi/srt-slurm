@@ -79,8 +79,8 @@ def render(filtered_runs: list, logs_dir: str):
                 all_node_metrics.extend(node_metrics)
 
     if not all_node_metrics:
-        st.warning("No log files (.err) found for the selected runs.")
-        st.info("Node metrics are extracted from files like `*_prefill_*.err` and `*_decode_*.err`")
+        st.warning("No log files found for the selected runs.")
+        st.info("Node metrics are extracted from files like `*_prefill_*.err`, `*_decode_*.err`, `*_prefill_*.out`, or `*_decode_*.out`")
         return
 
     # Split by prefill vs decode (for disaggregated) or agg (for aggregated)

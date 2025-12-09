@@ -286,16 +286,16 @@ def parse_command_line_to_dict(cmd_args: list[str]) -> dict[str, str]:
 
 
 def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
-    """Parse .err files to find explicitly set flags and service topology.
+    """Parse .err/.out files to find explicitly set flags and service topology.
 
     Uses parquet caching to avoid re-parsing on subsequent loads.
 
-    Expected .err file format:
-    - Filename pattern: <node>_<service>_<id>.err (e.g., watchtower-navy-cn01_prefill_w0.err)
+    Expected file format:
+    - Filename pattern: <node>_<service>_<id>.err or .out (e.g., watchtower-navy-cn01_prefill_w0.err)
     - Contains line with: python3 -m ... sglang --flag1 value1 --flag2 value2 ...
 
     Args:
-        run_path: Path to the run directory containing .err files
+        run_path: Path to the run directory containing .err/.out files
 
     Returns:
         {
@@ -308,7 +308,7 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
 
     # Initialize cache manager
     cache_mgr = CacheManager(run_path)
-    source_patterns = ["*.err"]
+    source_patterns = ["*.err", "*.out"]
 
     # Try to load from cache first
     if cache_mgr.is_cache_valid("config_topology", source_patterns):
@@ -330,25 +330,26 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
             logger.info(f"Loaded {len(explicit_flags)} flags and {len(services)} nodes from cache")
             return {"explicit_flags": explicit_flags, "services": services}
 
-    # Cache miss - parse from .err files
+    # Cache miss - parse from .err/.out files
     explicit_flags: set = set()
     services: dict[str, list[str]] = {}
-    err_files_found = 0
+    log_files_found = 0
     commands_found = 0
 
     if not os.path.exists(run_path):
         logger.error(f"Run path does not exist: {run_path}")
         return {"explicit_flags": explicit_flags, "services": services}
 
-    # Scan all .err files
+    # Scan all .err and .out files
     for filename in os.listdir(run_path):
-        if filename.endswith(".err"):
-            err_files_found += 1
+        if filename.endswith(".err") or filename.endswith(".out"):
+            log_files_found += 1
             filepath = os.path.join(run_path, filename)
 
             # Extract node name and service type from filename
-            # Pattern: watchtower-navy-cn01_prefill_w0.err -> cn01, prefill
-            match = re.match(r"(.+?)_(prefill|decode|frontend|nginx|nats|etcd)", filename)
+            # Pattern: watchtower-navy-cn01_prefill_w0.err or r02-p01-dgx-c11_prefill_w0.out -> cn01/c11, prefill
+            # Use greedy match (.+) since node names can contain underscores
+            match = re.match(r"(.+)_(prefill|decode|frontend|nginx|nats|etcd)", filename)
             if match:
                 node_name = match.group(1).replace("watchtower-navy-", "")
                 service_type = match.group(2)
@@ -359,7 +360,7 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
             else:
                 logger.debug(
                     f"Could not parse service type from filename: {filename}. "
-                    f"Expected pattern: <node>_<service>_<id>.err"
+                    f"Expected pattern: <node>_<service>_<id>.err or .out"
                 )
 
             # Look for command line to extract explicit flags
@@ -377,18 +378,18 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
                 continue
 
     # Validation warnings
-    if err_files_found == 0:
-        logger.warning(f"No .err files found in {run_path}. Cannot determine service topology.")
+    if log_files_found == 0:
+        logger.warning(f"No .err/.out files found in {run_path}. Cannot determine service topology.")
 
-    if commands_found == 0 and err_files_found > 0:
+    if commands_found == 0 and log_files_found > 0:
         logger.warning(
-            f"Found {err_files_found} .err files but no sglang commands. "
+            f"Found {log_files_found} log files but no sglang commands. "
             f"Expected format: 'python3 -m ... sglang --flag ...' "
             f"Log structure may have changed."
         )
 
     logger.info(
-        f"Parsed {err_files_found} .err files, found {commands_found} commands, "
+        f"Parsed {log_files_found} log files, found {commands_found} commands, "
         f"{len(explicit_flags)} unique flags, {len(services)} nodes"
     )
 

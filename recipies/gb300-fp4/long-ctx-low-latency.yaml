@@ -5,11 +5,12 @@ model:
   container: "yam"
   precision: "fp4"
 
+# still tinkering with prefill num workers
 resources:
   gpu_type: "gb300"
-  prefill_nodes: 1
+  prefill_nodes: 4
   decode_nodes: 1
-  prefill_workers: 1
+  prefill_workers: 4
   decode_workers: 1
   gpus_per_node: 4
 
@@ -32,8 +33,7 @@ backend:
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-    # performance tuning
-    #SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1" i think this causes ima
+    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
 
 
 
@@ -54,8 +54,7 @@ backend:
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-    # performance tuning
-    #SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1" i think this causes ima
+    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
 
   sglang_config:
     prefill:
@@ -73,7 +72,7 @@ backend:
       disable-radix-cache: true
       kv-cache-dtype: "fp8_e4m3"
       attention-backend: "trtllm_mla"
-      enable-symm-mem: true  
+      enable-symm-mem: true
       # moe
       moe-runner-backend: "flashinfer_trtllm"
       # sizing
@@ -116,7 +115,7 @@ backend:
       context-length: 136000
       mem-fraction-static: 0.95
       cuda-graph-max-bs: 256
-      chunked-prefill-size: -1 # why disable chunked prefill if we have dp attn?
+      chunked-prefill-size: -1 # disable chunked prefill bc perf rn
       #max-running-requests: 4
       # other
       watchdog-timeout: 1000000
@@ -133,5 +132,5 @@ benchmark:
   type: "sa-bench"
   isl: 128000
   osl: 8000
-  concurrencies: "1x8x16x64x128x256"
+  concurrencies: "1x4x8x16x32x64x128"
   req_rate: "inf"

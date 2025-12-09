@@ -1,5 +1,5 @@
 """
-Node analysis service for parsing .err log files
+Node analysis service for parsing .err/.out log files
 
 All parsing logic encapsulated in the NodeAnalyzer class.
 """
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class NodeAnalyzer:
     """Service for analyzing node-level metrics from log files.
 
-    Parses .err files to extract batch metrics, memory usage, and configuration.
+    Parses .err/.out files to extract batch metrics, memory usage, and configuration.
     All parsing logic is encapsulated as methods.
     """
 
@@ -29,7 +29,7 @@ class NodeAnalyzer:
         Uses parquet caching to avoid re-parsing on subsequent loads.
 
         Args:
-            run_path: Path to the run directory containing .err files
+            run_path: Path to the run directory containing .err/.out files
             return_dicts: If True, return dicts directly (faster). If False, return NodeMetrics objects.
 
         Returns:
@@ -38,8 +38,8 @@ class NodeAnalyzer:
         # Initialize cache manager
         cache_mgr = CacheManager(run_path)
 
-        # Define source patterns for cache validation (.err files)
-        source_patterns = ["*.err"]
+        # Define source patterns for cache validation (.err and .out files)
+        source_patterns = ["*.err", "*.out"]
 
         # Try to load from cache first
         if cache_mgr.is_cache_valid("node_metrics", source_patterns):
@@ -55,7 +55,7 @@ class NodeAnalyzer:
                     logger.info(f"Loaded {len(nodes)} nodes from cache")
                 return nodes
 
-        # Cache miss or invalid - parse from .err files
+        # Cache miss or invalid - parse from .err/.out files
         nodes = []
 
         if not os.path.exists(run_path):
@@ -66,7 +66,7 @@ class NodeAnalyzer:
         parsed_successfully = 0
 
         for file in os.listdir(run_path):
-            if file.endswith(".err") and ("prefill" in file or "decode" in file):
+            if (file.endswith(".err") or file.endswith(".out")) and ("prefill" in file or "decode" in file):
                 total_err_files += 1
                 filepath = os.path.join(run_path, file)
                 node = self.parse_single_log(filepath)
@@ -74,10 +74,10 @@ class NodeAnalyzer:
                     nodes.append(node)
                     parsed_successfully += 1
 
-        logger.info(f"Parsed {parsed_successfully}/{total_err_files} prefill/decode .err files from {run_path}")
+        logger.info(f"Parsed {parsed_successfully}/{total_err_files} prefill/decode log files from {run_path}")
 
         if total_err_files == 0:
-            logger.warning(f"No prefill/decode .err files found in {run_path}")
+            logger.warning(f"No prefill/decode log files found in {run_path}")
 
         # Save to cache if we have data
         if nodes:
@@ -90,7 +90,7 @@ class NodeAnalyzer:
         """Parse a single node log file.
 
         Args:
-            filepath: Path to the .err log file
+            filepath: Path to the .err/.out log file
 
         Returns:
             NodeMetrics object or None if parsing failed
@@ -100,7 +100,7 @@ class NodeAnalyzer:
         node_info = self._extract_node_info_from_filename(filepath)
         if not node_info:
             logger.warning(
-                f"Could not extract node info from filename: {filepath}. " f"Expected format: <node>_<service>_<id>.err"
+                f"Could not extract node info from filename: {filepath}. " f"Expected format: <node>_<service>_<id>.err or .out"
             )
             return None
 
@@ -444,9 +444,10 @@ class NodeAnalyzer:
     def _parse_dp_tp_ep_tag(self, line: str) -> tuple[int | None, int | None, int | None, str | None]:
         """Extract DP, TP, EP indices and timestamp from log line.
 
-        Supports two formats:
+        Supports three formats:
         - Full: [2025-11-04 05:31:43 DP0 TP0 EP0]
-        - Simple: [2025-11-04 07:05:55 TP0] (defaults DP=0, EP=0)
+        - Simple TP: [2025-11-04 07:05:55 TP0] (defaults DP=0, EP=0)
+        - Pipeline: [2025-12-08 14:34:44 PP0] (defaults DP=0, EP=0, TP=PP value)
 
         Args:
             line: Log line to parse
@@ -465,6 +466,12 @@ class NodeAnalyzer:
         if match:
             timestamp, tp = match.groups()
             return 0, int(tp), 0, timestamp  # Default DP=0, EP=0
+
+        # Try pipeline parallelism format: PP0 (prefill with PP)
+        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) PP(\d+)\]", line)
+        if match:
+            timestamp, pp = match.groups()
+            return 0, int(pp), 0, timestamp  # Map PP to TP slot, default DP=0, EP=0
 
         return None, None, None, None
 
@@ -585,10 +592,11 @@ class NodeAnalyzer:
     def _extract_node_info_from_filename(self, filename: str) -> dict | None:
         """Extract node name and worker info from filename.
 
-        Example: watchtower-navy-cn01_prefill_w0.err
+        Example: watchtower-navy-cn01_prefill_w0.err or r02-p01-dgx-c11_prefill_w0.out
         Returns: {'node': 'watchtower-navy-cn01', 'worker_type': 'prefill', 'worker_id': 'w0'}
         """
-        match = re.match(r"([^_]+)_(prefill|decode|frontend)_([^.]+)\.err", os.path.basename(filename))
+        # Use greedy match for node name up to _(prefill|decode|frontend)_
+        match = re.match(r"(.+)_(prefill|decode|frontend)_([^.]+)\.(err|out)", os.path.basename(filename))
         if match:
             return {
                 "node": match.group(1),
