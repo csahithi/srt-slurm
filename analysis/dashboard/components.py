@@ -78,9 +78,27 @@ def sync_cloud_data(logs_dir):
         return True, 0, str(e)
 
 
+def get_logs_dir_fingerprint(logs_dir):
+    """Get a fingerprint of the logs directory for cache invalidation.
+    
+    Returns a tuple of sorted subdirectory names. When new directories are added,
+    the fingerprint changes, automatically invalidating the cache.
+    """
+    if not os.path.exists(logs_dir):
+        return ()
+    subdirs = [d for d in os.listdir(logs_dir) if os.path.isdir(os.path.join(logs_dir, d))]
+    return tuple(sorted(subdirs))
+
+
 @st.cache_data
-def load_data(logs_dir):
+def load_data(logs_dir, _dir_fingerprint=None):
     """Load and cache benchmark data.
+
+    Args:
+        logs_dir: Path to the logs directory
+        _dir_fingerprint: Fingerprint of directory contents for cache invalidation.
+                         Pass get_logs_dir_fingerprint(logs_dir) to auto-invalidate
+                         when new directories are added.
 
     Returns:
         Tuple of (runs_with_data, skipped_runs)
@@ -172,8 +190,10 @@ def _memory_to_dict(mem) -> dict:
 
 
 def get_default_logs_dir():
-    """Get default logs directory path."""
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+    """Get default logs directory path (project root/logs)."""
+    # Go up 3 levels: components.py -> dashboard -> analysis -> project root
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(project_root, "logs")
 
 
 # Cached graph creation functions for node metrics

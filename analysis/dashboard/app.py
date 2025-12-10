@@ -390,9 +390,10 @@ def main():
         else:
             st.sidebar.info("💡 Cloud sync not configured")
 
-    # Load data
+    # Load data (fingerprint auto-invalidates cache when new dirs are added)
     with st.spinner("Loading benchmark data..."):
-        all_runs, skipped_runs = components.load_data(logs_dir)
+        dir_fingerprint = components.get_logs_dir_fingerprint(logs_dir)
+        all_runs, skipped_runs = components.load_data(logs_dir, _dir_fingerprint=dir_fingerprint)
 
     # Show warning if runs were skipped
     if skipped_runs:
