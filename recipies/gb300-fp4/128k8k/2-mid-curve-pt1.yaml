@@ -18,6 +18,8 @@ resources:
 backend:
 
   decode_environment:
+    UCX_TLS: '^ib'
+    UCX_CUDA_IPC_ENABLE_MNNVL: 'y'
     DYN_SKIP_SGLANG_LOG_FORMATTING: '1'
     FLASHINFER_DISABLE_VERSION_CHECK: '1'
     FLASHINFER_WORKSPACE_BASE: /configs/flashinfer-cache
@@ -37,6 +39,8 @@ backend:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: '1800'
 
   prefill_environment:
+    UCX_TLS: '^ib'
+    UCX_CUDA_IPC_ENABLE_MNNVL: 'y'
     DYN_SKIP_SGLANG_LOG_FORMATTING: '1'
     FLASHINFER_DISABLE_VERSION_CHECK: '1'
     FLASHINFER_WORKSPACE_BASE: /configs/flashinfer-cache
