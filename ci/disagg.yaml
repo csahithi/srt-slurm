@@ -43,13 +43,13 @@ frontend:
 
 backend:
   sglang_config:
+    # probably use flashattn 3 for attn backend
     prefill:
       disaggregation-mode: "prefill"
       served-model-name: "Qwen/Qwen2.5-32B-Instruct"
       model-path: "/model/"
       trust-remote-code: true
       tensor-parallel-size: 8
-      context-length: 32768
       mem-fraction-static: 0.90
       disaggregation-bootstrap-port: 30001
 
@@ -59,10 +59,8 @@ backend:
       model-path: "/model/"
       trust-remote-code: true
       tensor-parallel-size: 8
-      context-length: 32768
       mem-fraction-static: 0.90
       disaggregation-bootstrap-port: 30001
 
 benchmark:
   type: "router"
-

@@ -22,19 +22,18 @@ resources:
   gpus_per_node: 8
 
 frontend:
-  # Dynamo frontend with KV-aware routing
   dynamo_frontend_args:
     router-mode: kv
     router-reset-states: true
 
 backend:
   sglang_config:
+    # use flashhattn 3 for attn backend
     aggregated:
       served-model-name: "Qwen/Qwen2.5-32B-Instruct"
       model-path: "/model/"
       trust-remote-code: true
       tensor-parallel-size: 8
-      context-length: 32768
       mem-fraction-static: 0.90
 
 benchmark:
