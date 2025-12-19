@@ -22,6 +22,7 @@ max_context_length=${7:-128000}  # Default: 128000 (must ensure input + max_toke
 num_threads=${8:-16}             # Default: 16
 # Note: --thinking-mode removed because dynamo frontend doesn't support chat_template_kwargs
 categories=${9:-}                # Default: all categories
+use_sglang_router=${10:-false}   # Default: false (dynamo frontend)
 
 echo "LongBench-v2 Benchmark Config: num_examples=${num_examples:-all}; max_tokens=${max_tokens}; max_context_length=${max_context_length}; num_threads=${num_threads}; categories=${categories:-all}"
 
@@ -32,7 +33,7 @@ wait_for_model_timeout=1500 # 25 minutes
 wait_for_model_check_interval=5 # check interval -> 5s
 wait_for_model_report_interval=60 # wait_for_model report interval -> 60s
 
-wait_for_model $head_node $head_port $n_prefill $n_decode $wait_for_model_check_interval $wait_for_model_timeout $wait_for_model_report_interval
+wait_for_model $head_node $head_port $n_prefill $n_decode $wait_for_model_check_interval $wait_for_model_timeout $wait_for_model_report_interval $use_sglang_router
 
 # Create results directory
 result_dir="/logs/accuracy"

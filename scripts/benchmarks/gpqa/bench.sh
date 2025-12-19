@@ -17,7 +17,8 @@ num_examples=${5:-198}  # Default: 198
 max_tokens=${6:-512}    # Default: 512
 repeat=${7:-8}          # Default: 8
 num_threads=${8:-512}   # Default: 512
-thinking_mode=${9:-deepseek-r1} # Default: deepseek-r1
+thinking_mode=${9:-deepseek-r1}  # Default: deepseek-r1
+use_sglang_router=${10:-false}   # Default: false (dynamo frontend)
 
 echo "GPQA Benchmark Config: num_examples=${num_examples}; max_tokens=${max_tokens}; repeat=${repeat}; num_threads=${num_threads}; thinking-mode=${thinking_mode}"
 
@@ -28,7 +29,7 @@ wait_for_model_timeout=1500 # 25 minutes
 wait_for_model_check_interval=5 # check interval -> 5s
 wait_for_model_report_interval=60 # wait_for_model report interval -> 60s
 
-wait_for_model $head_node $head_port $n_prefill $n_decode $wait_for_model_check_interval $wait_for_model_timeout $wait_for_model_report_interval
+wait_for_model $head_node $head_port $n_prefill $n_decode $wait_for_model_check_interval $wait_for_model_timeout $wait_for_model_report_interval $use_sglang_router
 
 # Create results directory
 result_dir="/logs/accuracy"

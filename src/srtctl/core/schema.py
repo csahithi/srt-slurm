@@ -97,6 +97,7 @@ class BenchmarkType(str, Enum):
 
     MANUAL = "manual"
     SA_BENCH = "sa-bench"
+    ROUTER = "router"
     MMLU = "mmlu"
     GPQA = "gpqa"
     LONGBENCHV2 = "longbenchv2"
