@@ -182,6 +182,15 @@ class SweepOrchestrator:
         logger.info("Command: %s", shlex.join(cmd))
         logger.info("Log: %s", worker_log)
 
+        # Install dynamo when not using sglang router (required for dynamo.sglang module)
+        bash_preamble = None
+        if not self.config.frontend.use_sglang_router:
+            bash_preamble = (
+                "echo 'Installing dynamo...' && "
+                "pip install --quiet ai-dynamo-runtime==0.7.0 ai-dynamo==0.7.0 && "
+                "echo 'Dynamo installed'"
+            )
+
         proc = start_srun_process(
             command=cmd,
             nodelist=[process.node],
@@ -189,6 +198,7 @@ class SweepOrchestrator:
             container_image=str(self.runtime.container_image),
             container_mounts=self.runtime.container_mounts,
             env_to_set=env_to_set,
+            bash_preamble=bash_preamble,
         )
 
         return ManagedProcess(
@@ -240,6 +250,13 @@ class SweepOrchestrator:
             "NATS_SERVER": f"nats://{self.runtime.nodes.head}:4222",
         }
 
+        # Install dynamo before starting frontend
+        bash_preamble = (
+            "echo 'Installing dynamo...' && "
+            "pip install --quiet ai-dynamo-runtime==0.7.0 ai-dynamo==0.7.0 && "
+            "echo 'Dynamo installed'"
+        )
+
         proc = start_srun_process(
             command=cmd,
             nodelist=[self.runtime.nodes.head],
@@ -247,6 +264,7 @@ class SweepOrchestrator:
             container_image=str(self.runtime.container_image),
             container_mounts=self.runtime.container_mounts,
             env_to_set=env_to_set,
+            bash_preamble=bash_preamble,
         )
 
         return ManagedProcess(
