@@ -16,23 +16,15 @@ By default, srtctl uses **Dynamo frontends** to coordinate between prefill and d
 
 ## Configuration
 
-<<<<<<< HEAD
 Enable sglang router in your recipe's `frontend` section:
 
 ```yaml
 frontend:
-=======
-Enable sglang router in your recipe's `backend` section:
-
-```yaml
-backend:
->>>>>>> main
   use_sglang_router: true
 ```
 
 That's it. The workers will launch with `sglang.launch_server` instead of `dynamo.sglang`, and the router will handle request distribution.
 
-<<<<<<< HEAD
 ### Router Arguments
 
 Pass extra CLI args to the router:
@@ -49,8 +41,6 @@ frontend:
 
 For dynamo frontend, use `dynamo_frontend_args` instead.
 
-=======
->>>>>>> main
 ## Architecture Modes
 
 ### Single Router (`enable_multiple_frontends: false`)
@@ -58,11 +48,7 @@ For dynamo frontend, use `dynamo_frontend_args` instead.
 The simplest mode - one router on node 0, no nginx:
 
 ```yaml
-<<<<<<< HEAD
 frontend:
-=======
-backend:
->>>>>>> main
   use_sglang_router: true
   enable_multiple_frontends: false
 ```
@@ -86,11 +72,7 @@ backend:
 Nginx load balances across multiple router instances:
 
 ```yaml
-<<<<<<< HEAD
 frontend:
-=======
-backend:
->>>>>>> main
   use_sglang_router: true
   enable_multiple_frontends: true # default
   num_additional_frontends: 9 # default, total = 1 + 9 = 10 routers
@@ -177,19 +159,12 @@ resources:
   decode_nodes: 2
   decode_workers: 2
 
-<<<<<<< HEAD
 frontend:
-=======
-backend:
->>>>>>> main
   use_sglang_router: true
   enable_multiple_frontends: true
   num_additional_frontends: 3 # 4 total routers
 
-<<<<<<< HEAD
 backend:
-=======
->>>>>>> main
   sglang_config:
     prefill:
       model-path: /model/

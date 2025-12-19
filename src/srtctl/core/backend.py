@@ -37,7 +37,6 @@ class SGLangBackend:
     def _profiling_type(self) -> str:
         return (self.config.get("profiling") or {}).get("type") or "none"
 
-<<<<<<< HEAD
     def _frontend_config(self) -> dict:
         """Get frontend configuration with defaults."""
         frontend = self.config.get("frontend", {})
@@ -63,8 +62,6 @@ class SGLangBackend:
             args = fc.get("dynamo_frontend_args") or {}
         return json.dumps(args) if args else ""
 
-=======
->>>>>>> main
     def _config_to_flags(self, config: dict) -> list[str]:
         lines = []
         for key, value in sorted(config.items()):
@@ -111,11 +108,7 @@ class SGLangBackend:
         lines = [f"{k}={v} \\" for k, v in (self.get_environment_vars(mode) or {}).items()]
 
         prof = self._profiling_type()
-<<<<<<< HEAD
         use_sglang = prof != "none" or self._use_sglang_router()
-=======
-        use_sglang = prof != "none" or self.backend_config.get("use_sglang_router", False)
->>>>>>> main
         if prof == "nsys":
             lines.append(
                 "nsys profile -t cuda,nvtx --cuda-graph-trace=node -c cudaProfilerApi --capture-range-end stop --force-overwrite true python3 -m sglang.launch_server \\"
@@ -211,16 +204,10 @@ class SGLangBackend:
             "network_interface": get_srtslurm_setting("network_interface"),
             "gpu_type": self.backend_config.get("gpu_type", "h100"),
             "partition": partition,
-<<<<<<< HEAD
             "enable_multiple_frontends": self._frontend_config()["enable_multiple_frontends"],
             "num_additional_frontends": self._frontend_config()["num_additional_frontends"],
             "use_sglang_router": self._use_sglang_router(),
             "frontend_args_json": self._get_frontend_extra_args_json(),
-=======
-            "enable_multiple_frontends": self.backend_config.get("enable_multiple_frontends", True),
-            "num_additional_frontends": self.backend_config.get("num_additional_frontends", 9),
-            "use_sglang_router": self.backend_config.get("use_sglang_router", False),
->>>>>>> main
             "do_benchmark": bench_type != "manual",
             "benchmark_type": bench_type,
             "benchmark_arg": parsable_config,
