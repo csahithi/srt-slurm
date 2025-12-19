@@ -15,6 +15,7 @@ The script will:
 """
 
 import argparse
+import json
 import logging
 import socket
 
@@ -161,6 +162,13 @@ def _parse_command_line_args(args: list[str] | None = None) -> argparse.Namespac
         help="Custom setup script name in /configs directory (e.g., 'custom-setup.sh')",
     )
 
+    parser.add_argument(
+        "--frontend-args",
+        type=str,
+        default=None,
+        help="JSON string of extra CLI args for frontend/router (e.g., '{\"kv-overlap-score-weight\": 1}')",
+    )
+
     return parser.parse_args(args)
 
 
@@ -218,7 +226,8 @@ def main(input_args: list[str] | None = None):
             raise ValueError("--nginx_config is required for nginx worker type")
         setup_nginx_worker(args.nginx_config)
     elif args.worker_type == "frontend":
-        setup_frontend_worker(args.worker_idx, args.master_ip, args.gpu_type)
+        extra_args = json.loads(args.frontend_args) if args.frontend_args else None
+        setup_frontend_worker(args.worker_idx, args.master_ip, args.gpu_type, extra_args=extra_args)
     elif args.worker_type == "prefill":
         setup_prefill_worker(
             args.worker_idx,
@@ -266,6 +275,7 @@ def main(input_args: list[str] | None = None):
     elif args.worker_type == "sglang-router":
         prefill_ips = [ip.strip() for ip in args.prefill_ips.split(",") if ip.strip()]
         decode_ips = [ip.strip() for ip in args.decode_ips.split(",") if ip.strip()]
+        extra_args = json.loads(args.frontend_args) if args.frontend_args else None
         setup_router_worker(
             router_idx=args.worker_idx or 0,
             prefill_ips=prefill_ips,
@@ -274,6 +284,7 @@ def main(input_args: list[str] | None = None):
             port=args.router_port,
             server_port=args.server_port,
             bootstrap_port=args.bootstrap_port,
+            extra_args=extra_args,
         )
 
     logging.info(f"{args.worker_type.capitalize()} worker setup complete")

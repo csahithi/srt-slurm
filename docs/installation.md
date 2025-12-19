@@ -182,18 +182,28 @@ benchmark:
   req_rate: "inf"
 ```
 
-### Backend Options
+### Frontend Options
 
-The `backend` section supports these additional options:
+The `frontend` section (optional) configures the frontend/router:
 
 ```yaml
-backend:
-  # Frontend architecture (disaggregated mode only)
-  enable_multiple_frontends: true # Default: true. Use nginx + multiple frontends
-  num_additional_frontends: 9 # Default: 9. Additional frontends beyond the master
-
-  # Alternative: Use SGLang router instead of nginx + frontends
-  use_sglang_router: false # Default: false. Use sglang_router for load balancing
+frontend:
+  # Use sglang-router instead of dynamo frontend (default: false)
+  use_sglang_router: false
+  
+  # Enable multiple frontends/routers behind nginx (default: true)
+  enable_multiple_frontends: true
+  
+  # Additional frontends beyond the master (default: 9, total = 10)
+  num_additional_frontends: 9
+  
+  # Extra CLI args for sglang-router (when use_sglang_router: true)
+  sglang_router_args:
+    kv-overlap-score-weight: 1
+    router-temperature: 0
+  
+  # Extra CLI args for dynamo frontend (when use_sglang_router: false)
+  dynamo_frontend_args: {}
 ```
 
 ## Submit the Job

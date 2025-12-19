@@ -222,6 +222,48 @@ class SGLangConfig(BaseModel):
     aggregated: Optional[SGLangAggregatedConfig] = None
 
 
+class FrontendConfig(BaseModel):
+    """Frontend/router configuration.
+
+    Extra args are passed through as CLI flags to the frontend/router.
+    Use kebab-case keys (e.g., kv-overlap-score-weight: 1).
+    Boolean True values become flags with no argument (e.g., no-kv-events: true -> --no-kv-events).
+    """
+
+    model_config = {"extra": "forbid"}
+
+    # Whether to use sglang-router (True) or dynamo frontend (False, default)
+    use_sglang_router: bool = False
+
+    # Enable multiple frontend/router instances behind nginx
+    enable_multiple_frontends: bool = True
+
+    # Number of additional frontends/routers beyond the first (total = 1 + num_additional)
+    num_additional_frontends: int = 9
+
+    # Extra CLI args for sglang-router (only used when use_sglang_router=True)
+    # Keys should be kebab-case, e.g., {"kv-overlap-score-weight": 1, "no-kv-events": True}
+    sglang_router_args: Optional[Dict[str, Any]] = None
+
+    # Extra CLI args for dynamo frontend (only used when use_sglang_router=False)
+    # Keys should be kebab-case
+    dynamo_frontend_args: Optional[Dict[str, Any]] = None
+
+    def get_router_args_list(self) -> list[str]:
+        """Convert router args dict to CLI flag list."""
+        args = self.sglang_router_args if self.use_sglang_router else self.dynamo_frontend_args
+        if not args:
+            return []
+        result = []
+        for key, value in args.items():
+            if value is True:
+                result.append(f"--{key}")
+            elif value is not False and value is not None:
+                result.append(f"--{key}")
+                result.append(str(value))
+        return result
+
+
 class BackendConfig(BaseModel):
     """Backend configuration (auto-populated, not user-facing)."""
 
@@ -238,15 +280,6 @@ class BackendConfig(BaseModel):
     # SGLang-specific config
     sglang_config: Optional[SGLangConfig] = None
 
-    # Frontend / router settings
-    enable_multiple_frontends: bool = True
-    # Number of additional frontends/routers beyond the first (total = 1 + num_additional_frontends)
-    # Used for both dynamo frontends and sglang-router instances
-    num_additional_frontends: int = 9
-    # Whether to launch sglang_router alongside the workers (PD disaggregation).
-    # This is user-configurable via backend.use_sglang_router in the recipe.
-    use_sglang_router: bool = False
-
 
 class JobConfig(BaseModel):
     """Complete job configuration."""
@@ -258,6 +291,7 @@ class JobConfig(BaseModel):
     resources: ResourceConfig
     slurm: SlurmConfig = Field(default_factory=SlurmConfig)
     backend: Optional[BackendConfig] = None  # Auto-populated
+    frontend: FrontendConfig = Field(default_factory=FrontendConfig)
     benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
     profiling: ProfilingConfig = Field(default_factory=ProfilingConfig)
 

@@ -5,10 +5,32 @@
 
 import logging
 import os
+from typing import Any
 
 from .command import install_dynamo_wheels
 from .environment import ETCD_CLIENT_PORT, ETCD_LISTEN_ADDR, ETCD_PEER_PORT
 from .utils import run_command, wait_for_etcd
+
+
+def _build_extra_args(args_dict: dict[str, Any] | None) -> str:
+    """Convert args dict to CLI flags string.
+    
+    Args:
+        args_dict: Dict of arg names to values. Boolean True = flag with no value.
+        
+    Returns:
+        CLI args string like "--kv-overlap-score-weight 1 --no-kv-events"
+    """
+    if not args_dict:
+        return ""
+    
+    parts = []
+    for key, value in args_dict.items():
+        if value is True:
+            parts.append(f"--{key}")
+        elif value is not False and value is not None:
+            parts.append(f"--{key} {value}")
+    return " ".join(parts)
 
 
 def setup_head_prefill_node(prefill_host_ip: str) -> None:
@@ -43,8 +65,20 @@ def setup_nginx_worker(nginx_config: str) -> int:
     return run_command(nginx_cmd)
 
 
-def setup_frontend_worker(worker_idx: int, master_ip: str, gpu_type: str) -> int:
-    """Setup a frontend worker"""
+def setup_frontend_worker(
+    worker_idx: int,
+    master_ip: str,
+    gpu_type: str,
+    extra_args: dict[str, Any] | None = None,
+) -> int:
+    """Setup a frontend worker.
+    
+    Args:
+        worker_idx: Index of this frontend (0 = primary with NATS/ETCD)
+        master_ip: IP of the master node (for NATS/ETCD)
+        gpu_type: GPU type string
+        extra_args: Extra CLI args to pass to dynamo.frontend
+    """
     logging.info(f"Setting up frontend worker {worker_idx}")
 
     # First frontend (worker_idx 0) also sets up NATS/ETCD
@@ -60,6 +94,8 @@ def setup_frontend_worker(worker_idx: int, master_ip: str, gpu_type: str) -> int
     # Install dynamo from PyPI
     install_dynamo_wheels(gpu_type)
 
-    # Run frontend
-    frontend_cmd = "python3 -m dynamo.frontend --http-port=8000"
+    # Run frontend with extra args
+    extra_args_str = _build_extra_args(extra_args)
+    frontend_cmd = f"python3 -m dynamo.frontend --http-port=8000 {extra_args_str}".strip()
+    logging.info(f"Frontend command: {frontend_cmd}")
     return run_command(frontend_cmd)

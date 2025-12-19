@@ -37,6 +37,31 @@ class SGLangBackend:
     def _profiling_type(self) -> str:
         return (self.config.get("profiling") or {}).get("type") or "none"
 
+    def _frontend_config(self) -> dict:
+        """Get frontend configuration with defaults."""
+        frontend = self.config.get("frontend", {})
+        return {
+            "use_sglang_router": frontend.get("use_sglang_router", False),
+            "enable_multiple_frontends": frontend.get("enable_multiple_frontends", True),
+            "num_additional_frontends": frontend.get("num_additional_frontends", 9),
+            "sglang_router_args": frontend.get("sglang_router_args"),
+            "dynamo_frontend_args": frontend.get("dynamo_frontend_args"),
+        }
+
+    def _use_sglang_router(self) -> bool:
+        """Check if using sglang-router frontend."""
+        return self._frontend_config().get("use_sglang_router", False)
+
+    def _get_frontend_extra_args_json(self) -> str:
+        """Get the appropriate frontend extra args as JSON string."""
+        import json
+        fc = self._frontend_config()
+        if self._use_sglang_router():
+            args = fc.get("sglang_router_args") or {}
+        else:
+            args = fc.get("dynamo_frontend_args") or {}
+        return json.dumps(args) if args else ""
+
     def _config_to_flags(self, config: dict) -> list[str]:
         lines = []
         for key, value in sorted(config.items()):
@@ -83,7 +108,7 @@ class SGLangBackend:
         lines = [f"{k}={v} \\" for k, v in (self.get_environment_vars(mode) or {}).items()]
 
         prof = self._profiling_type()
-        use_sglang = prof != "none" or self.backend_config.get("use_sglang_router", False)
+        use_sglang = prof != "none" or self._use_sglang_router()
         if prof == "nsys":
             lines.append(
                 "nsys profile -t cuda,nvtx --cuda-graph-trace=node -c cudaProfilerApi --capture-range-end stop --force-overwrite true python3 -m sglang.launch_server \\"
@@ -179,9 +204,10 @@ class SGLangBackend:
             "network_interface": get_srtslurm_setting("network_interface"),
             "gpu_type": self.backend_config.get("gpu_type", "h100"),
             "partition": partition,
-            "enable_multiple_frontends": self.backend_config.get("enable_multiple_frontends", True),
-            "num_additional_frontends": self.backend_config.get("num_additional_frontends", 9),
-            "use_sglang_router": self.backend_config.get("use_sglang_router", False),
+            "enable_multiple_frontends": self._frontend_config()["enable_multiple_frontends"],
+            "num_additional_frontends": self._frontend_config()["num_additional_frontends"],
+            "use_sglang_router": self._use_sglang_router(),
+            "frontend_args_json": self._get_frontend_extra_args_json(),
             "do_benchmark": bench_type != "manual",
             "benchmark_type": bench_type,
             "benchmark_arg": parsable_config,

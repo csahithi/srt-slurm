@@ -193,6 +193,7 @@ def setup_router_worker(
     port: int = 8000,
     server_port: int = 30000,
     bootstrap_port: int = 30001,
+    extra_args: dict | None = None,
 ) -> int:
     """Setup an sglang router worker for PD disaggregation.
 
@@ -204,6 +205,7 @@ def setup_router_worker(
         port: Port to bind the router to
         server_port: Port where prefill/decode servers listen (default: 30000)
         bootstrap_port: Disaggregation bootstrap port for prefill servers (default: 30001)
+        extra_args: Extra CLI args dict to pass to sglang_router
 
     Returns:
         Exit code from the router process
@@ -225,6 +227,14 @@ def setup_router_worker(
         router_args.extend(["--decode", f"http://{ip}:{server_port}"])
 
     router_args.extend(["--host", host, "--port", str(port)])
+
+    # Add extra args
+    if extra_args:
+        for key, value in extra_args.items():
+            if value is True:
+                router_args.append(f"--{key}")
+            elif value is not False and value is not None:
+                router_args.extend([f"--{key}", str(value)])
 
     cmd = " ".join(router_args)
     logging.info(f"Router command: {cmd}")
