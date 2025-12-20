@@ -17,7 +17,7 @@ model:
 
 resources:
   gpu_type: "h100"
-  agg_nodes: 2
+  agg_nodes: 1
   agg_workers: 2
   gpus_per_node: 8
 
@@ -33,7 +33,7 @@ backend:
       served-model-name: "Qwen/Qwen3-32B"
       model-path: "/model/"
       trust-remote-code: true
-      tensor-parallel-size: 8
+      tensor-parallel-size: 4
       mem-fraction-static: 0.90
 
 benchmark:
