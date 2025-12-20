@@ -16,9 +16,8 @@ import subprocess
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +36,8 @@ class ManagedProcess:
 
     name: str
     popen: subprocess.Popen
-    log_file: Optional[Path] = None
-    node: Optional[str] = None
+    log_file: Path | None = None
+    node: str | None = None
     critical: bool = True
 
     @property
@@ -47,7 +46,7 @@ class ManagedProcess:
         return self.popen.poll() is None
 
     @property
-    def exit_code(self) -> Optional[int]:
+    def exit_code(self) -> int | None:
         """Get exit code if process has exited, None otherwise."""
         return self.popen.poll()
 
@@ -66,7 +65,7 @@ class ManagedProcess:
 
 
 # Type alias for named process collections
-NamedProcesses = Dict[str, ManagedProcess]
+NamedProcesses = dict[str, ManagedProcess]
 
 
 class ProcessRegistry:
@@ -93,9 +92,9 @@ class ProcessRegistry:
             job_id: SLURM job ID for logging
         """
         self.job_id = job_id
-        self._processes: Dict[str, ManagedProcess] = {}
+        self._processes: dict[str, ManagedProcess] = {}
         self._lock = threading.Lock()
-        self._failed_processes: List[str] = []
+        self._failed_processes: list[str] = []
 
     def add_process(self, process: ManagedProcess) -> None:
         """Add a process to the registry.
@@ -198,12 +197,12 @@ class ProcessRegistry:
 
         logger.error("=" * 60)
 
-    def get_process(self, name: str) -> Optional[ManagedProcess]:
+    def get_process(self, name: str) -> ManagedProcess | None:
         """Get a process by name."""
         with self._lock:
             return self._processes.get(name)
 
-    def get_all_processes(self) -> Dict[str, ManagedProcess]:
+    def get_all_processes(self) -> dict[str, ManagedProcess]:
         """Get a copy of all registered processes."""
         with self._lock:
             return dict(self._processes)

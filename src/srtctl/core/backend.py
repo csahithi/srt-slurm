@@ -7,10 +7,11 @@
 import logging
 import os
 import tempfile
-import yaml
 from datetime import datetime
-from jinja2 import Template
 from pathlib import Path
+
+import yaml
+from jinja2 import Template
 
 import srtctl
 from srtctl.core.config import get_srtslurm_setting
@@ -20,7 +21,7 @@ from srtctl.core.sweep import expand_template
 class SGLangBackend:
     """SGLang backend for distributed serving."""
 
-    def __init__(self, config: dict, setup_script: str = None):
+    def __init__(self, config: dict, setup_script: str | None = None):
         self.config = config
         self.backend_config = config.get("backend", {})
         self.resources = config.get("resources", {})
@@ -56,10 +57,7 @@ class SGLangBackend:
         """Get the appropriate frontend extra args as JSON string."""
         import json
         fc = self._frontend_config()
-        if self._use_sglang_router():
-            args = fc.get("sglang_router_args") or {}
-        else:
-            args = fc.get("dynamo_frontend_args") or {}
+        args = fc.get("sglang_router_args") or {} if self._use_sglang_router() else fc.get("dynamo_frontend_args") or {}
         return json.dumps(args) if args else ""
 
     def _config_to_flags(self, config: dict) -> list[str]:
@@ -75,7 +73,7 @@ class SGLangBackend:
                 lines.append(f"    --{flag} {value} \\")
         return lines
 
-    def generate_config_file(self, params: dict = None) -> Path | None:
+    def generate_config_file(self, params: dict | None = None) -> Path | None:
         """Generate SGLang YAML config file."""
         if "sglang_config" not in self.backend_config:
             return None
@@ -88,7 +86,7 @@ class SGLangBackend:
         # Validate kebab-case keys
         for mode in ["prefill", "decode", "aggregated"]:
             if mode in sglang_cfg and sglang_cfg[mode]:
-                for key in sglang_cfg[mode].keys():
+                for key in sglang_cfg[mode]:
                     if "_" in key:
                         raise ValueError(f"Invalid key '{key}': use '{key.replace('_', '-')}' (kebab-case)")
 
@@ -103,7 +101,7 @@ class SGLangBackend:
         logging.info(f"Generated SGLang config: {temp_path}")
         return Path(temp_path)
 
-    def render_command(self, mode: str, config_path: Path = None) -> str:
+    def render_command(self, mode: str, config_path: Path | None = None) -> str:
         """Render full SGLang command with all flags inlined."""
         lines = [f"{k}={v} \\" for k, v in (self.get_environment_vars(mode) or {}).items()]
 
@@ -137,7 +135,7 @@ class SGLangBackend:
         )
         return "\n".join(lines)
 
-    def generate_slurm_script(self, config_path: Path = None, timestamp: str = None) -> tuple[Path, str]:
+    def generate_slurm_script(self, config_path: Path | None = None, timestamp: str | None = None) -> tuple[Path, str]:
         """Generate SLURM job script from Jinja template."""
         timestamp = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
         is_aggregated = not self.is_disaggregated()

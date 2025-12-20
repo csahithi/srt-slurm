@@ -10,7 +10,6 @@ for formatted output throughout the codebase.
 
 import logging
 import sys
-from typing import Optional
 
 # ============================================================================
 # Emoji Constants
@@ -56,8 +55,8 @@ def get_logger(name: str) -> logging.Logger:
 
 def setup_logging(
     level: int = logging.INFO,
-    format_string: Optional[str] = None,
-    date_format: Optional[str] = None,
+    format_string: str | None = None,
+    date_format: str | None = None,
 ) -> None:
     """Configure logging for srtctl.
 
@@ -94,7 +93,7 @@ def setup_logging(
 # ============================================================================
 
 
-def section(title: str, emoji: str = GEAR, logger: Optional[logging.Logger] = None) -> None:
+def section(title: str, emoji: str = GEAR, logger: logging.Logger | None = None) -> None:
     """Print a section header.
 
     Creates a visually distinct section break in the logs.
@@ -112,7 +111,7 @@ def section(title: str, emoji: str = GEAR, logger: Optional[logging.Logger] = No
     logger.info("-" * 60)
 
 
-def success(message: str, logger: Optional[logging.Logger] = None) -> None:
+def success(message: str, logger: logging.Logger | None = None) -> None:
     """Log a success message with checkmark.
 
     Args:
@@ -124,7 +123,7 @@ def success(message: str, logger: Optional[logging.Logger] = None) -> None:
     logger.info("%s %s", CHECK, message)
 
 
-def error(message: str, logger: Optional[logging.Logger] = None) -> None:
+def error(message: str, logger: logging.Logger | None = None) -> None:
     """Log an error message with cross.
 
     Args:
@@ -136,7 +135,7 @@ def error(message: str, logger: Optional[logging.Logger] = None) -> None:
     logger.error("%s %s", CROSS, message)
 
 
-def warn(message: str, logger: Optional[logging.Logger] = None) -> None:
+def warn(message: str, logger: logging.Logger | None = None) -> None:
     """Log a warning message with warning emoji.
 
     Args:
@@ -148,7 +147,7 @@ def warn(message: str, logger: Optional[logging.Logger] = None) -> None:
     logger.warning("%s %s", WARN, message)
 
 
-def step(message: str, logger: Optional[logging.Logger] = None) -> None:
+def step(message: str, logger: logging.Logger | None = None) -> None:
     """Log a step/progress message with rocket.
 
     Args:
@@ -160,7 +159,7 @@ def step(message: str, logger: Optional[logging.Logger] = None) -> None:
     logger.info("%s %s", ROCKET, message)
 
 
-def waiting(message: str, logger: Optional[logging.Logger] = None) -> None:
+def waiting(message: str, logger: logging.Logger | None = None) -> None:
     """Log a waiting/pending message with hourglass.
 
     Args:

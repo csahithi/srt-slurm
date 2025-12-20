@@ -11,12 +11,10 @@ It runs inside the container and starts the infrastructure services.
 import argparse
 import logging
 import os
-import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 # Network configurations
 ETCD_CLIENT_PORT = 2379
@@ -122,7 +120,7 @@ def start_nats(binary_path: str = "/configs/nats-server") -> subprocess.Popen:
 def start_etcd(
     host_ip: str,
     binary_path: str = "/configs/etcd",
-    log_dir: Optional[Path] = None,
+    log_dir: Path | None = None,
 ) -> subprocess.Popen:
     """Start etcd server.
 
@@ -144,9 +142,11 @@ def start_etcd(
         "--listen-client-urls",
         f"{ETCD_LISTEN_ADDR}:{ETCD_CLIENT_PORT}",
         "--advertise-client-urls",
-        f"{ETCD_LISTEN_ADDR}:{ETCD_CLIENT_PORT}",
+        f"http://{host_ip}:{ETCD_CLIENT_PORT}",  # Must be reachable IP, not 0.0.0.0
         "--listen-peer-urls",
         f"{ETCD_LISTEN_ADDR}:{ETCD_PEER_PORT}",
+        "--initial-advertise-peer-urls",
+        f"http://{host_ip}:{ETCD_PEER_PORT}",  # Must be reachable IP
         "--initial-cluster",
         f"default=http://{host_ip}:{ETCD_PEER_PORT}",
     ]
@@ -155,7 +155,7 @@ def start_etcd(
     stdout = None
     if log_dir:
         etcd_log = log_dir / "etcd.log"
-        stdout = open(etcd_log, "w")
+        stdout = open(etcd_log, "w")  # noqa: SIM115 - stays open for subprocess
 
     proc = subprocess.Popen(
         cmd,
@@ -188,7 +188,7 @@ def wait_for_service(host: str, port: int, name: str, timeout: float = 60.0) -> 
             with socket.create_connection((host, port), timeout=1.0):
                 logger.info("%s is ready on port %d", name, port)
                 return True
-        except (socket.timeout, ConnectionRefusedError, OSError):
+        except (TimeoutError, ConnectionRefusedError, OSError):
             time.sleep(0.5)
 
     logger.error("%s did not become ready on port %d", name, port)

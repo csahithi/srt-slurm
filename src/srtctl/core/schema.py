@@ -11,7 +11,9 @@ All config classes are frozen (immutable) after creation.
 Backend configs are defined in srtctl.backends.configs/ for modularity.
 """
 
+import builtins
 import itertools
+from collections.abc import Iterator, Mapping
 from dataclasses import field
 from enum import Enum
 from pathlib import Path
@@ -20,14 +22,7 @@ from typing import (
     Annotated,
     Any,
     ClassVar,
-    Dict,
-    Iterator,
-    List,
     Literal,
-    Mapping,
-    Optional,
-    Type,
-    Union,
 )
 
 import yaml
@@ -45,7 +40,7 @@ from srtctl.core.formatting import (
 from srtctl.logging_utils import get_logger
 
 if TYPE_CHECKING:
-    from srtctl.core.runtime import RuntimeContext
+    pass
 
 logger = get_logger(__name__)
 
@@ -59,19 +54,19 @@ logger = get_logger(__name__)
 class ClusterConfig:
     """Cluster configuration from srtslurm.yaml."""
 
-    default_account: Optional[str] = None
-    default_partition: Optional[str] = None
-    default_time_limit: Optional[str] = None
-    gpus_per_node: Optional[int] = None
-    network_interface: Optional[str] = None
+    default_account: str | None = None
+    default_partition: str | None = None
+    default_time_limit: str | None = None
+    gpus_per_node: int | None = None
+    network_interface: str | None = None
     use_gpus_per_node_directive: bool = True
     use_segment_sbatch_directive: bool = True
-    srtctl_root: Optional[str] = None
-    model_paths: Optional[Dict[str, str]] = None
-    containers: Optional[Dict[str, str]] = None
-    cloud: Optional[Dict[str, str]] = None
+    srtctl_root: str | None = None
+    model_paths: dict[str, str] | None = None
+    containers: dict[str, str] | None = None
+    cloud: dict[str, str] | None = None
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
 
 # ============================================================================
@@ -118,8 +113,8 @@ class BackendConfigField(fields.Field):
     def _deserialize(
         self,
         value: Any,
-        attr: Optional[str],
-        data: Optional[Mapping[str, Any]],
+        attr: str | None,
+        data: Mapping[str, Any] | None,
         **kwargs,
     ) -> BackendConfig:
         """Deserialize backend config based on 'type' field."""
@@ -146,7 +141,7 @@ class BackendConfigField(fields.Field):
             )
 
     def _serialize(
-        self, value: Optional[Any], attr: Optional[str], obj: Any, **kwargs
+        self, value: Any | None, attr: str | None, obj: Any, **kwargs
     ) -> Any:
         """Serialize backend config to dict."""
         if value is None:
@@ -160,7 +155,7 @@ class SweepConfigField(fields.Field):
     """Marshmallow field for SweepConfig."""
 
     def _deserialize(
-        self, value: Any, attr: Optional[str], data: Optional[Mapping[str, Any]], **kwargs
+        self, value: Any, attr: str | None, data: Mapping[str, Any] | None, **kwargs
     ) -> Any:
         if value is None:
             return None
@@ -170,7 +165,7 @@ class SweepConfigField(fields.Field):
             raise ValidationError(f"Expected dict for sweep config, got {type(value).__name__}")
 
         mode = value.get("mode", "zip")
-        parameters: Dict[str, List[Any]] = {}
+        parameters: dict[str, list[Any]] = {}
 
         if "parameters" in value:
             for key, val in value["parameters"].items():
@@ -188,12 +183,12 @@ class SweepConfigField(fields.Field):
         return SweepConfig(mode=mode, parameters=parameters)
 
     def _serialize(
-        self, value: Optional[Any], attr: Optional[str], obj: Any, **kwargs
+        self, value: Any | None, attr: str | None, obj: Any, **kwargs
     ) -> Any:
         if value is None:
             return None
         if isinstance(value, SweepConfig):
-            result: Dict[str, Any] = {"mode": value.mode}
+            result: dict[str, Any] = {"mode": value.mode}
             result.update(value.parameters)
             return result
         return value
@@ -209,9 +204,9 @@ class SweepConfig:
     """Configuration for benchmark parameter sweeps."""
 
     mode: Literal["zip", "grid"] = "zip"
-    parameters: Dict[str, List[Any]] = field(default_factory=dict)
+    parameters: dict[str, list[Any]] = field(default_factory=dict)
 
-    def get_combinations(self) -> Iterator[Dict[str, Any]]:
+    def get_combinations(self) -> Iterator[dict[str, Any]]:
         if not self.parameters:
             yield {}
             return
@@ -219,13 +214,13 @@ class SweepConfig:
         if self.mode == "zip":
             param_names = list(self.parameters.keys())
             param_lists = [self.parameters[name] for name in param_names]
-            for values in zip(*param_lists):
-                yield dict(zip(param_names, values))
+            for values in zip(*param_lists, strict=False):
+                yield dict(zip(param_names, values, strict=False))
         else:
             param_names = list(self.parameters.keys())
             param_lists = [self.parameters[name] for name in param_names]
             for values in itertools.product(*param_lists):
-                yield dict(zip(param_names, values))
+                yield dict(zip(param_names, values, strict=False))
 
     def __len__(self) -> int:
         if not self.parameters:
@@ -237,7 +232,7 @@ class SweepConfig:
             result *= len(param_list)
         return result
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
 
 @dataclass(frozen=True)
@@ -248,7 +243,7 @@ class ModelConfig:
     container: str
     precision: str
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
 
 @dataclass(frozen=True)
@@ -259,14 +254,14 @@ class ResourceConfig:
     gpus_per_node: int = 4
 
     # Disaggregated mode
-    prefill_nodes: Optional[int] = None
-    decode_nodes: Optional[int] = None
-    prefill_workers: Optional[int] = None
-    decode_workers: Optional[int] = None
+    prefill_nodes: int | None = None
+    decode_nodes: int | None = None
+    prefill_workers: int | None = None
+    decode_workers: int | None = None
 
     # Aggregated mode
-    agg_nodes: Optional[int] = None
-    agg_workers: Optional[int] = None
+    agg_nodes: int | None = None
+    agg_workers: int | None = None
 
     @property
     def is_disaggregated(self) -> bool:
@@ -308,18 +303,18 @@ class ResourceConfig:
             return (self.agg_nodes * self.gpus_per_node) // self.agg_workers
         return self.gpus_per_node
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
 
 @dataclass(frozen=True)
 class SlurmConfig:
     """SLURM job settings."""
 
-    account: Optional[str] = None
-    partition: Optional[str] = None
-    time_limit: Optional[str] = None
+    account: str | None = None
+    partition: str | None = None
+    time_limit: str | None = None
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
 
 @dataclass(frozen=True)
@@ -327,26 +322,26 @@ class BenchmarkConfig:
     """Benchmark configuration."""
 
     type: str = "manual"
-    isl: Optional[int] = None
-    osl: Optional[int] = None
-    concurrencies: Optional[Union[List[int], str]] = None
-    req_rate: Optional[str] = "inf"
-    sweep: Optional[Annotated[SweepConfig, SweepConfigField()]] = None
-    num_examples: Optional[int] = None
-    max_tokens: Optional[int] = None
-    repeat: Optional[int] = None
-    num_threads: Optional[int] = None
-    max_context_length: Optional[int] = None
-    categories: Optional[List[str]] = None
+    isl: int | None = None
+    osl: int | None = None
+    concurrencies: list[int] | str | None = None
+    req_rate: str | None = "inf"
+    sweep: Annotated[SweepConfig, SweepConfigField()] | None = None
+    num_examples: int | None = None
+    max_tokens: int | None = None
+    repeat: int | None = None
+    num_threads: int | None = None
+    max_context_length: int | None = None
+    categories: list[str] | None = None
 
-    def get_concurrency_list(self) -> List[int]:
+    def get_concurrency_list(self) -> list[int]:
         if self.concurrencies is None:
             return []
         if isinstance(self.concurrencies, str):
             return [int(x) for x in self.concurrencies.split("x")]
         return list(self.concurrencies)
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[builtins.type[Schema]] = Schema
 
 
 @dataclass(frozen=True)
@@ -354,17 +349,17 @@ class ProfilingConfig:
     """Profiling configuration."""
 
     type: str = "none"
-    isl: Optional[int] = None
-    osl: Optional[int] = None
-    concurrency: Optional[int] = None
-    start_step: Optional[int] = None
-    stop_step: Optional[int] = None
+    isl: int | None = None
+    osl: int | None = None
+    concurrency: int | None = None
+    start_step: int | None = None
+    stop_step: int | None = None
 
     @property
     def enabled(self) -> bool:
         return self.type != "none"
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[builtins.type[Schema]] = Schema
 
 
 @dataclass(frozen=True)
@@ -374,10 +369,10 @@ class FrontendConfig:
     use_sglang_router: bool = False
     enable_multiple_frontends: bool = True
     num_additional_frontends: int = 9
-    sglang_router_args: Optional[Dict[str, Any]] = None
-    dynamo_frontend_args: Optional[Dict[str, Any]] = None
+    sglang_router_args: dict[str, Any] | None = None
+    dynamo_frontend_args: dict[str, Any] | None = None
 
-    def get_router_args_list(self) -> List[str]:
+    def get_router_args_list(self) -> list[str]:
         args = self.sglang_router_args if self.use_sglang_router else self.dynamo_frontend_args
         if not args:
             return []
@@ -389,7 +384,7 @@ class FrontendConfig:
                 result.extend([f"--{key}", str(value)])
         return result
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
 
 @dataclass(frozen=True)
@@ -399,19 +394,19 @@ class OutputConfig:
     log_dir: Annotated[FormattablePath, FormattablePathField()] = field(
         default_factory=lambda: FormattablePath(template="./outputs/{job_id}/logs")
     )
-    results_dir: Optional[Annotated[FormattablePath, FormattablePathField()]] = None
+    results_dir: Annotated[FormattablePath, FormattablePathField()] | None = None
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
 
 @dataclass(frozen=True)
 class HealthCheckConfig:
     """Health check configuration."""
 
-    max_attempts: int = 60
+    max_attempts: int = 180  # 30 minutes default (large models take time to load)
     interval_seconds: int = 10
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
 
 # ============================================================================
@@ -443,25 +438,25 @@ class SrtConfig:
     output: OutputConfig = field(default_factory=OutputConfig)
     health_check: HealthCheckConfig = field(default_factory=HealthCheckConfig)
 
-    environment: Dict[str, str] = field(default_factory=dict)
-    container_mounts: Dict[
+    environment: dict[str, str] = field(default_factory=dict)
+    container_mounts: dict[
         Annotated[FormattablePath, FormattablePathField()],
         Annotated[FormattablePath, FormattablePathField()],
     ] = field(default_factory=dict)
-    extra_mount: Optional[tuple[str, ...]] = None
-    srun_options: Dict[str, str] = field(default_factory=dict)
-    sbatch_directives: Dict[str, str] = field(default_factory=dict)
+    extra_mount: tuple[str, ...] | None = None
+    srun_options: dict[str, str] = field(default_factory=dict)
+    sbatch_directives: dict[str, str] = field(default_factory=dict)
     enable_config_dump: bool = True
 
     # Custom setup script (runs before dynamo install and worker startup)
     # e.g. "custom-setup.sh" -> runs /configs/custom-setup.sh
-    setup_script: Optional[str] = None
+    setup_script: str | None = None
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
     @classmethod
     def from_yaml(cls, yaml_path: Path) -> "SrtConfig":
-        with open(yaml_path, "r") as f:
+        with open(yaml_path) as f:
             data = yaml.safe_load(f)
         schema = cls.Schema()
         return schema.load(data)

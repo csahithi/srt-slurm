@@ -7,18 +7,15 @@ SGLang backend configuration.
 Implements BackendProtocol for SGLang inference serving with prefill/decode disaggregation.
 """
 
+import builtins
+from collections.abc import Sequence
 from dataclasses import field
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
-    List,
     Literal,
-    Optional,
-    Sequence,
-    Type,
 )
 
 from marshmallow import Schema
@@ -40,11 +37,11 @@ class SGLangConfig:
     to CLI flags when starting the worker.
     """
 
-    prefill: Optional[Dict[str, Any]] = None
-    decode: Optional[Dict[str, Any]] = None
-    aggregated: Optional[Dict[str, Any]] = None
+    prefill: dict[str, Any] | None = None
+    decode: dict[str, Any] | None = None
+    aggregated: dict[str, Any] | None = None
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[type[Schema]] = Schema
 
 
 @dataclass(frozen=True)
@@ -68,23 +65,23 @@ class SGLangBackendConfig:
     """
 
     type: Literal["sglang"] = "sglang"
-    gpu_type: Optional[str] = None
+    gpu_type: str | None = None
 
     # Environment variables per mode
-    prefill_environment: Dict[str, str] = field(default_factory=dict)
-    decode_environment: Dict[str, str] = field(default_factory=dict)
-    aggregated_environment: Dict[str, str] = field(default_factory=dict)
+    prefill_environment: dict[str, str] = field(default_factory=dict)
+    decode_environment: dict[str, str] = field(default_factory=dict)
+    aggregated_environment: dict[str, str] = field(default_factory=dict)
 
     # SGLang-specific config
-    sglang_config: Optional[SGLangConfig] = None
+    sglang_config: SGLangConfig | None = None
 
-    Schema: ClassVar[Type[Schema]] = Schema
+    Schema: ClassVar[builtins.type[Schema]] = Schema
 
     # =========================================================================
     # BackendProtocol Implementation
     # =========================================================================
 
-    def get_config_for_mode(self, mode: WorkerMode) -> Dict[str, Any]:
+    def get_config_for_mode(self, mode: WorkerMode) -> dict[str, Any]:
         """Get merged config dict for a worker mode."""
         if not self.sglang_config:
             return {}
@@ -97,7 +94,7 @@ class SGLangBackendConfig:
             return dict(self.sglang_config.aggregated or {})
         return {}
 
-    def get_environment_for_mode(self, mode: WorkerMode) -> Dict[str, str]:
+    def get_environment_for_mode(self, mode: WorkerMode) -> dict[str, str]:
         """Get environment variables for a worker mode."""
         if mode == "prefill":
             return dict(self.prefill_environment)
@@ -117,7 +114,7 @@ class SGLangBackendConfig:
         gpus_per_agg: int,
         gpus_per_node: int,
         available_nodes: Sequence[str],
-    ) -> List["Endpoint"]:
+    ) -> list["Endpoint"]:
         """Allocate endpoints to nodes."""
         from srtctl.core.endpoints import allocate_endpoints
 
@@ -134,9 +131,9 @@ class SGLangBackendConfig:
 
     def endpoints_to_processes(
         self,
-        endpoints: List["Endpoint"],
+        endpoints: list["Endpoint"],
         base_port: int = 8081,
-    ) -> List["Process"]:
+    ) -> list["Process"]:
         """Convert endpoints to processes."""
         from srtctl.core.endpoints import endpoints_to_processes
 
@@ -145,11 +142,11 @@ class SGLangBackendConfig:
     def build_worker_command(
         self,
         process: "Process",
-        endpoint_processes: List["Process"],
+        endpoint_processes: list["Process"],
         runtime: "RuntimeContext",
         use_sglang_router: bool = False,
-        dump_config_path: Optional[Path] = None,
-    ) -> List[str]:
+        dump_config_path: Path | None = None,
+    ) -> list[str]:
         """Build the command to start an SGLang worker process."""
         from srtctl.core.runtime import get_hostname_ip
 
@@ -217,9 +214,9 @@ class SGLangBackendConfig:
         return cmd
 
 
-def _config_to_cli_args(config: Dict[str, Any]) -> List[str]:
+def _config_to_cli_args(config: dict[str, Any]) -> list[str]:
     """Convert config dict to CLI arguments."""
-    args: List[str] = []
+    args: list[str] = []
     for key, value in sorted(config.items()):
         flag_name = key.replace("_", "-")
         if isinstance(value, bool):

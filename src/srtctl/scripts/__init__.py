@@ -11,7 +11,6 @@ to avoid reimplementing complex logic in Python.
 import logging
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +20,10 @@ SCRIPTS_DIR = Path(__file__).parent
 
 def get_node_ip(
     node: str,
-    slurm_job_id: Optional[str] = None,
-    network_interface: Optional[str] = None,
+    slurm_job_id: str | None = None,
+    network_interface: str | None = None,
     timeout: float = 30.0,
-) -> Optional[str]:
+) -> str | None:
     """Get IP address for a SLURM node using the battle-tested bash function.
 
     Uses scripts/slurm_utils.sh::get_node_ip which tries multiple methods:
@@ -78,7 +77,7 @@ def get_node_ip(
         return None
 
 
-def get_local_ip(network_interface: Optional[str] = None) -> str:
+def get_local_ip(network_interface: str | None = None) -> str:
     """Get local IP address using the same methods as get_node_ip.
 
     This runs locally (no srun) and tries:

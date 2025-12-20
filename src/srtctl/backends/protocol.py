@@ -3,7 +3,8 @@
 
 """Protocol definition for backend implementations."""
 
-from typing import TYPE_CHECKING, Dict, List, Protocol, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from srtctl.core.endpoints import Endpoint, Process
@@ -38,7 +39,7 @@ class BackendProtocol(Protocol):
         gpus_per_agg: int,
         gpus_per_node: int,
         available_nodes: Sequence[str],
-    ) -> List["Endpoint"]:
+    ) -> list["Endpoint"]:
         """Allocate logical endpoints based on backend-specific logic.
 
         Args:
@@ -58,9 +59,9 @@ class BackendProtocol(Protocol):
 
     def endpoints_to_processes(
         self,
-        endpoints: List["Endpoint"],
+        endpoints: list["Endpoint"],
         base_port: int = 8081,
-    ) -> List["Process"]:
+    ) -> list["Process"]:
         """Convert logical endpoints to physical processes.
 
         Backend-specific mapping:
@@ -79,9 +80,9 @@ class BackendProtocol(Protocol):
 
     def start_processes(
         self,
-        processes: List["Process"],
+        processes: list["Process"],
         runtime: "RuntimeContext",
-        environment: Dict[str, str],
+        environment: dict[str, str],
     ) -> "NamedProcesses":
         """Start all processes for this backend.
 
@@ -95,7 +96,7 @@ class BackendProtocol(Protocol):
         """
         ...
 
-    def get_config_for_mode(self, mode: str) -> Dict[str, object]:
+    def get_config_for_mode(self, mode: str) -> dict[str, object]:
         """Get the merged config dict for a worker mode.
 
         Args:
@@ -106,7 +107,7 @@ class BackendProtocol(Protocol):
         """
         ...
 
-    def get_environment_for_mode(self, mode: str) -> Dict[str, str]:
+    def get_environment_for_mode(self, mode: str) -> dict[str, str]:
         """Get environment variables for a worker mode.
 
         Args:

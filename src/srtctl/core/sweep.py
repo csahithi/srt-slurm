@@ -76,7 +76,7 @@ def generate_sweep_configs(sweep_config: dict) -> list[tuple[dict, dict]]:
     configs = []
     for values in itertools.product(*param_values_list):
         # Create parameter dict for this combination
-        params = dict(zip(param_names, values))
+        params = dict(zip(param_names, values, strict=False))
 
         # Create a copy of the config without the sweep section
         config = copy.deepcopy(sweep_config)

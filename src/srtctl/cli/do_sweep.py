@@ -20,7 +20,6 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from srtctl.core.config import load_config
 from srtctl.core.endpoints import Endpoint, Process
@@ -36,9 +35,6 @@ from srtctl.core.schema import SrtConfig
 from srtctl.core.utils import start_srun_process, wait_for_health, wait_for_port
 from srtctl.logging_utils import (
     CHECK,
-    CROSS,
-    GEAR,
-    HOURGLASS,
     PACKAGE,
     ROCKET,
     WRENCH,
@@ -70,7 +66,7 @@ class SweepOrchestrator:
         return self.config.backend
 
     @functools.cached_property
-    def endpoints(self) -> List[Endpoint]:
+    def endpoints(self) -> list[Endpoint]:
         """Compute endpoint allocation topology (cached).
 
         This is the single source of truth for endpoint assignments.
@@ -88,11 +84,11 @@ class SweepOrchestrator:
         )
 
     @functools.cached_property
-    def backend_processes(self) -> List[Process]:
+    def backend_processes(self) -> list[Process]:
         """Compute physical process topology from endpoints (cached)."""
         return self.backend.endpoints_to_processes(self.endpoints)
 
-    def _build_worker_preamble(self) -> Optional[str]:
+    def _build_worker_preamble(self) -> str | None:
         """Build bash preamble for worker processes.
 
         Runs (in order):
@@ -171,7 +167,7 @@ class SweepOrchestrator:
 
         return managed
 
-    def start_worker(self, process: Process, endpoint_processes: List[Process]) -> ManagedProcess:
+    def start_worker(self, process: Process, endpoint_processes: list[Process]) -> ManagedProcess:
         """Start a single worker process."""
         mode = process.endpoint_mode
         index = process.endpoint_index
@@ -238,13 +234,13 @@ class SweepOrchestrator:
         section("Starting backend workers", PACKAGE, logger)
 
         from collections import defaultdict
-        grouped: Dict[tuple, List[Process]] = defaultdict(list)
+        grouped: dict[tuple, list[Process]] = defaultdict(list)
         for process in self.backend_processes:
             key = (process.endpoint_mode, process.endpoint_index)
             grouped[key].append(process)
 
         result: NamedProcesses = {}
-        for endpoint_key, endpoint_processes in grouped.items():
+        for _endpoint_key, endpoint_processes in grouped.items():
             for process in endpoint_processes:
                 managed = self.start_worker(process, endpoint_processes)
                 result[managed.name] = managed
@@ -252,7 +248,7 @@ class SweepOrchestrator:
         logger.info("Started %d worker processes", len(result))
         return result
 
-    def start_frontend(self, registry: ProcessRegistry) -> Optional[ManagedProcess]:
+    def start_frontend(self, registry: ProcessRegistry) -> ManagedProcess | None:
         """Start the frontend."""
         section("Starting frontend", PACKAGE, logger)
 
@@ -360,10 +356,10 @@ class SweepOrchestrator:
             expected_workers=num_workers,
             stop_event=stop_event,
         ):
-            logger.error("%s Server did not become healthy", CROSS)
+            logger.error("Server did not become healthy")
             return 1
 
-        logger.info("%s Server is healthy", CHECK)
+        logger.info("Server is healthy")
 
         if self.config.benchmark.type == "manual":
             logger.info("Benchmark type is 'manual' - server is ready for testing")
@@ -446,6 +442,8 @@ def main():
             logger.error("Not running in SLURM (SLURM_JOB_ID not set)")
             sys.exit(1)
 
+        # Type narrowing: job_id is str after the check above
+        assert job_id is not None
         runtime = RuntimeContext.from_config(config, job_id)
         orchestrator = SweepOrchestrator(config=config, runtime=runtime)
         exit_code = orchestrator.run()

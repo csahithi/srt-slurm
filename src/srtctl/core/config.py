@@ -14,7 +14,7 @@ This module provides:
 import copy
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import yaml
 
@@ -23,7 +23,7 @@ from .schema import ClusterConfig, SrtConfig
 logger = logging.getLogger(__name__)
 
 
-def load_cluster_config() -> Optional[Dict[str, Any]]:
+def load_cluster_config() -> dict[str, Any] | None:
     """
     Load cluster configuration from srtslurm.yaml if it exists.
 
@@ -67,8 +67,8 @@ def load_cluster_config() -> Optional[Dict[str, Any]]:
 
 
 def resolve_config_with_defaults(
-    user_config: Dict[str, Any], cluster_config: Optional[Dict[str, Any]]
-) -> Dict[str, Any]:
+    user_config: dict[str, Any], cluster_config: dict[str, Any] | None
+) -> dict[str, Any]:
     """
     Resolve user config by applying cluster defaults and aliases.
 
@@ -143,7 +143,7 @@ def get_srtslurm_setting(key: str, default: Any = None) -> Any:
     return default
 
 
-def load_config(path: Union[Path, str]) -> SrtConfig:
+def load_config(path: Path | str) -> SrtConfig:
     """
     Load and validate YAML config, applying cluster defaults.
 
@@ -184,7 +184,7 @@ def load_config(path: Union[Path, str]) -> SrtConfig:
         raise ValueError(f"Invalid config in {path}: {e}") from e
 
 
-def load_config_dict(path: Union[Path, str]) -> Dict[str, Any]:
+def load_config_dict(path: Path | str) -> dict[str, Any]:
     """
     Load config and return as dict (legacy compatibility).
 

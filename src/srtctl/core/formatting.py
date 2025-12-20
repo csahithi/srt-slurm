@@ -12,9 +12,10 @@ import dataclasses
 import logging
 import os
 import traceback
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional
+from typing import TYPE_CHECKING, Any
 
 from marshmallow import fields
 
@@ -58,7 +59,7 @@ class FormattableString:
         """
         return runtime.format_string(self.template, **extra_kwargs)
 
-    def raw_string(self, format_kwargs: Optional[Dict[str, str]] = None) -> str:
+    def raw_string(self, format_kwargs: dict[str, str] | None = None) -> str:
         """Format without runtime context (for early expansion).
 
         Args:
@@ -67,10 +68,7 @@ class FormattableString:
         Returns:
             Formatted string with env vars expanded
         """
-        if format_kwargs:
-            formatted = self.template.format(**format_kwargs)
-        else:
-            formatted = self.template
+        formatted = self.template.format(**format_kwargs) if format_kwargs else self.template
         return os.path.expandvars(formatted)
 
     def __str__(self) -> str:
@@ -108,7 +106,7 @@ class FormattablePath:
         self,
         make_absolute: bool = True,
         ensure_exists: bool = False,
-        format_kwargs: Optional[Dict[str, str]] = None,
+        format_kwargs: dict[str, str] | None = None,
     ) -> Path:
         """Return the raw path without runtime context formatting.
 
@@ -123,10 +121,7 @@ class FormattablePath:
         Returns:
             Path object
         """
-        if format_kwargs:
-            formatted = self.template.format(**format_kwargs)
-        else:
-            formatted = self.template
+        formatted = self.template.format(**format_kwargs) if format_kwargs else self.template
         path = Path(os.path.expandvars(formatted)).expanduser()
 
         if make_absolute:
@@ -189,7 +184,7 @@ class FormattablePathField(fields.Field):
         self.allow_none = allow_none
 
     def _serialize(
-        self, value: Optional[Any], attr: Optional[str], obj: Any, **kwargs
+        self, value: Any | None, attr: str | None, obj: Any, **kwargs
     ) -> Any:
         if value is None:
             return None
@@ -200,8 +195,8 @@ class FormattablePathField(fields.Field):
     def _deserialize(
         self,
         value: Any,
-        attr: Optional[str],
-        data: Optional[Mapping[str, Any]],
+        attr: str | None,
+        data: Mapping[str, Any] | None,
         **kwargs,
     ) -> Any:
         if value is None:
@@ -223,7 +218,7 @@ class FormattableStringField(fields.Field):
         self.allow_none = allow_none
 
     def _serialize(
-        self, value: Optional[Any], attr: Optional[str], obj: Any, **kwargs
+        self, value: Any | None, attr: str | None, obj: Any, **kwargs
     ) -> Any:
         if value is None:
             return None
@@ -234,8 +229,8 @@ class FormattableStringField(fields.Field):
     def _deserialize(
         self,
         value: Any,
-        attr: Optional[str],
-        data: Optional[Mapping[str, Any]],
+        attr: str | None,
+        data: Mapping[str, Any] | None,
         **kwargs,
     ) -> Any:
         if value is None:

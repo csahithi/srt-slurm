@@ -17,28 +17,30 @@ import socket
 import subprocess
 import threading
 import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
 
 import requests
+
+from srtctl.scripts import get_node_ip  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 
 def start_srun_process(
-    command: List[str],
+    command: list[str],
     *,
     nodes: int = 1,
     ntasks: int = 1,
-    cpus_per_task: Optional[int] = None,
-    nodelist: Optional[Sequence[str]] = None,
-    output: Optional[str] = None,
-    container_image: Optional[str] = None,
-    container_mounts: Optional[Dict[Path, Path]] = None,
-    env_to_pass_through: Optional[List[str]] = None,
-    env_to_set: Optional[Dict[str, str]] = None,
-    bash_preamble: Optional[str] = None,
-    srun_options: Optional[Dict[str, str]] = None,
+    cpus_per_task: int | None = None,
+    nodelist: Sequence[str] | None = None,
+    output: str | None = None,
+    container_image: str | None = None,
+    container_mounts: dict[Path, Path] | None = None,
+    env_to_pass_through: list[str] | None = None,
+    env_to_set: dict[str, str] | None = None,
+    bash_preamble: str | None = None,
+    srun_options: dict[str, str] | None = None,
     overlap: bool = True,
     use_bash_wrapper: bool = True,
 ) -> subprocess.Popen:
@@ -173,7 +175,7 @@ def wait_for_port(
         try:
             with socket.create_connection((host, port), timeout=1.0):
                 return True
-        except (socket.timeout, ConnectionRefusedError, OSError):
+        except (TimeoutError, ConnectionRefusedError, OSError):
             time.sleep(interval)
 
     return False
@@ -184,8 +186,8 @@ def wait_for_health(
     port: int,
     max_attempts: int = 60,
     interval: float = 10.0,
-    expected_workers: Optional[int] = None,
-    stop_event: Optional[threading.Event] = None,
+    expected_workers: int | None = None,
+    stop_event: threading.Event | None = None,
 ) -> bool:
     """Wait for HTTP health endpoint to return healthy status.
 
@@ -297,7 +299,7 @@ def wait_for_etcd(
     return False
 
 
-def get_container_mounts_str(mounts: Dict[Path, Path]) -> str:
+def get_container_mounts_str(mounts: dict[Path, Path]) -> str:
     """Convert container mounts dict to comma-separated string.
 
     Args:
@@ -341,15 +343,11 @@ def run_command(
         return result.returncode
 
 
-# Re-export from scripts module (uses battle-tested bash)
-from srtctl.scripts import get_node_ip, get_local_ip, wait_for_model
-
-
 def get_node_ips(
-    nodes: List[str],
-    slurm_job_id: Optional[str] = None,
-    network_interface: Optional[str] = None,
-) -> Dict[str, str]:
+    nodes: list[str],
+    slurm_job_id: str | None = None,
+    network_interface: str | None = None,
+) -> dict[str, str]:
     """Get IP addresses for multiple SLURM nodes.
 
     Args:

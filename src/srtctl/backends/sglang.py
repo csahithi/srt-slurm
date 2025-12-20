@@ -10,14 +10,14 @@ building SGLang commands.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 WorkerMode = Literal["prefill", "decode", "agg"]
 
 
 def build_sglang_command(
     mode: WorkerMode,
-    config: Dict[str, Any],
+    config: dict[str, Any],
     model_path: Path,
     served_model_name: str,
     leader_ip: str,
@@ -25,8 +25,8 @@ def build_sglang_command(
     num_nodes: int = 1,
     node_rank: int = 0,
     use_sglang_router: bool = False,
-    dump_config_path: Optional[Path] = None,
-) -> List[str]:
+    dump_config_path: Path | None = None,
+) -> list[str]:
     """Build an SGLang command from configuration.
 
     This is a standalone function for use in templates or scripts.
@@ -77,7 +77,7 @@ def build_sglang_command(
     return cmd
 
 
-def config_to_cli_args(config: Dict[str, Any]) -> List[str]:
+def config_to_cli_args(config: dict[str, Any]) -> list[str]:
     """Convert config dict to CLI arguments.
 
     Args:
@@ -86,7 +86,7 @@ def config_to_cli_args(config: Dict[str, Any]) -> List[str]:
     Returns:
         List of CLI arguments
     """
-    args: List[str] = []
+    args: list[str] = []
     for key, value in sorted(config.items()):
         flag_name = key.replace("_", "-")
         if isinstance(value, bool):

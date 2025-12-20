@@ -18,8 +18,9 @@ After (Python):
         print(f"{endpoint.mode} worker {endpoint.index} on {endpoint.nodes}")
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import FrozenSet, Literal, Sequence, Tuple
+from typing import Literal
 
 # Worker mode type
 WorkerMode = Literal["prefill", "decode", "agg"]
@@ -43,8 +44,8 @@ class Endpoint:
 
     mode: WorkerMode
     index: int
-    nodes: Tuple[str, ...]
-    gpu_indices: FrozenSet[int] = field(default_factory=lambda: frozenset(range(8)))
+    nodes: tuple[str, ...]
+    gpu_indices: frozenset[int] = field(default_factory=lambda: frozenset(range(8)))
     gpus_per_node: int = 8
 
     @property
@@ -85,7 +86,7 @@ class Process:
     """
 
     node: str
-    gpu_indices: FrozenSet[int]
+    gpu_indices: frozenset[int]
     sys_port: int
     endpoint_mode: WorkerMode
     endpoint_index: int
@@ -160,10 +161,9 @@ def allocate_endpoints(
         nodes_per_worker = (gpus_needed + gpus_per_node - 1) // gpus_per_node
 
         # For multi-node workers, start fresh on node boundary
-        if nodes_per_worker > 1 or gpus_needed == gpus_per_node:
-            if gpu_offset > 0:
-                node_idx += 1
-                gpu_offset = 0
+        if (nodes_per_worker > 1 or gpus_needed == gpus_per_node) and gpu_offset > 0:
+            node_idx += 1
+            gpu_offset = 0
 
         # Collect nodes for this worker
         worker_nodes = []

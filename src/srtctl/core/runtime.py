@@ -12,9 +12,8 @@ import os
 import socket
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from srtctl.core.schema import SrtConfig
@@ -91,23 +90,23 @@ class RuntimeContext:
 
     # Resource configuration
     gpus_per_node: int
-    network_interface: Optional[str]
+    network_interface: str | None
 
     # Container mounts: host_path -> container_path
-    container_mounts: Dict[Path, Path] = field(default_factory=dict)
+    container_mounts: dict[Path, Path] = field(default_factory=dict)
 
     # Additional srun options
-    srun_options: Dict[str, str] = field(default_factory=dict)
+    srun_options: dict[str, str] = field(default_factory=dict)
 
     # Environment variables
-    environment: Dict[str, str] = field(default_factory=dict)
+    environment: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_config(
         cls,
         config: "SrtConfig",
         job_id: str,
-        log_dir_base: Optional[Path] = None,
+        log_dir_base: Path | None = None,
     ) -> "RuntimeContext":
         """Create RuntimeContext from config and job_id.
 
@@ -147,7 +146,7 @@ class RuntimeContext:
         container_image = Path(os.path.expandvars(config.model.container)).resolve()
 
         # Build container mounts
-        container_mounts: Dict[Path, Path] = {
+        container_mounts: dict[Path, Path] = {
             model_path: Path("/model"),
             log_dir: Path("/logs"),
             results_dir: Path("/results"),
@@ -259,12 +258,12 @@ class RuntimeContext:
 # ============================================================================
 
 
-def get_slurm_job_id() -> Optional[str]:
+def get_slurm_job_id() -> str | None:
     """Get the current SLURM job ID from environment."""
     return os.environ.get("SLURM_JOB_ID") or os.environ.get("SLURM_JOBID")
 
 
-def get_slurm_nodelist() -> List[str]:
+def get_slurm_nodelist() -> list[str]:
     """Get list of nodes from SLURM_NODELIST environment variable.
 
     Returns:
@@ -288,7 +287,7 @@ def get_slurm_nodelist() -> List[str]:
         return [nodelist_raw]
 
 
-def get_hostname_ip(hostname: str, network_interface: Optional[str] = None) -> str:
+def get_hostname_ip(hostname: str, network_interface: str | None = None) -> str:
     """Resolve hostname to IP address.
 
     Args:

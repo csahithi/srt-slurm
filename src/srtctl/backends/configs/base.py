@@ -5,14 +5,14 @@
 Base types and protocols for backend configurations.
 """
 
+from collections.abc import Sequence
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from srtctl.core.endpoints import Endpoint, Process
-    from srtctl.core.process_registry import NamedProcesses
     from srtctl.core.runtime import RuntimeContext
 
 
@@ -37,11 +37,11 @@ class BackendProtocol(Protocol):
         """Backend type identifier."""
         ...
 
-    def get_config_for_mode(self, mode: str) -> Dict[str, Any]:
+    def get_config_for_mode(self, mode: str) -> dict[str, Any]:
         """Get config dict for a worker mode (prefill/decode/agg)."""
         ...
 
-    def get_environment_for_mode(self, mode: str) -> Dict[str, str]:
+    def get_environment_for_mode(self, mode: str) -> dict[str, str]:
         """Get environment variables for a worker mode."""
         ...
 
@@ -55,26 +55,26 @@ class BackendProtocol(Protocol):
         gpus_per_agg: int,
         gpus_per_node: int,
         available_nodes: Sequence[str],
-    ) -> List["Endpoint"]:
+    ) -> list["Endpoint"]:
         """Allocate logical endpoints based on resource requirements."""
         ...
 
     def endpoints_to_processes(
         self,
-        endpoints: List["Endpoint"],
+        endpoints: list["Endpoint"],
         base_port: int = 8081,
-    ) -> List["Process"]:
+    ) -> list["Process"]:
         """Convert logical endpoints to physical processes."""
         ...
 
     def build_worker_command(
         self,
         process: "Process",
-        endpoint_processes: List["Process"],
+        endpoint_processes: list["Process"],
         runtime: "RuntimeContext",
         use_sglang_router: bool = False,
         dump_config_path: Optional["Path"] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """Build command to start a worker process."""
         ...
 

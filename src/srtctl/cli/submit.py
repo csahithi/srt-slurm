@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import contextlib
 import json
 import logging
 import os
@@ -23,12 +24,11 @@ import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 import yaml
 
 # Import from srtctl modules
-from srtctl.core.config import load_config, load_config_dict, get_srtslurm_setting
+from srtctl.core.config import get_srtslurm_setting, load_config
 from srtctl.core.schema import SrtConfig
 
 
@@ -45,7 +45,7 @@ def calculate_required_nodes(config: SrtConfig) -> int:
     return config.resources.total_nodes
 
 
-def calculate_required_nodes_from_dict(config: Dict) -> int:
+def calculate_required_nodes_from_dict(config: dict) -> int:
     """Calculate total number of nodes required from dict config (legacy)."""
     resources = config.get("resources", {})
 
@@ -122,9 +122,9 @@ def generate_minimal_sbatch_script(
 
 def submit_with_orchestrator(
     config_path: Path,
-    config: Optional[SrtConfig] = None,
+    config: SrtConfig | None = None,
     dry_run: bool = False,
-    tags: Optional[List[str]] = None,
+    tags: list[str] | None = None,
 ) -> None:
     """Submit job using the new Python orchestrator.
 
@@ -202,7 +202,6 @@ def submit_with_orchestrator(
                 "prefill_workers": config.resources.num_prefill,
                 "decode_workers": config.resources.num_decode,
                 "agg_workers": config.resources.num_agg,
-                "total_nodes": config.slurm.nodes,
             },
             # Backend and frontend
             "backend_type": config.backend_type,
@@ -230,18 +229,16 @@ def submit_with_orchestrator(
         logging.error(f"❌ sbatch failed: {e.stderr}")
         raise
     finally:
-        try:
+        with contextlib.suppress(OSError):
             os.remove(script_path)
-        except OSError:
-            pass
 
 
 def submit_single(
-    config_path: Optional[Path] = None,
-    config: Optional[SrtConfig] = None,
+    config_path: Path | None = None,
+    config: SrtConfig | None = None,
     dry_run: bool = False,
-    setup_script: Optional[str] = None,
-    tags: Optional[List[str]] = None,
+    setup_script: str | None = None,
+    tags: list[str] | None = None,
 ):
     """Submit a single job from YAML config.
 
@@ -282,8 +279,8 @@ def is_sweep_config(config_path: Path) -> bool:
 def submit_sweep(
     config_path: Path,
     dry_run: bool = False,
-    setup_script: Optional[str] = None,
-    tags: Optional[List[str]] = None,
+    setup_script: str | None = None,
+    tags: list[str] | None = None,
 ):
     """Submit parameter sweep.
 
@@ -351,10 +348,8 @@ def submit_sweep(
                 tags=tags,
             )
         finally:
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(temp_config_path)
-            except OSError:
-                pass
 
 
 def main():
