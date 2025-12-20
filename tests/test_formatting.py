@@ -30,7 +30,7 @@ class TestFormattableString:
         fs = FormattableString(template="test")
 
         with pytest.raises(AttributeError):
-            fs.template = "new"
+            fs.template = "new"  # type: ignore[misc]
 
 
 class TestFormattablePath:
@@ -53,7 +53,7 @@ class TestFormattablePath:
         fp = FormattablePath(template="/test")
 
         with pytest.raises(AttributeError):
-            fp.template = "/new"
+            fp.template = "/new"  # type: ignore[misc]
 
     def test_relative_path(self):
         """Test relative path handling."""

@@ -75,6 +75,14 @@ addopts = "-v --tb=short"
 # ty - Astral's fast type checker (10-100x faster than mypy)
 # https://docs.astral.sh/ty/
 # =============================================================================
+[tool.ty.src]
+exclude = [
+    "src/srtctl/benchmarks/scripts/",
+    "scripts/",
+    "analysis/",
+    "ignition/",
+]
+
 [tool.ty.environment]
 python-version = "3.10"
 

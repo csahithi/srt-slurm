@@ -75,6 +75,6 @@ class SABenchRunner:
             endpoint,
             str(b.isl),
             str(b.osl),
-            concurrencies or "",
-            b.req_rate or "inf",
+            str(concurrencies) if concurrencies else "",
+            str(b.req_rate) if b.req_rate else "inf",
         ]

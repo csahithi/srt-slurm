@@ -168,7 +168,13 @@ class SGLangBackend:
             parsable_config = f"{benchmark_config.get('isl')} {benchmark_config.get('osl')} {conc_str} {benchmark_config.get('req_rate', 'inf')}"
 
         # Paths
-        srtctl_root = Path(get_srtslurm_setting("srtctl_root") or Path(srtctl.__file__).parent.parent.parent)
+        srtctl_root_setting = get_srtslurm_setting("srtctl_root")
+        if srtctl_root_setting:
+            srtctl_root = Path(srtctl_root_setting)
+        elif srtctl.__file__:
+            srtctl_root = Path(srtctl.__file__).parent.parent.parent
+        else:
+            raise RuntimeError("Cannot determine srtctl root: srtctl.__file__ is None")
 
         # Profiling env
         profiling_cfg = self.config.get("profiling") or {}
