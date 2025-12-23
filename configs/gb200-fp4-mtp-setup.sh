@@ -1,8 +1,7 @@
 #!/bin/bash
-BRANCH="baizhou/gb200-spec"
+BRANCH="spec-tp-1"
 
 cd /sgl-workspace/sglang
-git remote remove origin
-git remote add origin https://github.com/sgl-project/sglang.git
-git fetch origin
-git checkout origin/${BRANCH}
+git remote add trevor https://github.com/trevor-m/sglang.git
+git fetch trevor
+git checkout trevor/${BRANCH}
