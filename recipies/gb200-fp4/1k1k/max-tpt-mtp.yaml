@@ -34,7 +34,6 @@ backend:
     SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
     SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
     SGLANG_MOE_NVFP4_DISPATCH: "1"
-    SGLANG_NVFP4_CKPT_FP8_NEXTN_MOE: "1"
 
   # Decode-specific environment variables
   decode_environment:
@@ -57,7 +56,6 @@ backend:
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
     SGLANG_MOE_NVFP4_DISPATCH: "1"
     SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
-    SGLANG_NVFP4_CKPT_FP8_NEXTN_MOE: "1"
 
   sglang_config:
     prefill:
@@ -115,8 +113,9 @@ backend:
       speculative-num-steps: 1
       speculative-eagle-topk: 1
       speculative-num-draft-tokens: 2
-      speculative-moe-runner-backend: "deep_gemm"
-      speculative-moe-a2a-backend: "deepep"
+      speculative-moe-runner-backend: "flashinfer_trtllm"
+      speculative-moe-a2a-backend: "none"
+      speculative-moe-tp-ep-size: 1
 
     decode:
       # Model configuration
@@ -182,8 +181,9 @@ backend:
       speculative-num-steps: 1
       speculative-eagle-topk: 1
       speculative-num-draft-tokens: 2
-      speculative-moe-runner-backend: "deep_gemm"
-      speculative-moe-a2a-backend: "deepep"
+      speculative-moe-runner-backend: "flashinfer_trtllm"
+      speculative-moe-a2a-backend: "none"
+      speculative-moe-tp-ep-size: 1
 
 benchmark:
   type: "sa-bench"
