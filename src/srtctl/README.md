@@ -9,21 +9,30 @@ on SLURM clusters, replacing the previous Jinja/bash-heavy approach.
 srtctl/
 ├── __init__.py              # Package exports
 ├── cli/
-│   ├── submit.py            # Job submission CLI
-│   ├── do_sweep.py          # Main orchestrator (called by sbatch)
+│   ├── submit.py            # srtctl apply - job submission
+│   ├── do_sweep.py          # srtctl-sweep - main orchestrator
 │   └── setup_head.py        # Head node infrastructure (NATS/etcd)
 ├── core/
-│   ├── config.py            # Config loading and validation
+│   ├── config.py            # Config loading and srtslurm.yaml resolution
 │   ├── runtime.py           # RuntimeContext - single source of truth
-│   ├── topology.py          # Endpoint/Process dataclasses for worker allocation
-│   ├── processes.py         # Process lifecycle management
-│   ├── srun.py              # SLURM srun launching utilities
-│   ├── health.py            # Health check and port waiting utilities
+│   ├── topology.py          # Endpoint/Process allocation for workers
+│   ├── processes.py         # ProcessRegistry - lifecycle management
+│   ├── slurm.py             # SLURM srun launching and node resolution
+│   ├── health.py            # Health checks (HTTP polling, worker readiness)
 │   ├── schema.py            # Frozen dataclass schemas
-│   └── sweep.py             # Sweep parameter handling
-└── backends/
-    ├── base.py              # BackendProtocol interface
-    └── sglang.py            # SGLang implementation
+│   ├── sweep.py             # Sweep parameter handling
+│   └── ip_utils/            # Bash-based IP resolution utilities
+│       ├── __init__.py      # Python wrappers for bash functions
+│       └── get_node_ip.sh   # IP detection bash functions
+├── backends/
+│   ├── base.py              # BackendProtocol interface
+│   └── sglang.py            # SGLang implementation
+├── benchmarks/
+│   ├── base.py              # BenchmarkRunner ABC
+│   ├── sa_bench.py          # Serving benchmark
+│   ├── router.py            # Router benchmark
+│   └── ...                  # Other benchmark types
+└── templates/               # Jinja2 templates for sbatch scripts
 ```
 
 ## Usage
@@ -58,8 +67,8 @@ Typed Python replaces bash array math:
 
 # New (Python):
 endpoints = allocate_endpoints(
-    num_prefill=2, num_decode=4,
-    gpus_per_prefill=8, gpus_per_decode=4,
+    num_prefill=2, num_decode=4, num_agg=0,
+    gpus_per_prefill=8, gpus_per_decode=4, gpus_per_agg=8,
     gpus_per_node=8, available_nodes=nodes
 )
 for endpoint in endpoints:
@@ -79,25 +88,59 @@ if registry.check_failures():
     registry.cleanup()  # Graceful shutdown
 ```
 
+### Health Checks
+
+HTTP-based health checking for different backends:
+
+```python
+from srtctl.core.health import wait_for_model
+
+# Wait for all workers to register
+wait_for_model(
+    host=head_ip, port=8000,
+    expected_prefill=2, expected_decode=4,
+    use_sglang_router=True,
+    timeout=300,
+)
+```
+
+For aggregated mode, pass `expected_prefill=0, expected_decode=num_agg`.
+
 ### BackendProtocol
 
 Interface for different serving frameworks:
 
 ```python
 class BackendProtocol(Protocol):
-    def allocate_endpoints(self, ...) -> List[Endpoint]: ...
-    def endpoints_to_processes(self, ...) -> List[Process]: ...
-    def start_processes(self, ...) -> NamedProcesses: ...
+    @property
+    def type(self) -> BackendType: ...
+    def build_worker_command(self, process, runtime) -> list[str]: ...
 ```
+
+### Multiple Workers Per Node
+
+The allocator automatically handles placing multiple workers on a single node:
+
+```yaml
+resources:
+  gpus_per_node: 8
+  decode_workers: 2
+  gpus_per_decode: 4 # 2 workers × 4 GPUs = 8 GPUs = 1 node
+```
+
+`CUDA_VISIBLE_DEVICES` is automatically set per worker (e.g., `0,1,2,3` and `4,5,6,7`).
 
 ## Files Overview
 
-| File                 | Purpose                        |
-| -------------------- | ------------------------------ |
-| `core/runtime.py`    | Computed paths/values          |
-| `core/topology.py`   | Worker topology allocation     |
-| `core/processes.py`  | Process lifecycle management   |
-| `core/srun.py`       | SLURM srun launching           |
-| `core/health.py`     | Health checks and port waiting |
-| `cli/do_sweep.py`    | Sweep orchestration            |
-| `backends/sglang.py` | SGLang backend implementation  |
+| File                 | Purpose                                  |
+| -------------------- | ---------------------------------------- |
+| `core/config.py`     | YAML loading, srtslurm.yaml resolution   |
+| `core/runtime.py`    | Computed paths/values (RuntimeContext)   |
+| `core/topology.py`   | Worker topology and GPU allocation       |
+| `core/processes.py`  | Process lifecycle management             |
+| `core/slurm.py`      | SLURM srun launching, node IP resolution |
+| `core/health.py`     | Health checks, worker readiness polling  |
+| `core/ip_utils/`     | Bash-based IP detection utilities        |
+| `cli/do_sweep.py`    | Main orchestrator (runs on head node)    |
+| `backends/sglang.py` | SGLang backend implementation            |
+| `benchmarks/base.py` | BenchmarkRunner ABC                      |

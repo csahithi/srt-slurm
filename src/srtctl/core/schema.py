@@ -32,7 +32,7 @@ from marshmallow_dataclass import dataclass
 
 from srtctl.backends import (
     BackendConfig,
-    SGLangBackendConfig,
+    SGLangProtocol,
 )
 from srtctl.core.formatting import (
     FormattablePath,
@@ -120,9 +120,9 @@ class BackendConfigField(fields.Field):
         """Deserialize backend config based on 'type' field."""
         if value is None:
             # Default to SGLang
-            return SGLangBackendConfig()
+            return SGLangProtocol()
 
-        if isinstance(value, (SGLangBackendConfig)):
+        if isinstance(value, (SGLangProtocol)):
             return value
 
         if not isinstance(value, dict):
@@ -132,7 +132,7 @@ class BackendConfigField(fields.Field):
         backend_type = value.get("type", "sglang")
 
         if backend_type == "sglang":
-            schema = SGLangBackendConfig.Schema()
+            schema = SGLangProtocol.Schema()
             return schema.load(value)
         else:
             raise ValidationError(f"Unknown backend type: {backend_type!r}. Supported types: sglang")
@@ -141,8 +141,8 @@ class BackendConfigField(fields.Field):
         """Serialize backend config to dict."""
         if value is None:
             return None
-        if isinstance(value, SGLangBackendConfig):
-            return SGLangBackendConfig.Schema().dump(value)
+        if isinstance(value, SGLangProtocol):
+            return SGLangProtocol.Schema().dump(value)
         return value
 
 
@@ -505,7 +505,7 @@ class SrtConfig:
     This is the main configuration type returned by load_config().
 
     The backend field supports polymorphic deserialization:
-    - type: sglang -> SGLangBackendConfig
+    - type: sglang -> SGLangProtocol
     """
 
     name: str
@@ -513,7 +513,7 @@ class SrtConfig:
     resources: ResourceConfig
 
     slurm: SlurmConfig = field(default_factory=SlurmConfig)
-    backend: Annotated[BackendConfig, BackendConfigField()] = field(default_factory=SGLangBackendConfig)
+    backend: Annotated[BackendConfig, BackendConfigField()] = field(default_factory=SGLangProtocol)
     frontend: FrontendConfig = field(default_factory=FrontendConfig)
     benchmark: BenchmarkConfig = field(default_factory=BenchmarkConfig)
     profiling: ProfilingConfig = field(default_factory=ProfilingConfig)
@@ -547,7 +547,7 @@ class SrtConfig:
     def served_model_name(self) -> str:
         """Get the served model name from backend config or model path."""
         # Try SGLang-specific extraction
-        if isinstance(self.backend, SGLangBackendConfig) and self.backend.sglang_config:
+        if isinstance(self.backend, SGLangProtocol) and self.backend.sglang_config:
             for cfg in [
                 self.backend.sglang_config.prefill,
                 self.backend.sglang_config.aggregated,

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from srtctl.backends import SGLangBackendConfig
+from srtctl.backends import SGLangProtocol
 from srtctl.core.schema import SrtConfig
 
 
@@ -71,12 +71,12 @@ class TestSrtConfigStructure:
         assert agg.is_disaggregated is False
 
 
-class TestSGLangBackendConfig:
-    """Tests for SGLangBackendConfig."""
+class TestSGLangProtocol:
+    """Tests for SGLangProtocol."""
 
     def test_sglang_config_structure(self):
         """Test SGLang config has expected structure."""
-        config = SGLangBackendConfig()
+        config = SGLangProtocol()
 
         assert config.type == "sglang"
         assert hasattr(config, "prefill_environment")
@@ -85,7 +85,7 @@ class TestSGLangBackendConfig:
 
     def test_get_environment_for_mode(self):
         """Test environment variable retrieval per mode."""
-        config = SGLangBackendConfig(
+        config = SGLangProtocol(
             prefill_environment={"PREFILL_VAR": "1"},
             decode_environment={"DECODE_VAR": "1"},
         )

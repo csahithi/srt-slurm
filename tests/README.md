@@ -1,106 +1,136 @@
 # Tests
 
-Unit tests for srtctl YAML configuration and command generation.
-
-## Test Structure
-
-### `test_command_generation.py`
-
-Tests SGLang command generation from YAML configs. Verifies that the generated `commands.sh` files contain the expected flags and environment variables.
-
-**Test Cases:**
-
-1. **`test_basic_disaggregated_commands()`**
-   - Tests disaggregated mode (1 prefill node + 4 decode nodes)
-   - Verifies prefill and decode commands are generated correctly
-   - Checks environment variables, SGLang flags, and coordination flags
-   - Validates disaggregation-mode flags (prefill/decode)
-   - Ensures max-total-tokens only appears in prefill command
-
-2. **`test_basic_aggregated_commands()`**
-   - Tests aggregated mode (4 combined nodes)
-   - Verifies aggregated command uses `aggregated_environment`
-   - Checks that aggregated config section is used
-   - Validates no disaggregation-mode flag is present
-   - Ensures correct nnodes for aggregated workers
-
-3. **`test_environment_variable_handling()`**
-   - Tests configs with no environment variables
-   - Verifies commands work correctly without env vars
-   - Ensures no spurious env var lines in output
-
-4. **`test_profiling_mode()`**
-   - Tests profiling mode configuration
-   - Verifies `sglang.launch_server` is used instead of `dynamo.sglang`
-   - Checks that disaggregation-mode flag is skipped when profiling
-
-5. **`test_config_from_yaml_file()`**
-   - Tests loading from actual `configs/example.yaml`
-   - End-to-end validation of config loading and command generation
-   - Ensures example configs are valid
+Unit tests for srtctl configuration, allocation, and command generation.
 
 ## Running Tests
 
 ```bash
-# Run all tests with pytest
-uv run pytest tests/
+# Run all tests
+uv run pytest tests/ -v
 
 # Run specific test file
-uv run pytest tests/test_command_generation.py
+uv run pytest tests/test_e2e.py -v
 
-# Run tests directly (without pytest)
-uv run python tests/test_command_generation.py
+# Run single test
+uv run pytest tests/test_e2e.py::TestH100Cluster::test_endpoint_allocation -v
 
-# Verbose output
-uv run pytest tests/ -v
+# With coverage
+uv run pytest tests/ --cov=srtctl
 ```
 
-## What's Tested
+## Test Structure
 
-### Command Structure
-- Environment variables are rendered before python command
-- Correct python module (`dynamo.sglang` vs `sglang.launch_server`)
-- SGLang flags are properly formatted with `--flag-name value`
-- Coordination flags (--nnodes, --dist-init-addr, --node-rank)
+### `test_e2e.py` - Cluster-Style E2E Tests
 
-### Configuration Modes
-- **Disaggregated**: Separate prefill/decode workers
-  - `prefill_nodes`, `decode_nodes`, `prefill_workers`, `decode_workers`
-  - `prefill_environment` and `decode_environment`
-  - `sglang_config.prefill` and `sglang_config.decode`
+Tests the full allocation flow with mocked SLURM environments. Defines rack fixtures for different hardware:
 
-- **Aggregated**: Combined workers
-  - `agg_nodes`, `agg_workers`
-  - `aggregated_environment`
-  - `sglang_config.aggregated`
+- **`GB200NVLRack`**: 18 nodes × 4 GPUs = 72 total GPUs
+- **`H100Rack`**: 13 nodes × 8 GPUs = 104 total GPUs
 
-### SGLang Flags
-- Required flags: `--model-path`, `--tensor-parallel-size`
-- Mode-specific flags: `--disaggregation-mode` (disagg only)
-- Prefill-only flags: `--max-total-tokens`
-- Memory flags: `--mem-fraction-static`, `--kv-cache-dtype`
-- Quantization flags: `--quantization`
+**Test Classes:**
+
+- `TestGB200FP4Cluster` - Tests GB200 configs (4 GPUs/node)
+- `TestH100Cluster` - Tests H100 configs (8 GPUs/node)
+- `TestCIConfigs` - Tests CI configs (`ci/agg.yaml`, `ci/disagg.yaml`)
+
+### `test_endpoint_allocation.py` - GPU Allocation Logic
+
+Tests the core `allocate_endpoints` and `endpoints_to_processes` functions:
+
+- Node assignment for prefill/decode/aggregated workers
+- GPU slicing (multiple workers per node)
+- `CUDA_VISIBLE_DEVICES` generation
+- Port assignment
+
+### `test_health.py` - Health Check Parsing
+
+Tests health check response parsing for different backends:
+
+- `check_dynamo_health` - Dynamo `/metrics` response parsing
+- `check_sglang_router_health` - SGLang `/workers` response parsing
+- Error handling for malformed responses
+- Aggregated mode (workers count as decode)
+
+### `test_command_generation.py` - SGLang Command Building
+
+Tests SGLang command generation from YAML configs:
+
+- Disaggregated mode (prefill/decode commands)
+- Aggregated mode (combined workers)
+- Environment variable handling
+- Profiling mode configuration
+
+### `test_configs.py` - Config Loading
+
+Tests YAML config loading and validation:
+
+- Schema validation
+- Default resolution from `srtslurm.yaml`
+- Model/container path resolution
+
+### `test_benchmarks.py` - Benchmark Runners
+
+Tests benchmark runner implementations:
+
+- BenchmarkRunner ABC inheritance
+- Script path resolution
+- Config validation
+
+### `test_process_registry.py` - Process Management
+
+Tests ProcessRegistry lifecycle management:
+
+- Process registration/deregistration
+- Failure detection
+- Cleanup handling
+
+## Mocking SLURM
+
+Tests use mock SLURM environments to avoid cluster dependencies:
+
+```python
+class H100Rack:
+    """H100 SLURM rack: 13 nodes × 8 GPUs = 104 total GPUs."""
+    NUM_NODES = 13
+    GPUS_PER_NODE = 8
+
+    @classmethod
+    def slurm_env(cls) -> dict[str, str]:
+        return {
+            "SLURM_JOB_ID": "67890",
+            "SLURM_NODELIST": f"h100-[01-{cls.NUM_NODES:02d}]",
+            "SLURM_JOB_NUM_NODES": str(cls.NUM_NODES),
+            ...
+        }
+
+    @classmethod
+    def mock_scontrol(cls):
+        """Mock subprocess.run for scontrol hostnames."""
+        def mock_run(cmd, **kwargs):
+            if cmd[0] == "scontrol" and "hostnames" in cmd:
+                result = MagicMock()
+                result.stdout = "\n".join(cls.nodes())
+                return result
+            raise subprocess.CalledProcessError(1, cmd)
+        return mock_run
+
+# Usage in tests
+with patch.dict(os.environ, H100Rack.slurm_env()):
+    with patch("subprocess.run", H100Rack.mock_scontrol()):
+        endpoints = allocate_endpoints(...)
+```
 
 ## Test Philosophy
 
-These tests focus on **command generation correctness** rather than end-to-end job execution:
-
-1. **Config → SGLang Config**: YAML configs are transformed into SGLang config files
-2. **Config → Commands**: Commands are rendered with correct flags and env vars
-3. **Validation**: Generated commands match expected structure
-
-Tests use minimal configs to isolate specific functionality and avoid dependencies on external services (SLURM, containers, models).
+1. **Isolation**: No external dependencies (SLURM, containers, models)
+2. **Focused**: Each test verifies one specific behavior
+3. **Fast**: All tests run in < 5 seconds
+4. **Realistic**: Use actual config files from `configs/` and `ci/`
 
 ## Adding New Tests
 
-When adding SGLang flags or changing command generation logic:
+### For New Config Options
 
-1. Add test case to `test_command_generation.py`
-2. Create minimal config with the new feature
-3. Assert expected flags/env vars in generated command
-4. Run tests to verify
-
-Example:
 ```python
 def test_new_sglang_flag():
     from srtctl.backends import SGLangBackendConfig, SGLangServerConfig
@@ -110,7 +140,30 @@ def test_new_sglang_flag():
             prefill={"my-new-flag": "value"}
         )
     )
-
-    flags = config.get_config_for_mode("prefill")
+    flags = config.sglang_config.prefill
     assert "my-new-flag" in flags
+```
+
+### For New Allocation Logic
+
+```python
+def test_new_allocation_mode():
+    endpoints = allocate_endpoints(
+        num_prefill=2, num_decode=4, num_agg=0,
+        gpus_per_prefill=8, gpus_per_decode=4, gpus_per_agg=8,
+        gpus_per_node=8,
+        available_nodes=("n0", "n1", "n2", "n3"),
+    )
+    assert len(endpoints) == 6  # 2 prefill + 4 decode
+```
+
+### For New Health Check Backends
+
+```python
+def test_new_backend_health():
+    response = {"workers": [...], "stats": {...}}
+    result = check_new_backend_health(
+        response, expected_prefill=2, expected_decode=4
+    )
+    assert result.ready
 ```

@@ -21,7 +21,7 @@ from srtctl.backends import (
     BackendConfig,
     BackendProtocol,
     BackendType,
-    SGLangBackendConfig,
+    SGLangProtocol,
     SGLangServerConfig,
 )
 
@@ -84,7 +84,7 @@ __all__ = [
     "HealthCheckConfig",
     "ClusterConfig",
     # Backend configs (re-exported from backends)
-    "SGLangBackendConfig",
+    "SGLangProtocol",
     "SGLangServerConfig",
     "BackendConfig",
     "BackendProtocol",

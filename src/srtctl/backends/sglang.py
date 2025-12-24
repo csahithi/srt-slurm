@@ -45,8 +45,8 @@ class SGLangServerConfig:
 
 
 @dataclass(frozen=True)
-class SGLangBackendConfig:
-    """SGLang backend configuration - implements BackendProtocol.
+class SGLangProtocol:
+    """SGLang protocol - implements BackendProtocol.
 
     This frozen dataclass both holds configuration AND implements the
     BackendProtocol methods for process allocation and launching.

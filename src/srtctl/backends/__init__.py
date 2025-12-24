@@ -9,10 +9,10 @@ Supported backends:
 """
 
 from .base import BackendProtocol, BackendType
-from .sglang import SGLangBackendConfig, SGLangServerConfig
+from .sglang import SGLangProtocol, SGLangServerConfig
 
 # Union type for all backend configs
-BackendConfig = SGLangBackendConfig
+BackendConfig = SGLangProtocol
 
 __all__ = [
     # Base types
@@ -20,6 +20,6 @@ __all__ = [
     "BackendType",
     "BackendConfig",
     # SGLang
-    "SGLangBackendConfig",
+    "SGLangProtocol",
     "SGLangServerConfig",
 ]

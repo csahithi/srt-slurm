@@ -39,31 +39,6 @@ def setup_logging(level: int = logging.INFO) -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-
-def calculate_required_nodes(config: SrtConfig) -> int:
-    """Calculate total number of nodes required based on resource allocation."""
-    return config.resources.total_nodes
-
-
-def calculate_required_nodes_from_dict(config: dict) -> int:
-    """Calculate total number of nodes required from dict config (legacy)."""
-    resources = config.get("resources", {})
-
-    prefill_nodes = resources.get("prefill_nodes", 0) or 0
-    decode_nodes = resources.get("decode_nodes", 0) or 0
-    agg_nodes = resources.get("agg_nodes", 0) or 0
-
-    total_nodes = prefill_nodes + decode_nodes + agg_nodes
-
-    if total_nodes == 0:
-        prefill_workers = resources.get("prefill_workers", 0) or 0
-        decode_workers = resources.get("decode_workers", 0) or 0
-        agg_workers = resources.get("agg_workers", 0) or 0
-        total_nodes = prefill_workers + decode_workers + agg_workers
-
-    return max(total_nodes, 1)
-
-
 def generate_minimal_sbatch_script(
     config: SrtConfig,
     config_path: Path,
@@ -96,7 +71,7 @@ def generate_minimal_sbatch_script(
     env = Environment(loader=FileSystemLoader(str(template_dir)))
     template = env.get_template("job_script_minimal.j2")
 
-    total_nodes = calculate_required_nodes(config)
+    total_nodes = config.resources.total_nodes
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Resolve container image path (expand aliases from srtslurm.yaml)

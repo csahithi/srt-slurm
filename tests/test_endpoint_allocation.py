@@ -13,8 +13,8 @@ class TestAllocateEndpoints:
 
     def test_multiple_endpoints_per_node(self):
         """Test multiple endpoints sharing a single node."""
-        # 2 prefill endpoints, 2 GPUs each, 4 GPUs per node -> both on node 0
-        # 2 decode endpoints, 2 GPUs each, 4 GPUs per node -> both on node 1
+        # 2 prefill endpoints, 2 GPUs each, 4 GPUs per node -> both on node0
+        # 2 decode endpoints, 2 GPUs each, 4 GPUs per node -> both on node1
         endpoints = allocate_endpoints(
             num_prefill=2,
             num_decode=2,
@@ -28,14 +28,23 @@ class TestAllocateEndpoints:
 
         assert len(endpoints) == 4
 
-        # Check prefill endpoints
+        # Check prefill endpoints - both should be on the SAME node
         prefill_eps = [e for e in endpoints if e.mode == "prefill"]
         assert len(prefill_eps) == 2
+        assert prefill_eps[0].nodes[0] == prefill_eps[1].nodes[0] == "node0"
         assert prefill_eps[0].total_gpus == 2
+        assert prefill_eps[1].total_gpus == 2
+        # They should have different GPU indices
+        assert prefill_eps[0].gpu_indices != prefill_eps[1].gpu_indices
+        assert prefill_eps[0].gpu_indices == frozenset({0, 1})
+        assert prefill_eps[1].gpu_indices == frozenset({2, 3})
 
-        # Check decode endpoints
+        # Check decode endpoints - both should be on the SAME node (node1)
         decode_eps = [e for e in endpoints if e.mode == "decode"]
         assert len(decode_eps) == 2
+        assert decode_eps[0].nodes[0] == decode_eps[1].nodes[0] == "node1"
+        assert decode_eps[0].gpu_indices == frozenset({0, 1})
+        assert decode_eps[1].gpu_indices == frozenset({2, 3})
 
     def test_full_node_endpoints(self):
         """Test endpoints that use full nodes."""

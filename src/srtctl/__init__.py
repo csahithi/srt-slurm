@@ -34,7 +34,7 @@ from .backends import (
     BackendConfig,
     BackendProtocol,
     BackendType,
-    SGLangBackendConfig,
+    SGLangProtocol,
 )
 
 # Core modules
@@ -81,5 +81,5 @@ __all__ = [
     "BackendProtocol",
     "BackendConfig",
     "BackendType",
-    "SGLangBackendConfig",
+    "SGLangProtocol",
 ]
