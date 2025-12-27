@@ -560,6 +560,42 @@ class SweepOrchestrator:
 
         return env
 
+    def _print_connection_info(self) -> None:
+        """Print srun commands for connecting to nodes."""
+        container_args = f"--container-image={self.runtime.container_image}"
+        mounts_str = ",".join(f"{src}:{dst}" for src, dst in self.runtime.container_mounts.items())
+        if mounts_str:
+            container_args += f" --container-mounts={mounts_str}"
+
+        logger.info("")
+        logger.info("=" * 60)
+        logger.info("Connection Commands")
+        logger.info("=" * 60)
+        logger.info("Frontend URL: http://%s:8000", self.runtime.nodes.head)
+        logger.info("")
+        logger.info("To connect to head node (%s):", self.runtime.nodes.head)
+        logger.info(
+            "  srun %s --jobid %s -w %s --overlap --pty bash",
+            container_args,
+            self.runtime.job_id,
+            self.runtime.nodes.head,
+        )
+
+        # Print worker node connection commands
+        for node in self.runtime.nodes.worker:
+            if node != self.runtime.nodes.head:
+                logger.info("")
+                logger.info("To connect to worker node (%s):", node)
+                logger.info(
+                    "  srun %s --jobid %s -w %s --overlap --pty bash",
+                    container_args,
+                    self.runtime.job_id,
+                    node,
+                )
+
+        logger.info("=" * 60)
+        logger.info("")
+
     def run(self) -> int:
         """Run the complete sweep."""
         logger.info("Sweep Orchestrator")
@@ -594,6 +630,8 @@ class SweepOrchestrator:
             frontend_proc = self.start_frontend(registry)
             if frontend_proc:
                 registry.add_process(frontend_proc)
+
+            self._print_connection_info()
 
             exit_code = self.run_benchmark(registry, stop_event)
 

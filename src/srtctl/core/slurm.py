@@ -64,7 +64,11 @@ def get_slurm_nodelist() -> list[str]:
 
 
 def get_hostname_ip(hostname: str, network_interface: str | None = None) -> str:
-    """Resolve hostname to IP address.
+    """Resolve hostname to routable IP address.
+
+    Uses multiple resolution strategies:
+    1. If inside a SLURM job, use srun to get the real IP from the target node
+    2. Fall back to socket.gethostbyname() (may return loopback on some systems)
 
     Args:
         hostname: Node hostname to resolve
@@ -73,12 +77,31 @@ def get_hostname_ip(hostname: str, network_interface: str | None = None) -> str:
     Returns:
         IP address as string
     """
+    # If we're inside a SLURM allocation, use srun-based resolution
+    # This gets the actual routable IP from the target node
+    slurm_job_id = get_slurm_job_id()
+    if slurm_job_id:
+        ip = get_node_ip(hostname, slurm_job_id, network_interface)
+        if ip:
+            return ip
+        logger.warning(
+            "srun-based IP resolution failed for %s, falling back to socket resolution",
+            hostname,
+        )
+
+    # Fallback to socket resolution
     try:
-        # Try socket resolution first
         ip = socket.gethostbyname(hostname)
+        # Warn if we got a loopback address
+        if ip.startswith("127."):
+            logger.warning(
+                "socket.gethostbyname returned loopback %s for %s - this may cause cross-node issues",
+                ip,
+                hostname,
+            )
         return ip
     except socket.gaierror:
-        # Fallback: return hostname as-is (may be IP already)
+        # Return hostname as-is (may be IP already)
         return hostname
 
 
