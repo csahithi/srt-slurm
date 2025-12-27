@@ -24,13 +24,6 @@ test-cov:
 check: lint test
 	@echo "✓ All checks passed"
 
-ci: check
-	@echo "✓ CI checks passed"
-		echo "Usage: make delete-from-cloud RUN_ID=3667_1P_1D_20251110_192145"; \
-		exit 1; \
-	fi
-	@uv run python -m analysis.srtlog.sync_results delete $(RUN_ID)
-
 # Runners
 gb200-fp8:
 	srtctl apply -f recipies/gb200-fp8/1k1k/low-latency.yaml
