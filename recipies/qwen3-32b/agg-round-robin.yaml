@@ -21,6 +21,7 @@ dynamo:
   top_of_tree: true
 
 frontend:
+  enable_multiple_frontends: false
   dynamo_frontend_args:
     router-reset-states: true
 

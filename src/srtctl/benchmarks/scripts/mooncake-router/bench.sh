@@ -76,6 +76,7 @@ aiperf profile \
     --fixed-schedule \
     --url "${ENDPOINT}" \
     --streaming \
+    --ui simple \
     --artifact-dir "${RUN_ARTIFACT_DIR}" \
     --goodput "time_to_first_token:${TTFT_THRESHOLD} inter_token_latency:${ITL_THRESHOLD}"
 
