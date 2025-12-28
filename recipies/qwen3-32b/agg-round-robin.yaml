@@ -16,6 +16,7 @@ resources:
   agg_nodes: 2
   agg_workers: 8
 
+# until prefill router goes in 0.8.0
 dynamo:
   top_of_tree: true
 
