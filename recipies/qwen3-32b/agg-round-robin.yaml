@@ -1,0 +1,58 @@
+# Qwen3-32B Aggregated Round-Robin Configuration
+# Based on dynamo exemplar for Mooncake benchmark
+# Configuration: 8x TP2 workers on 16x H200 GPUs (2 nodes)
+
+name: "qwen3-32b-agg-round-robin"
+
+model:
+  path: "Qwen/Qwen3-32B"
+  container: "lmsysorg+sglang+latest.sqsh"
+  precision: "bf16"
+
+resources:
+  gpu_type: "h200"
+  gpus_per_node: 8
+
+  # Aggregated mode: 8 TP2 workers = 16 GPUs across 2 nodes
+  agg_nodes: 2
+  agg_workers: 8
+
+frontend:
+  use_sglang_router: true
+  enable_multiple_frontends: false
+  sglang_router_args:
+    # Round-robin routing (baseline)
+    router-policy: "round-robin"
+
+backend:
+  type: sglang
+
+  aggregated_environment:
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
+    PYTHONUNBUFFERED: "1"
+    HF_HOME: "/home/user/.cache/huggingface"
+
+  sglang_config:
+    aggregated:
+      served-model-name: "Qwen/Qwen3-32B"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 2
+      mem-fraction-static: 0.90
+      # Rope scaling for extended context
+      json-model-override-args: '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768},"max_position_embeddings":131072}'
+      context-length: 131072
+
+# Mooncake benchmark using aiperf
+benchmark:
+  type: "mooncake-router"
+  mooncake_workload: "conversation"
+  ttft_threshold_ms: 2000
+  itl_threshold_ms: 25
+
+slurm:
+  time_limit: "4:00:00"
+
+health_check:
+  max_attempts: 360  # 60 minutes - large model takes time to load
+  interval_seconds: 10

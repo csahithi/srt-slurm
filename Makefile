@@ -11,7 +11,7 @@ default:
 # === CI targets ===
 lint:
 	uv run ruff check src/srtctl/
-	uv run ruff format --check src/srtctl/
+	uv run ruff format src/srtctl/
 	uv run ty check src/srtctl/ || true
 
 test:

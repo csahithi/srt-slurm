@@ -91,6 +91,7 @@ class BenchmarkType(str, Enum):
     MANUAL = "manual"
     SA_BENCH = "sa-bench"
     ROUTER = "router"
+    MOONCAKE_ROUTER = "mooncake-router"
     MMLU = "mmlu"
     GPQA = "gpqa"
     LONGBENCHV2 = "longbenchv2"
@@ -339,6 +340,10 @@ class BenchmarkConfig:
     num_requests: int | None = None
     concurrency: int | None = None
     prefix_ratios: list[float] | str | None = None
+    # Mooncake router benchmark fields (uses aiperf with mooncake_trace)
+    mooncake_workload: str | None = None  # "mooncake", "conversation", "synthetic", "toolagent"
+    ttft_threshold_ms: int | None = None  # Goodput TTFT threshold in ms (default: 2000)
+    itl_threshold_ms: int | None = None  # Goodput ITL threshold in ms (default: 25)
 
     def get_concurrency_list(self) -> list[int]:
         if self.concurrencies is None:

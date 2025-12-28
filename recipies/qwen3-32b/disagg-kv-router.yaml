@@ -1,0 +1,83 @@
+# Qwen3-32B Disaggregated KV-Aware Routing Configuration
+# Based on dynamo exemplar for Mooncake benchmark
+# Configuration: 6 prefill + 2 decode workers with TP2 on 16x H200 GPUs (2 nodes)
+
+name: "qwen3-32b-disagg-kv-router"
+
+model:
+  path: "Qwen/Qwen3-32B"
+  container: "lmsysorg+sglang+latest.sqsh"
+  precision: "bf16"
+
+resources:
+  gpu_type: "h200"
+  gpus_per_node: 8
+
+  # Disaggregated mode: 6 prefill + 2 decode
+  # 6 prefill workers @ TP2 = 12 GPUs (1.5 nodes)
+  # 2 decode workers @ TP2 = 4 GPUs (0.5 nodes)
+  # Total: 16 GPUs across 2 nodes
+  prefill_nodes: 2
+  decode_nodes: 0  # Decode workers share nodes with prefill
+  prefill_workers: 6
+  decode_workers: 2
+
+frontend:
+  use_sglang_router: true
+  enable_multiple_frontends: false
+  sglang_router_args:
+    # KV-aware routing mode for prefix caching optimization
+    router-policy: "cache-aware"
+    cache-routing-percentage: 1.0
+
+backend:
+  type: sglang
+
+  prefill_environment:
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
+    PYTHONUNBUFFERED: "1"
+    HF_HOME: "/home/user/.cache/huggingface"
+
+  decode_environment:
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
+    PYTHONUNBUFFERED: "1"
+    HF_HOME: "/home/user/.cache/huggingface"
+
+  sglang_config:
+    prefill:
+      served-model-name: "Qwen/Qwen3-32B"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 2
+      disaggregation-mode: "prefill"
+      mem-fraction-static: 0.90
+      chunked-prefill-size: 32768
+      max-prefill-tokens: 32768
+      # Rope scaling for extended context
+      json-model-override-args: '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768},"max_position_embeddings":131072}'
+      context-length: 131072
+
+    decode:
+      served-model-name: "Qwen/Qwen3-32B"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 2
+      disaggregation-mode: "decode"
+      mem-fraction-static: 0.90
+      # Rope scaling for extended context
+      json-model-override-args: '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768},"max_position_embeddings":131072}'
+      context-length: 131072
+
+# Mooncake benchmark using aiperf
+benchmark:
+  type: "mooncake-router"
+  mooncake_workload: "conversation"
+  ttft_threshold_ms: 2000
+  itl_threshold_ms: 25
+
+slurm:
+  time_limit: "4:00:00"
+
+health_check:
+  max_attempts: 360  # 60 minutes - large model takes time to load
+  interval_seconds: 10
