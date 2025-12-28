@@ -55,14 +55,6 @@ if [ ! -f "${INPUT_FILE}" ]; then
     echo "Downloaded to ${INPUT_FILE}"
 fi
 
-# Wait for model to be ready
-echo "Waiting for model '${MODEL_NAME}' at ${ENDPOINT}/v1/models..."
-until curl -s "${ENDPOINT}/v1/models" | jq -e --arg model "${MODEL_NAME}" '.data[]? | select(.id == $model)' >/dev/null 2>&1; do
-    echo "[$(date '+%H:%M:%S')] Model not ready, retrying in 5s..."
-    sleep 5
-done
-echo "Model '${MODEL_NAME}' is ready!"
-
 # Setup artifact directory with model and timestamp
 MODEL_BASE_NAME="${MODEL_NAME##*/}"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
