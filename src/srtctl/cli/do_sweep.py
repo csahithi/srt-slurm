@@ -126,11 +126,7 @@ class SweepOrchestrator:
         # 2. Dynamo installation (required for dynamo.sglang when not using sglang router and not profiling)
         # When profiling is enabled, we use sglang.launch_server directly (no dynamo)
         if not self.config.frontend.use_sglang_router and not self.config.profiling.enabled:
-            parts.append(
-                "echo 'Installing dynamo...' && "
-                "pip install --quiet ai-dynamo-runtime==0.7.0 ai-dynamo==0.7.0 && "
-                "echo 'Dynamo installed'"
-            )
+            parts.append(self.config.dynamo.get_install_commands())
 
         if not parts:
             return None

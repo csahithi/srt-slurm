@@ -16,11 +16,12 @@ resources:
   agg_nodes: 2
   agg_workers: 8
 
+dynamo:
+  top_of_tree: true
+
 frontend:
-  use_sglang_router: true
-  enable_multiple_frontends: false
-  sglang_router_args:
-    router-policy: "round-robin"
+  dynamo_frontend_args:
+    router-reset-states: true
 
 backend:
   type: sglang

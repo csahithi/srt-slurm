@@ -21,13 +21,15 @@ resources:
   prefill_workers: 6
   decode_workers: 2
 
+# until prefill router goes in 0.8.0
+dynamo:
+  top_of_tree: true
+
 frontend:
-  use_sglang_router: true
   enable_multiple_frontends: false
-  sglang_router_args:
-    # KV-aware routing mode for prefix caching optimization
-    router-policy: "cache-aware"
-    cache-routing-percentage: 1.0
+  dynamo_frontend_args:
+    router-mode: "kv"
+    router-reset-states: true
 
 backend:
   type: sglang

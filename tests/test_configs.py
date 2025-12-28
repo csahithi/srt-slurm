@@ -93,6 +93,62 @@ class TestSrtConfigStructure:
         assert total_needed <= total_available
 
 
+class TestDynamoConfig:
+    """Tests for DynamoConfig."""
+
+    def test_default_version(self):
+        """Default is version 0.7.0."""
+        from srtctl.core.schema import DynamoConfig
+
+        config = DynamoConfig()
+        assert config.version == "0.7.0"
+        assert config.hash is None
+        assert config.top_of_tree is False
+        assert not config.needs_source_install
+
+    def test_version_install_command(self):
+        """Version config generates pip install command."""
+        from srtctl.core.schema import DynamoConfig
+
+        config = DynamoConfig(version="0.8.0")
+        cmd = config.get_install_commands()
+        assert "pip install" in cmd
+        assert "ai-dynamo-runtime==0.8.0" in cmd
+        assert "ai-dynamo==0.8.0" in cmd
+
+    def test_hash_install_command(self):
+        """Hash config generates source install command."""
+        from srtctl.core.schema import DynamoConfig
+
+        config = DynamoConfig(hash="abc123")
+        assert config.version is None  # Auto-cleared
+        assert config.needs_source_install
+        cmd = config.get_install_commands()
+        assert "git clone" in cmd
+        assert "git checkout abc123" in cmd
+        assert "maturin build" in cmd
+        assert "pip install -e" in cmd
+
+    def test_top_of_tree_install_command(self):
+        """Top-of-tree config generates source install without checkout."""
+        from srtctl.core.schema import DynamoConfig
+
+        config = DynamoConfig(top_of_tree=True)
+        assert config.version is None  # Auto-cleared
+        assert config.needs_source_install
+        cmd = config.get_install_commands()
+        assert "git clone" in cmd
+        assert "git checkout" not in cmd
+        assert "maturin build" in cmd
+
+    def test_hash_and_top_of_tree_not_allowed(self):
+        """Cannot specify both hash and top_of_tree."""
+        from srtctl.core.schema import DynamoConfig
+
+        with pytest.raises(ValueError, match="Cannot specify both"):
+            DynamoConfig(hash="abc123", top_of_tree=True)
+
+
 class TestSGLangProtocol:
     """Tests for SGLangProtocol."""
 

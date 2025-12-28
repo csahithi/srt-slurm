@@ -489,6 +489,70 @@ class ProfilingConfig:
     Schema: ClassVar[builtins.type[Schema]] = Schema
 
 
+@dataclass
+class DynamoConfig:
+    """Dynamo installation configuration.
+
+    Only one of version, hash, or top_of_tree should be specified.
+    Defaults to version="0.7.0" (pip install).
+
+    Options:
+        version: Install specific version from PyPI (e.g., "0.7.0")
+        hash: Clone repo and checkout specific commit hash
+        top_of_tree: Clone repo at HEAD (latest)
+
+    If top_of_tree or hash is set, version is automatically cleared.
+    """
+
+    version: str | None = "0.7.0"
+    hash: str | None = None
+    top_of_tree: bool = False
+
+    def __post_init__(self) -> None:
+        # Auto-clear version if hash or top_of_tree is set
+        if self.hash is not None or self.top_of_tree:
+            object.__setattr__(self, "version", None)
+
+        # Validate only one source option is set
+        if self.hash is not None and self.top_of_tree:
+            raise ValueError("Cannot specify both hash and top_of_tree")
+
+    @property
+    def needs_source_install(self) -> bool:
+        """Whether this config requires a source install (git clone + maturin)."""
+        return self.hash is not None or self.top_of_tree
+
+    def get_install_commands(self) -> str:
+        """Get the bash commands to install dynamo."""
+        if self.version is not None:
+            return (
+                f"echo 'Installing dynamo {self.version}...' && "
+                f"pip install --quiet ai-dynamo-runtime=={self.version} ai-dynamo=={self.version} && "
+                f"echo 'Dynamo {self.version} installed'"
+            )
+
+        # Source install (hash or top-of-tree)
+        git_ref = self.hash if self.hash else "HEAD"
+        checkout_cmd = f"git checkout {self.hash}" if self.hash else ""
+
+        return (
+            f"echo 'Installing dynamo from source ({git_ref})...' && "
+            "cd /sgl-workspace/ && "
+            "git clone https://github.com/ai-dynamo/dynamo.git && "
+            "cd dynamo && "
+            f"{checkout_cmd + ' && ' if checkout_cmd else ''}"
+            "cd lib/bindings/python/ && "
+            "maturin build -o /tmp && "
+            "pip install /tmp/ai_dynamo_runtime*.whl && "
+            "cd /sgl-workspace/dynamo/ && "
+            "pip install -e . && "
+            "cd /sgl-workspace/sglang/ && "
+            f"echo 'Dynamo installed from source ({git_ref})'"
+        )
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
 @dataclass(frozen=True)
 class FrontendConfig:
     """Frontend/router configuration."""
@@ -557,6 +621,7 @@ class SrtConfig:
     slurm: SlurmConfig = field(default_factory=SlurmConfig)
     backend: Annotated[BackendConfig, BackendConfigField()] = field(default_factory=SGLangProtocol)
     frontend: FrontendConfig = field(default_factory=FrontendConfig)
+    dynamo: DynamoConfig = field(default_factory=DynamoConfig)
     benchmark: BenchmarkConfig = field(default_factory=BenchmarkConfig)
     profiling: ProfilingConfig = field(default_factory=ProfilingConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
