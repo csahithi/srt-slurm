@@ -459,17 +459,27 @@ class SweepOrchestrator:
         return processes
 
     def _start_sglang_routers(self, topology: FrontendTopology) -> list[ManagedProcess]:
-        """Start sglang routers on designated nodes."""
-        # Collect prefill and decode leader info from backend processes
-        prefill_leaders: list[tuple[str, int, int]] = []  # (ip, http_port, bootstrap_port)
+        """Start sglang routers on designated nodes.
+
+        Supports two modes:
+        - Aggregated: --worker-urls http://w1:port1 http://w2:port2 ...
+        - Disaggregated: --pd-disaggregation --prefill url bootstrap_port --decode url
+        """
+        r = self.config.resources
+        is_disaggregated = r.num_prefill > 0 or r.num_decode > 0
+
+        # Collect worker info by mode
+        agg_workers: list[tuple[str, int]] = []  # (ip, http_port)
+        prefill_leaders: list[tuple[str, int, int | None]] = []  # (ip, http_port, bootstrap_port)
         decode_leaders: list[tuple[str, int]] = []  # (ip, http_port)
 
         for process in self.backend_processes:
             if not process.is_leader:
                 continue
             leader_ip = get_hostname_ip(process.node)
-            if process.endpoint_mode == "prefill":
-                assert process.bootstrap_port is not None
+            if process.endpoint_mode == "agg":
+                agg_workers.append((leader_ip, process.http_port))
+            elif process.endpoint_mode == "prefill":
                 prefill_leaders.append((leader_ip, process.http_port, process.bootstrap_port))
             elif process.endpoint_mode == "decode":
                 decode_leaders.append((leader_ip, process.http_port))
@@ -481,12 +491,22 @@ class SweepOrchestrator:
 
             router_log = self.runtime.log_dir / f"{node}_router_{idx}.out"
 
-            cmd = ["python", "-m", "sglang_router.launch_router", "--pd-disaggregation"]
+            cmd = ["python", "-m", "sglang_router.launch_router"]
 
-            for ip, http_port, bootstrap_port in prefill_leaders:
-                cmd.extend(["--prefill", f"http://{ip}:{http_port}", str(bootstrap_port)])
-            for ip, http_port in decode_leaders:
-                cmd.extend(["--decode", f"http://{ip}:{http_port}"])
+            if is_disaggregated:
+                # Disaggregated mode: --pd-disaggregation with --prefill and --decode
+                cmd.append("--pd-disaggregation")
+                for ip, http_port, bootstrap_port in prefill_leaders:
+                    cmd.extend(["--prefill", f"http://{ip}:{http_port}"])
+                    # Add bootstrap port if available, otherwise omit
+                    if bootstrap_port is not None:
+                        cmd.append(str(bootstrap_port))
+                for ip, http_port in decode_leaders:
+                    cmd.extend(["--decode", f"http://{ip}:{http_port}"])
+            else:
+                # Aggregated mode: --worker-urls with space-separated URLs
+                worker_urls = [f"http://{ip}:{port}" for ip, port in agg_workers]
+                cmd.extend(["--worker-urls"] + worker_urls)
 
             cmd.extend(["--host", "0.0.0.0", "--port", str(topology.frontend_port)])
             cmd.extend(self.config.frontend.get_router_args_list())
