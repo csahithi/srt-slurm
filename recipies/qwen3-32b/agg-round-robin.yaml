@@ -5,14 +5,13 @@
 name: "qwen3-32b-agg-round-robin"
 
 model:
-  path: "Qwen/Qwen3-32B"
-  container: "lmsysorg+sglang+latest.sqsh"
+  path: "qwen3-32b"
+  container: "0.5.6.post2"
   precision: "bf16"
 
 resources:
   gpu_type: "h200"
   gpus_per_node: 8
-
   # Aggregated mode: 8 TP2 workers = 16 GPUs across 2 nodes
   agg_nodes: 2
   agg_workers: 8
@@ -21,16 +20,13 @@ frontend:
   use_sglang_router: true
   enable_multiple_frontends: false
   sglang_router_args:
-    # Round-robin routing (baseline)
     router-policy: "round-robin"
 
 backend:
   type: sglang
 
   aggregated_environment:
-    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
-    PYTHONUNBUFFERED: "1"
-    HF_HOME: "/home/user/.cache/huggingface"
+    DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
 
   sglang_config:
     aggregated:
@@ -49,10 +45,3 @@ benchmark:
   mooncake_workload: "conversation"
   ttft_threshold_ms: 2000
   itl_threshold_ms: 25
-
-slurm:
-  time_limit: "4:00:00"
-
-health_check:
-  max_attempts: 360  # 60 minutes - large model takes time to load
-  interval_seconds: 10

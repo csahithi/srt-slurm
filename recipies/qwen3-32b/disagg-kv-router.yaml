@@ -12,7 +12,6 @@ model:
 resources:
   gpu_type: "h200"
   gpus_per_node: 8
-
   # Disaggregated mode: 6 prefill + 2 decode
   # 6 prefill workers @ TP2 = 12 GPUs (1.5 nodes)
   # 2 decode workers @ TP2 = 4 GPUs (0.5 nodes)
@@ -74,10 +73,3 @@ benchmark:
   mooncake_workload: "conversation"
   ttft_threshold_ms: 2000
   itl_threshold_ms: 25
-
-slurm:
-  time_limit: "4:00:00"
-
-health_check:
-  max_attempts: 360  # 60 minutes - large model takes time to load
-  interval_seconds: 10

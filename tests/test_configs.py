@@ -70,6 +70,28 @@ class TestSrtConfigStructure:
         )
         assert agg.is_disaggregated is False
 
+    def test_decode_nodes_zero_inherits_tp_from_prefill(self):
+        """When decode_nodes=0, gpus_per_decode inherits from prefill."""
+        from srtctl.core.schema import ResourceConfig
+
+        # 6 prefill + 2 decode on 2 nodes, sharing
+        config = ResourceConfig(
+            gpu_type="gb200",
+            gpus_per_node=8,
+            prefill_nodes=2,
+            decode_nodes=0,
+            prefill_workers=6,
+            decode_workers=2,
+        )
+
+        assert config.gpus_per_prefill == 2  # (2*8)/6 = 2
+        assert config.gpus_per_decode == 2  # inherits from prefill
+
+        # Total GPUs should fit
+        total_needed = config.num_prefill * config.gpus_per_prefill + config.num_decode * config.gpus_per_decode
+        total_available = config.total_nodes * config.gpus_per_node
+        assert total_needed <= total_available
+
 
 class TestSGLangProtocol:
     """Tests for SGLangProtocol."""

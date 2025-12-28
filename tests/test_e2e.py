@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from srtctl.core.config import load_config
+from srtctl.core.topology import allocate_endpoints, endpoints_to_processes
 
 RECIPES_DIR = Path(__file__).parent.parent / "recipies"
 CI_DIR = Path(__file__).parent.parent / "ci"
@@ -302,3 +303,152 @@ class TestCIConfigs:
                     assert ep.total_gpus == r.gpus_per_prefill
                 for ep in decode_eps:
                     assert ep.total_gpus == r.gpus_per_decode
+
+
+class TestQwen32BCluster:
+    """Qwen3-32B configs with shared node allocation (decode_nodes=0)."""
+
+    RACK = H100Rack
+    RECIPES = list((RECIPES_DIR / "qwen3-32b").glob("*.yaml")) if (RECIPES_DIR / "qwen3-32b").exists() else []
+
+    @pytest.mark.parametrize("recipe_path", RECIPES, ids=lambda p: p.name)
+    def test_config_loads(self, recipe_path):
+        """Qwen3-32B configs load correctly."""
+        with patch.dict(os.environ, self.RACK.slurm_env(), clear=False):
+            with patch("subprocess.run", side_effect=self.RACK.mock_scontrol()):
+                config = load_config(str(recipe_path))
+                assert config.name is not None
+                assert config.resources.gpus_per_node == 8
+
+    def test_disagg_kv_router_shared_node_allocation(self):
+        """disagg-kv-router.yaml: 6P+2D on 2 nodes with decode_nodes=0."""
+        recipe_path = RECIPES_DIR / "qwen3-32b" / "disagg-kv-router.yaml"
+        if not recipe_path.exists():
+            pytest.skip("disagg-kv-router.yaml not found")
+
+        with patch.dict(os.environ, self.RACK.slurm_env(), clear=False):
+            with patch("subprocess.run", side_effect=self.RACK.mock_scontrol()):
+                config = load_config(str(recipe_path))
+                r = config.resources
+
+                # Verify decode_nodes=0 triggers inheritance from prefill
+                assert r.decode_nodes == 0, "decode_nodes should be 0"
+                assert r.gpus_per_prefill == 2, "prefill TP should be 2"
+                assert r.gpus_per_decode == 2, "decode TP should inherit 2 from prefill"
+
+                # Allocate endpoints
+                nodes = self.RACK.nodes()[:2]
+                endpoints = allocate_endpoints(
+                    num_prefill=r.num_prefill,
+                    num_decode=r.num_decode,
+                    num_agg=0,
+                    gpus_per_prefill=r.gpus_per_prefill,
+                    gpus_per_decode=r.gpus_per_decode,
+                    gpus_per_agg=8,
+                    gpus_per_node=r.gpus_per_node,
+                    available_nodes=nodes,
+                )
+
+                prefill_eps = [e for e in endpoints if e.mode == "prefill"]
+                decode_eps = [e for e in endpoints if e.mode == "decode"]
+
+                assert len(prefill_eps) == 6
+                assert len(decode_eps) == 2
+
+                # Check prefill allocation: first 4 on node0, next 2 on node1
+                for i, ep in enumerate(prefill_eps[:4]):
+                    assert ep.nodes[0] == nodes[0], f"prefill {i} should be on node0"
+                for i, ep in enumerate(prefill_eps[4:]):
+                    assert ep.nodes[0] == nodes[1], f"prefill {i+4} should be on node1"
+
+                # Check decode allocation: on node1 (GPUs 4-5, 6-7)
+                for ep in decode_eps:
+                    assert ep.nodes[0] == nodes[1], "decode should be on node1"
+
+                # Verify GPU indices don't overlap on shared node (node1)
+                node1_prefill_gpus = set()
+                for ep in prefill_eps:
+                    if ep.nodes[0] == nodes[1]:
+                        node1_prefill_gpus.update(ep.gpu_indices)
+
+                node1_decode_gpus = set()
+                for ep in decode_eps:
+                    node1_decode_gpus.update(ep.gpu_indices)
+
+                assert node1_prefill_gpus.isdisjoint(node1_decode_gpus), (
+                    f"GPU overlap on node1! prefill uses {node1_prefill_gpus}, decode uses {node1_decode_gpus}"
+                )
+
+    def test_disagg_kv_router_cuda_visible_devices(self):
+        """Processes on shared node have non-overlapping CUDA_VISIBLE_DEVICES."""
+        recipe_path = RECIPES_DIR / "qwen3-32b" / "disagg-kv-router.yaml"
+        if not recipe_path.exists():
+            pytest.skip("disagg-kv-router.yaml not found")
+
+        with patch.dict(os.environ, self.RACK.slurm_env(), clear=False):
+            with patch("subprocess.run", side_effect=self.RACK.mock_scontrol()):
+                config = load_config(str(recipe_path))
+                r = config.resources
+
+                nodes = self.RACK.nodes()[:2]
+                endpoints = allocate_endpoints(
+                    num_prefill=r.num_prefill,
+                    num_decode=r.num_decode,
+                    num_agg=0,
+                    gpus_per_prefill=r.gpus_per_prefill,
+                    gpus_per_decode=r.gpus_per_decode,
+                    gpus_per_agg=8,
+                    gpus_per_node=r.gpus_per_node,
+                    available_nodes=nodes,
+                )
+
+                processes = endpoints_to_processes(endpoints)
+
+                # Group processes by node
+                node1_processes = [p for p in processes if p.node == nodes[1]]
+
+                # Should have 2 prefill + 2 decode = 4 processes on node1
+                assert len(node1_processes) == 4, f"Expected 4 processes on node1, got {len(node1_processes)}"
+
+                # Each process should have unique, non-overlapping GPU indices
+                all_gpus_on_node1 = set()
+                for proc in node1_processes:
+                    for gpu in proc.gpu_indices:
+                        assert gpu not in all_gpus_on_node1, (
+                            f"GPU {gpu} assigned to multiple processes on {nodes[1]}!"
+                        )
+                        all_gpus_on_node1.add(gpu)
+
+                # All 8 GPUs on node1 should be used
+                assert all_gpus_on_node1 == {0, 1, 2, 3, 4, 5, 6, 7}, (
+                    f"Expected all 8 GPUs used on node1, got {all_gpus_on_node1}"
+                )
+
+                # Verify CUDA_VISIBLE_DEVICES strings are correct
+                for proc in node1_processes:
+                    cvd = proc.cuda_visible_devices
+                    expected_gpus = sorted(proc.gpu_indices)
+                    expected_cvd = ",".join(str(g) for g in expected_gpus)
+                    assert cvd == expected_cvd, f"Expected CUDA_VISIBLE_DEVICES={expected_cvd}, got {cvd}"
+
+    def test_disagg_kv_router_total_allocation_fits(self):
+        """Total GPU allocation fits within declared nodes."""
+        recipe_path = RECIPES_DIR / "qwen3-32b" / "disagg-kv-router.yaml"
+        if not recipe_path.exists():
+            pytest.skip("disagg-kv-router.yaml not found")
+
+        with patch.dict(os.environ, self.RACK.slurm_env(), clear=False):
+            with patch("subprocess.run", side_effect=self.RACK.mock_scontrol()):
+                config = load_config(str(recipe_path))
+                r = config.resources
+
+                total_gpus_needed = (
+                    r.num_prefill * r.gpus_per_prefill
+                    + r.num_decode * r.gpus_per_decode
+                )
+                total_gpus_available = r.total_nodes * r.gpus_per_node
+
+                assert total_gpus_needed <= total_gpus_available, (
+                    f"Need {total_gpus_needed} GPUs but only have {total_gpus_available} "
+                    f"({r.total_nodes} nodes × {r.gpus_per_node} GPUs)"
+                )

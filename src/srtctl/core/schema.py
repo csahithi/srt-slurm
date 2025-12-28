@@ -287,6 +287,10 @@ class ResourceConfig:
     def gpus_per_decode(self) -> int:
         if self.decode_nodes and self.decode_workers:
             return (self.decode_nodes * self.gpus_per_node) // self.decode_workers
+        # decode_nodes=0 with decode_workers means "share nodes with prefill"
+        # Inherit TP from prefill in this case
+        if self.decode_nodes == 0 and self.decode_workers:
+            return self.gpus_per_prefill
         return self.gpus_per_node
 
     @property
