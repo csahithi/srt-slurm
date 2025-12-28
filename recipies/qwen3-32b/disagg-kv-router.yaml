@@ -25,6 +25,14 @@ resources:
 dynamo:
   top_of_tree: true
 
+# frontend:
+#   use_sglang_router: true
+#   enable_multiple_frontends: false
+#   sglang_router_args:
+#     policy: "cache_aware"
+#     # Or use separate policies per stage:
+#     # prefill-policy: "cache_aware"
+#     # decode-policy: "round_robin"
 frontend:
   enable_multiple_frontends: false
   dynamo_frontend_args:
