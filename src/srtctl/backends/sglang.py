@@ -210,9 +210,12 @@ class SGLangProtocol:
         if use_sglang:
             cmd.extend(["--port", str(process.http_port)])
 
-        # Add disaggregation mode flag (not for agg mode, not when using sglang router)
-        if mode != "agg" and not use_sglang_router:
+        # Add disaggregation mode for prefill/decode workers (both dynamo and sglang router)
+        if mode != "agg":
             cmd.extend(["--disaggregation-mode", mode])
+            # Bootstrap port only needed for sglang router (dynamo handles internally)
+            if use_sglang_router and mode == "prefill" and process.bootstrap_port is not None:
+                cmd.extend(["--disaggregation-bootstrap-port", str(process.bootstrap_port)])
 
         # Add multi-node coordination flags
         if is_multi_node:
