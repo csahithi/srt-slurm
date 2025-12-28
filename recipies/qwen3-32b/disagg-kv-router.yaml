@@ -10,7 +10,7 @@ model:
   precision: "bf16"
 
 resources:
-  gpu_type: "h200"
+  gpu_type: "h100"
   gpus_per_node: 8
   # Disaggregated mode: 6 prefill + 2 decode
   # 6 prefill workers @ TP2 = 12 GPUs (1.5 nodes)

@@ -10,7 +10,7 @@ model:
   precision: "bf16"
 
 resources:
-  gpu_type: "h200"
+  gpu_type: "h100"
   gpus_per_node: 8
   # Aggregated mode: 8 TP2 workers = 16 GPUs across 2 nodes
   agg_nodes: 2
