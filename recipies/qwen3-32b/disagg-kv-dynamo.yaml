@@ -23,7 +23,7 @@ resources:
 
 # until prefill router goes in 0.8.0
 dynamo:
-  top_of_tree: "f6741ec6c260182fbf6063a4e554dc80ec679f13"
+  hash: "f6741ec6c260182fbf6063a4e554dc80ec679f13"
 
 frontend:
   enable_multiple_frontends: false
