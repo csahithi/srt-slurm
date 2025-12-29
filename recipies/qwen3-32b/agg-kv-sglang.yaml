@@ -1,8 +1,4 @@
-# Qwen3-32B Aggregated Round-Robin Configuration
-# Based on dynamo exemplar for Mooncake benchmark
-# Configuration: 8x TP2 workers on 16x H200 GPUs (2 nodes)
-
-name: "qwen3-32b-agg-round-robin"
+name: "agg-round-robin"
 
 model:
   path: "qwen3-32b"
@@ -16,25 +12,14 @@ resources:
   agg_nodes: 2
   agg_workers: 8
 
-# until prefill router goes in 0.8.0
-dynamo:
-  top_of_tree: true
-
-# frontend:
-#   use_sglang_router: true
-#   enable_multiple_frontends: false
-#   sglang_router_args:
-#     policy: "round_robin"
 frontend:
+  use_sglang_router: true
   enable_multiple_frontends: false
-  dynamo_frontend_args:
-    router-reset-states: true
+  sglang_router_args:
+    policy: "cache_aware"
 
 backend:
   type: sglang
-
-  aggregated_environment:
-    DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
 
   sglang_config:
     aggregated:
