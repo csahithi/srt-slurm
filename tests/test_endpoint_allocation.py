@@ -238,19 +238,13 @@ class TestEndpointsToProcesses:
         leaders = [p for p in processes if p.is_leader]
         assert len(leaders) == 4  # 2 prefill + 2 decode
 
-        # All leaders should have kv_events_port
+        # All leaders should have globally unique kv_events_port
         kv_ports = [p.kv_events_port for p in leaders]
         assert all(port is not None for port in kv_ports)
+        assert len(kv_ports) == len(set(kv_ports)), "All kv_events_ports should be globally unique"
 
-        # Ports are unique per-node (workers on different nodes can share ports)
-        # node0 has 2 prefill workers -> ports 5550, 5551
-        # node1 has 2 decode workers -> ports 5550, 5551
-        node0_leaders = [p for p in leaders if p.node == "node0"]
-        node1_leaders = [p for p in leaders if p.node == "node1"]
-        node0_ports = [p.kv_events_port for p in node0_leaders]
-        node1_ports = [p.kv_events_port for p in node1_leaders]
-        assert len(node0_ports) == len(set(node0_ports)), "Ports on same node should be unique"
-        assert len(node1_ports) == len(set(node1_ports)), "Ports on same node should be unique"
+        # Ports should be sequential starting from 5550
+        assert sorted(kv_ports) == [5550, 5551, 5552, 5553]
 
         # Non-leaders should not have kv_events_port
         non_leaders = [p for p in processes if not p.is_leader]

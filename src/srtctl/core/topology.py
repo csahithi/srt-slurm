@@ -56,7 +56,7 @@ class NodePortAllocator:
 
     _http_ports: dict[str, int] = field(default_factory=dict, repr=False)
     _bootstrap_ports: dict[str, int] = field(default_factory=dict, repr=False)
-    _kv_events_ports: dict[str, int] = field(default_factory=dict, repr=False)
+    _next_kv_events_port: int = field(default=0, repr=False)  # Global counter
 
     def next_http_port(self, node: str) -> int:
         """Get next available HTTP port for a node."""
@@ -74,12 +74,12 @@ class NodePortAllocator:
         self._bootstrap_ports[node] += 1
         return port
 
-    def next_kv_events_port(self, node: str) -> int:
-        """Get next available kv-events ZMQ port for a node."""
-        if node not in self._kv_events_ports:
-            self._kv_events_ports[node] = self.base_kv_events_port
-        port = self._kv_events_ports[node]
-        self._kv_events_ports[node] += 1
+    def next_kv_events_port(self) -> int:
+        """Get next available kv-events ZMQ port (globally unique across all nodes)."""
+        if self._next_kv_events_port == 0:
+            self._next_kv_events_port = self.base_kv_events_port
+        port = self._next_kv_events_port
+        self._next_kv_events_port += 1
         return port
 
 
@@ -376,8 +376,8 @@ def endpoints_to_processes(
             port_allocator.next_bootstrap_port(leader_node) if endpoint.mode == "prefill" else None
         )
 
-        # Allocate kv_events port for all worker leaders
-        endpoint_kv_events_port = port_allocator.next_kv_events_port(leader_node)
+        # Allocate kv_events port for all worker leaders (globally unique)
+        endpoint_kv_events_port = port_allocator.next_kv_events_port()
 
         for node_rank, node in enumerate(endpoint.nodes):
             is_leader = node_rank == 0
