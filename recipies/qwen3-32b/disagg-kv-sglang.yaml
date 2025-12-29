@@ -21,10 +21,6 @@ resources:
   prefill_workers: 6
   decode_workers: 2
 
-# until prefill router goes in 0.8.0
-dynamo:
-  top_of_tree: "f6741ec6c260182fbf6063a4e554dc80ec679f13"
-
 frontend:
   use_sglang_router: true
   enable_multiple_frontends: false
