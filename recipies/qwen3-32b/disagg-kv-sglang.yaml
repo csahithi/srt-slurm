@@ -2,7 +2,7 @@
 # Based on dynamo exemplar for Mooncake benchmark
 # Configuration: 6 prefill + 2 decode workers with TP2 on 16x H200 GPUs (2 nodes)
 
-name: "qwen3-32b-disagg-kv"
+name: "disagg-kv-sglang"
 
 model:
   path: "qwen3-32b"

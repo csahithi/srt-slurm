@@ -1,4 +1,4 @@
-name: "agg-round-robin"
+name: "agg-kv-sglang"
 
 model:
   path: "qwen3-32b"
