@@ -55,6 +55,16 @@ if [ ! -f "${INPUT_FILE}" ]; then
     echo "Downloaded to ${INPUT_FILE}"
 fi
 
+# Run small benchmark for warmup
+echo "Running small benchmark for warmup..."
+aiperf profile \
+    -m "${MODEL_NAME}" \
+    --url "${ENDPOINT}" \
+    --streaming \
+    --concurrency 10 \
+    --request-count 20
+echo "Small benchmark for warmup complete"
+
 # Setup artifact directory with model and timestamp
 MODEL_BASE_NAME="${MODEL_NAME##*/}"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
