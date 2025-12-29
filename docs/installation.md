@@ -182,29 +182,7 @@ benchmark:
   req_rate: "inf"
 ```
 
-### Frontend Options
-
-The `frontend` section (optional) configures the frontend/router:
-
-```yaml
-frontend:
-  # Use sglang-router instead of dynamo frontend (default: false)
-  use_sglang_router: false
-  
-  # Enable multiple frontends/routers behind nginx (default: true)
-  enable_multiple_frontends: true
-  
-  # Additional frontends beyond the master (default: 9, total = 10)
-  num_additional_frontends: 9
-  
-  # Extra CLI args for sglang-router (when use_sglang_router: true)
-  sglang_router_args:
-    kv-overlap-score-weight: 1
-    router-temperature: 0
-  
-  # Extra CLI args for dynamo frontend (when use_sglang_router: false)
-  dynamo_frontend_args: {}
-```
+See [Configuration Reference](config-reference.md) for all available options.
 
 ## Submit the Job
 

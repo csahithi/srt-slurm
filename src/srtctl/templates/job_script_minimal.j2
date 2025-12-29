@@ -73,6 +73,11 @@ srun --nodes=1 --ntasks=1 --nodelist="${HEAD_NODE}" \
 export PYTHONPATH="${SRTCTL_INSTALL_DIR}:${PYTHONPATH}"
 echo "Installed to ${SRTCTL_INSTALL_DIR}"
 
+{% if setup_script %}
+# Custom setup script override from CLI
+export SRTCTL_SETUP_SCRIPT="{{ setup_script }}"
+{% endif %}
+
 echo "Running orchestrator on host (with srun access)..."
 echo ""
 

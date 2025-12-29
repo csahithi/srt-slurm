@@ -15,6 +15,7 @@ This script is called from within the sbatch job and coordinates:
 import argparse
 import functools
 import logging
+import os
 import shlex
 import sys
 import threading
@@ -823,6 +824,8 @@ class SweepOrchestrator:
 
 def main():
     """Main entry point."""
+    from dataclasses import replace
+
     parser = argparse.ArgumentParser(description="Run benchmark sweep")
     parser.add_argument("config", type=str, help="Path to YAML configuration file")
     args = parser.parse_args()
@@ -836,6 +839,12 @@ def main():
             sys.exit(1)
 
         config = load_config(config_path)
+
+        # Check for setup_script override from CLI (passed via env var)
+        setup_script_override = os.environ.get("SRTCTL_SETUP_SCRIPT")
+        if setup_script_override:
+            logger.info("Setup script override: %s", setup_script_override)
+            config = replace(config, setup_script=setup_script_override)
 
         job_id = get_slurm_job_id()
         if not job_id:

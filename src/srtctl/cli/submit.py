@@ -50,6 +50,7 @@ def setup_logging(level: int = logging.INFO) -> None:
 def generate_minimal_sbatch_script(
     config: SrtConfig,
     config_path: Path,
+    setup_script: str | None = None,
 ) -> str:
     """Generate minimal sbatch script that calls the Python orchestrator.
 
@@ -59,6 +60,7 @@ def generate_minimal_sbatch_script(
     Args:
         config: Typed SrtConfig
         config_path: Path to the YAML config file
+        setup_script: Optional setup script override (passed via env var)
 
     Returns:
         Rendered sbatch script as string
@@ -96,6 +98,7 @@ def generate_minimal_sbatch_script(
         sbatch_directives=config.sbatch_directives,
         container_image=container_image,
         srtctl_source=str(srtctl_source.resolve()),
+        setup_script=setup_script,
     )
 
     return rendered
@@ -106,6 +109,7 @@ def submit_with_orchestrator(
     config: SrtConfig | None = None,
     dry_run: bool = False,
     tags: list[str] | None = None,
+    setup_script: str | None = None,
 ) -> None:
     """Submit job using the new Python orchestrator.
 
@@ -116,13 +120,17 @@ def submit_with_orchestrator(
         config: Pre-loaded SrtConfig (or None to load from path)
         dry_run: If True, print script but don't submit
         tags: Optional tags for the run
+        setup_script: Optional custom setup script name (overrides config)
     """
+    from dataclasses import replace
+
     if config is None:
         config = load_config(config_path)
 
     script_content = generate_minimal_sbatch_script(
         config=config,
         config_path=config_path,
+        setup_script=setup_script,
     )
 
     if dry_run:
@@ -247,6 +255,7 @@ def submit_single(
         config=config,
         dry_run=dry_run,
         tags=tags,
+        setup_script=setup_script,
     )
 
 

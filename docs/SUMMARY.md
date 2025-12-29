@@ -2,6 +2,7 @@
 
 - [Introduction](README.md)
 - [Installation](installation.md)
+- [Configuration Reference](config-reference.md)
 - [CLI Reference](cli.md)
 - [Parameter Sweeps](sweeps.md)
 - [SGLang Router](sglang-router.md)
