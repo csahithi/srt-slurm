@@ -253,3 +253,109 @@ class TestFrontendConfig:
         assert "--policy" in args
         assert "round_robin" in args
         assert "--verbose" in args
+
+
+class TestSetupScript:
+    """Tests for setup_script functionality."""
+
+    def test_setup_script_in_config(self):
+        """Test setup_script can be set in config."""
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+            setup_script="my-setup.sh",
+        )
+
+        assert config.setup_script == "my-setup.sh"
+
+    def test_setup_script_override_with_replace(self):
+        """Test setup_script can be overridden with dataclasses.replace."""
+        from dataclasses import replace
+
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        assert config.setup_script is None
+
+        # Override with replace (simulates CLI flag behavior)
+        config = replace(config, setup_script="install-sglang-main.sh")
+        assert config.setup_script == "install-sglang-main.sh"
+
+    def test_sbatch_template_includes_setup_script_env_var(self):
+        """Test that sbatch template sets SRTCTL_SETUP_SCRIPT env var."""
+        from pathlib import Path
+
+        from srtctl.cli.submit import generate_minimal_sbatch_script
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        # Without setup_script
+        script = generate_minimal_sbatch_script(
+            config=config,
+            config_path=Path("/tmp/test.yaml"),
+            setup_script=None,
+        )
+        assert "SRTCTL_SETUP_SCRIPT" not in script
+
+        # With setup_script
+        script = generate_minimal_sbatch_script(
+            config=config,
+            config_path=Path("/tmp/test.yaml"),
+            setup_script="install-sglang-main.sh",
+        )
+        assert 'export SRTCTL_SETUP_SCRIPT="install-sglang-main.sh"' in script
+
+    def test_setup_script_env_var_override(self, monkeypatch):
+        """Test that SRTCTL_SETUP_SCRIPT env var overrides config."""
+        import os
+        from dataclasses import replace
+
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+            setup_script=None,
+        )
+
+        # Simulate env var being set (like do_sweep.main does)
+        monkeypatch.setenv("SRTCTL_SETUP_SCRIPT", "install-sglang-main.sh")
+
+        setup_script_override = os.environ.get("SRTCTL_SETUP_SCRIPT")
+        assert setup_script_override == "install-sglang-main.sh"
+
+        # Apply override like do_sweep.main does
+        if setup_script_override:
+            config = replace(config, setup_script=setup_script_override)
+
+        assert config.setup_script == "install-sglang-main.sh"
