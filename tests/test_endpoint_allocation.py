@@ -218,3 +218,64 @@ class TestEndpointsToProcesses:
             assert len(p.gpu_indices) == 2
             # Check cuda_visible_devices is formatted correctly
             assert "," in p.cuda_visible_devices or p.cuda_visible_devices.isdigit()
+
+    def test_kv_events_port_allocation(self):
+        """Test that kv_events_port is allocated for all worker leaders."""
+        endpoints = allocate_endpoints(
+            num_prefill=2,
+            num_decode=2,
+            num_agg=0,
+            gpus_per_prefill=2,
+            gpus_per_decode=2,
+            gpus_per_agg=8,
+            gpus_per_node=4,
+            available_nodes=("node0", "node1"),
+        )
+
+        processes = endpoints_to_processes(endpoints, base_sys_port=8081)
+
+        # Get all leaders (they should have kv_events_port)
+        leaders = [p for p in processes if p.is_leader]
+        assert len(leaders) == 4  # 2 prefill + 2 decode
+
+        # All leaders should have kv_events_port
+        kv_ports = [p.kv_events_port for p in leaders]
+        assert all(port is not None for port in kv_ports)
+
+        # Ports are unique per-node (workers on different nodes can share ports)
+        # node0 has 2 prefill workers -> ports 5550, 5551
+        # node1 has 2 decode workers -> ports 5550, 5551
+        node0_leaders = [p for p in leaders if p.node == "node0"]
+        node1_leaders = [p for p in leaders if p.node == "node1"]
+        node0_ports = [p.kv_events_port for p in node0_leaders]
+        node1_ports = [p.kv_events_port for p in node1_leaders]
+        assert len(node0_ports) == len(set(node0_ports)), "Ports on same node should be unique"
+        assert len(node1_ports) == len(set(node1_ports)), "Ports on same node should be unique"
+
+        # Non-leaders should not have kv_events_port
+        non_leaders = [p for p in processes if not p.is_leader]
+        for p in non_leaders:
+            assert p.kv_events_port is None
+
+    def test_kv_events_port_same_node_unique(self):
+        """Test kv_events_port is unique even when workers share a node."""
+        # 2 prefill workers on same node
+        endpoints = allocate_endpoints(
+            num_prefill=2,
+            num_decode=0,
+            num_agg=0,
+            gpus_per_prefill=2,
+            gpus_per_decode=2,
+            gpus_per_agg=8,
+            gpus_per_node=4,
+            available_nodes=("node0",),
+        )
+
+        processes = endpoints_to_processes(endpoints, base_sys_port=8081)
+
+        # Both on node0, both should have unique ports
+        assert len(processes) == 2
+        assert processes[0].node == processes[1].node == "node0"
+        assert processes[0].kv_events_port != processes[1].kv_events_port
+        assert processes[0].kv_events_port == 5550
+        assert processes[1].kv_events_port == 5551

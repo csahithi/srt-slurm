@@ -37,6 +37,7 @@ class NodePortAllocator:
     Ports allocated:
         - http_port: HTTP serving port for sglang.launch_server (default: 30000+)
         - bootstrap_port: P/D coordination port for prefill workers (default: 31000+)
+        - kv_events_port: ZMQ port for kv-events publishing (default: 5550+)
 
     Example:
         allocator = NodePortAllocator()
@@ -51,9 +52,11 @@ class NodePortAllocator:
 
     base_http_port: int = 30000
     base_bootstrap_port: int = 31000
+    base_kv_events_port: int = 5550
 
     _http_ports: dict[str, int] = field(default_factory=dict, repr=False)
     _bootstrap_ports: dict[str, int] = field(default_factory=dict, repr=False)
+    _kv_events_ports: dict[str, int] = field(default_factory=dict, repr=False)
 
     def next_http_port(self, node: str) -> int:
         """Get next available HTTP port for a node."""
@@ -69,6 +72,14 @@ class NodePortAllocator:
             self._bootstrap_ports[node] = self.base_bootstrap_port
         port = self._bootstrap_ports[node]
         self._bootstrap_ports[node] += 1
+        return port
+
+    def next_kv_events_port(self, node: str) -> int:
+        """Get next available kv-events ZMQ port for a node."""
+        if node not in self._kv_events_ports:
+            self._kv_events_ports[node] = self.base_kv_events_port
+        port = self._kv_events_ports[node]
+        self._kv_events_ports[node] += 1
         return port
 
 
@@ -128,6 +139,7 @@ class Process:
         sys_port: DYN_SYSTEM_PORT for this process
         http_port: HTTP serving port for this process (avoids conflicts on same node)
         bootstrap_port: P/D coordination port (only for prefill leaders)
+        kv_events_port: ZMQ port for kv-events publishing (all worker leaders)
         endpoint_mode: The mode of the parent endpoint
         endpoint_index: The index of the parent endpoint
         node_rank: Rank within the endpoint (0 for leader)
@@ -141,6 +153,7 @@ class Process:
     endpoint_index: int
     node_rank: int = 0
     bootstrap_port: int | None = None
+    kv_events_port: int | None = None
 
     @property
     def is_leader(self) -> bool:
@@ -363,6 +376,9 @@ def endpoints_to_processes(
             port_allocator.next_bootstrap_port(leader_node) if endpoint.mode == "prefill" else None
         )
 
+        # Allocate kv_events port for all worker leaders
+        endpoint_kv_events_port = port_allocator.next_kv_events_port(leader_node)
+
         for node_rank, node in enumerate(endpoint.nodes):
             is_leader = node_rank == 0
 
@@ -379,6 +395,7 @@ def endpoints_to_processes(
                     endpoint_index=endpoint.index,
                     node_rank=node_rank,
                     bootstrap_port=endpoint_bootstrap_port,
+                    kv_events_port=endpoint_kv_events_port if is_leader else None,
                 )
             )
             current_sys_port += 1

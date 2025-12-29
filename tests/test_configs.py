@@ -172,6 +172,61 @@ class TestSGLangProtocol:
         assert config.get_environment_for_mode("decode") == {"DECODE_VAR": "1"}
         assert config.get_environment_for_mode("agg") == {}
 
+    def test_kv_events_config_global_bool(self):
+        """Test kv_events_config=True enables prefill+decode with defaults."""
+        config = SGLangProtocol(kv_events_config=True)
+
+        assert config.get_kv_events_config_for_mode("prefill") == {
+            "publisher": "zmq",
+            "topic": "kv-events",
+        }
+        assert config.get_kv_events_config_for_mode("decode") == {
+            "publisher": "zmq",
+            "topic": "kv-events",
+        }
+        assert config.get_kv_events_config_for_mode("agg") is None
+
+    def test_kv_events_config_per_mode(self):
+        """Test kv_events_config per-mode control."""
+        config = SGLangProtocol(
+            kv_events_config={
+                "prefill": True,
+                # decode omitted = disabled
+            }
+        )
+
+        assert config.get_kv_events_config_for_mode("prefill") == {
+            "publisher": "zmq",
+            "topic": "kv-events",
+        }
+        assert config.get_kv_events_config_for_mode("decode") is None
+        assert config.get_kv_events_config_for_mode("agg") is None
+
+    def test_kv_events_config_custom_settings(self):
+        """Test kv_events_config with custom publisher/topic."""
+        config = SGLangProtocol(
+            kv_events_config={
+                "prefill": {"topic": "prefill-events"},
+                "decode": {"publisher": "custom", "topic": "decode-events"},
+            }
+        )
+
+        prefill_cfg = config.get_kv_events_config_for_mode("prefill")
+        assert prefill_cfg["publisher"] == "zmq"  # default
+        assert prefill_cfg["topic"] == "prefill-events"
+
+        decode_cfg = config.get_kv_events_config_for_mode("decode")
+        assert decode_cfg["publisher"] == "custom"
+        assert decode_cfg["topic"] == "decode-events"
+
+    def test_kv_events_config_disabled(self):
+        """Test kv_events_config disabled by default."""
+        config = SGLangProtocol()
+
+        assert config.get_kv_events_config_for_mode("prefill") is None
+        assert config.get_kv_events_config_for_mode("decode") is None
+        assert config.get_kv_events_config_for_mode("agg") is None
+
 
 class TestFrontendConfig:
     """Tests for FrontendConfig."""

@@ -8,6 +8,7 @@ Implements BackendProtocol for SGLang inference serving with prefill/decode disa
 """
 
 import builtins
+import json
 from collections.abc import Sequence
 from dataclasses import field
 from pathlib import Path
@@ -75,6 +76,11 @@ class SGLangProtocol:
     # SGLang server CLI config per mode
     sglang_config: SGLangServerConfig | None = None
 
+    # KV events config - enables --kv-events-config with auto-allocated ports
+    # Per-mode: {"prefill": true, "decode": {"publisher": "zmq", "topic": "custom"}}
+    # Or global: true (enables for prefill+decode with defaults)
+    kv_events_config: bool | dict[str, Any] | None = None
+
     Schema: ClassVar[builtins.type[Schema]] = Schema
 
     # =========================================================================
@@ -103,6 +109,33 @@ class SGLangProtocol:
         elif mode == "agg":
             return dict(self.aggregated_environment)
         return {}
+
+    def get_kv_events_config_for_mode(self, mode: WorkerMode) -> dict[str, str] | None:
+        """Get kv-events config for a worker mode.
+
+        Returns None if disabled, or dict with publisher/topic if enabled.
+        """
+        if not self.kv_events_config:
+            return None
+
+        # Global bool: enable for prefill+decode with defaults
+        if self.kv_events_config is True:
+            if mode in ("prefill", "decode"):
+                return {"publisher": "zmq", "topic": "kv-events"}
+            return None
+
+        # Per-mode config dict
+        if isinstance(self.kv_events_config, dict):
+            mode_cfg = self.kv_events_config.get(mode)
+            if mode_cfg is None:
+                return None
+            if mode_cfg is True:
+                return {"publisher": "zmq", "topic": "kv-events"}
+            if isinstance(mode_cfg, dict):
+                # Merge with defaults
+                return {"publisher": "zmq", "topic": "kv-events", **mode_cfg}
+
+        return None
 
     def allocate_endpoints(
         self,
@@ -234,6 +267,13 @@ class SGLangProtocol:
         # Add config dump path (not when using sglang router)
         if dump_config_path and not use_sglang_router:
             cmd.extend(["--dump-config-to", str(dump_config_path)])
+
+        # Add kv-events-config if enabled for this mode and we have an allocated port
+        kv_cfg = self.get_kv_events_config_for_mode(mode)
+        if kv_cfg and process.kv_events_port is not None:
+            # Add the endpoint with the allocated port
+            kv_cfg["endpoint"] = f"tcp://*:{process.kv_events_port}"
+            cmd.extend(["--kv-events-config", json.dumps(kv_cfg)])
 
         # Add all config flags
         cmd.extend(_config_to_cli_args(config))
