@@ -475,6 +475,21 @@ class SweepOrchestrator:
         prefill_leaders: list[tuple[str, int, int | None]] = []  # (ip, http_port, bootstrap_port)
         decode_leaders: list[tuple[str, int]] = []  # (ip, http_port)
 
+        # Determine URL schemes based on gRPC mode
+        from srtctl.backends.sglang import SGLangProtocol
+
+        backend = self.config.backend
+        prefill_scheme = "http://"
+        decode_scheme = "http://"
+        agg_scheme = "http://"
+        if isinstance(backend, SGLangProtocol):
+            if backend.is_grpc_mode("prefill"):
+                prefill_scheme = "grpc://"
+            if backend.is_grpc_mode("decode"):
+                decode_scheme = "grpc://"
+            if backend.is_grpc_mode("agg"):
+                agg_scheme = "grpc://"
+
         for process in self.backend_processes:
             if not process.is_leader:
                 continue
@@ -499,18 +514,27 @@ class SweepOrchestrator:
                 # Disaggregated mode: --pd-disaggregation with --prefill and --decode
                 cmd.append("--pd-disaggregation")
                 for ip, http_port, bootstrap_port in prefill_leaders:
-                    cmd.extend(["--prefill", f"http://{ip}:{http_port}"])
+                    cmd.extend(["--prefill", f"{prefill_scheme}{ip}:{http_port}"])
                     # Add bootstrap port if available, otherwise omit
                     if bootstrap_port is not None:
                         cmd.append(str(bootstrap_port))
                 for ip, http_port in decode_leaders:
-                    cmd.extend(["--decode", f"http://{ip}:{http_port}"])
+                    cmd.extend(["--decode", f"{decode_scheme}{ip}:{http_port}"])
             else:
                 # Aggregated mode: --worker-urls with space-separated URLs
-                worker_urls = [f"http://{ip}:{port}" for ip, port in agg_workers]
+                worker_urls = [f"{agg_scheme}{ip}:{port}" for ip, port in agg_workers]
                 cmd.extend(["--worker-urls"] + worker_urls)
 
             cmd.extend(["--host", "0.0.0.0", "--port", str(topology.frontend_port)])
+
+            # Add model path for gRPC mode (needed for tokenization in router)
+            uses_grpc = (
+                (is_disaggregated and (prefill_scheme == "grpc://" or decode_scheme == "grpc://"))
+                or (not is_disaggregated and agg_scheme == "grpc://")
+            )
+            if uses_grpc:
+                cmd.extend(["--model-path", str(self.runtime.model_path)])
+
             cmd.extend(self.config.frontend.get_router_args_list())
 
             logger.info("Router command: %s", shlex.join(cmd))

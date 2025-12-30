@@ -110,6 +110,11 @@ class SGLangProtocol:
             return dict(self.aggregated_environment)
         return {}
 
+    def is_grpc_mode(self, mode: WorkerMode) -> bool:
+        """Check if gRPC mode is enabled for a worker mode."""
+        config = self.get_config_for_mode(mode)
+        return config.get("grpc-mode", False)
+
     def get_kv_events_config_for_mode(self, mode: WorkerMode) -> dict[str, str] | None:
         """Get kv-events config for a worker mode.
 

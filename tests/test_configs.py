@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from srtctl.backends import SGLangProtocol
+from srtctl.backends import SGLangProtocol, SGLangServerConfig
 from srtctl.core.schema import SrtConfig
 
 
@@ -226,6 +226,28 @@ class TestSGLangProtocol:
         assert config.get_kv_events_config_for_mode("prefill") is None
         assert config.get_kv_events_config_for_mode("decode") is None
         assert config.get_kv_events_config_for_mode("agg") is None
+
+    def test_grpc_mode_disabled_by_default(self):
+        """Test gRPC mode is disabled by default."""
+        config = SGLangProtocol()
+
+        assert config.is_grpc_mode("prefill") is False
+        assert config.is_grpc_mode("decode") is False
+        assert config.is_grpc_mode("agg") is False
+
+    def test_grpc_mode_enabled_per_mode(self):
+        """Test gRPC mode can be enabled per worker mode."""
+        config = SGLangProtocol(
+            sglang_config=SGLangServerConfig(
+                prefill={"grpc-mode": True},
+                decode={"grpc-mode": True},
+                aggregated={"grpc-mode": False},
+            )
+        )
+
+        assert config.is_grpc_mode("prefill") is True
+        assert config.is_grpc_mode("decode") is True
+        assert config.is_grpc_mode("agg") is False
 
 
 class TestFrontendConfig:

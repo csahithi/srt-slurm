@@ -10,3 +10,6 @@ cd /sgl-workspace
 sed -i '/_record_remove_event(child)/d' /sgl-workspace/sglang/python/sglang/srt/mem_cache/radix_cache.py
 
 cd /sgl-workspace/sglang
+
+# install updated sglang router 
+pip install sglang-router --upgrade
