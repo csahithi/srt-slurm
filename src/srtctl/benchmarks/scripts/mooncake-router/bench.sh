@@ -61,6 +61,7 @@ aiperf profile \
     -m "${MODEL_NAME}" \
     --url "${ENDPOINT}" \
     --streaming \
+    --ui simple \
     --concurrency 10 \
     --request-count 20
 echo "Small benchmark for warmup complete"
