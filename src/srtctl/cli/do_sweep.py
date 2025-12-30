@@ -433,6 +433,7 @@ class SweepOrchestrator:
             env_to_set = {
                 "ETCD_ENDPOINTS": f"http://{self.runtime.nodes.head}:2379",
                 "NATS_SERVER": f"nats://{self.runtime.nodes.head}:4222",
+                "DYN_REQUEST_PLANE": "nats",
             }
 
             bash_preamble = self._build_worker_preamble()
