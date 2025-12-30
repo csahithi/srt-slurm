@@ -7,9 +7,9 @@ cd /sgl-workspace
 
 rm -rf sglang
 
-git clone https://github.com/sgl-project/sglang.git
-cd sglang
-git config --global --add safe.directory "*"
-pip install -e "python"
 
-#pip install nvidia-nccl-cu12==2.28.3 nvidia-cudnn-cu12==9.16.0.29 nvidia-cutlass-dsl==4.3.0 --force-reinstall --no-deps
+# Apply fix from PR #14934 - remove incorrect BlockRemoved event emission during node splits
+# https://github.com/sgl-project/sglang/pull/14934
+sed -i '/_record_remove_event(child)/d' /sgl-workspace/sglang/python/sglang/srt/mem_cache/radix_cache.py
+
+cd /sgl-workspace/sglang
