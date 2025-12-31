@@ -542,6 +542,8 @@ class DynamoConfig:
             "cd dynamo && "
             f"{checkout_cmd + ' && ' if checkout_cmd else ''}"
             "cd lib/bindings/python/ && "
+            # Set RUSTFLAGS for native CPU optimizations on arm64
+            'if [ "$(uname -m)" = "aarch64" ]; then export RUSTFLAGS="-C target-cpu=native"; fi && '
             "maturin build -o /tmp && "
             "pip install /tmp/ai_dynamo_runtime*.whl && "
             "cd /sgl-workspace/dynamo/ && "
