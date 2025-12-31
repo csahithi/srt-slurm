@@ -62,6 +62,9 @@ class SABenchRunner(BenchmarkRunner):
         b = config.benchmark
         endpoint = f"http://localhost:{runtime.frontend_port}"
 
+        # Get model name - try served_model_name first, then model path
+        model_name = config.served_model_name or config.model.path
+
         # Format concurrencies as x-separated string if it's a list
         concurrencies = b.concurrencies
         if isinstance(concurrencies, list):
@@ -71,6 +74,7 @@ class SABenchRunner(BenchmarkRunner):
             "bash",
             self.script_path,
             endpoint,
+            model_name,
             str(b.isl),
             str(b.osl),
             str(concurrencies) if concurrencies else "",
