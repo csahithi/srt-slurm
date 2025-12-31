@@ -186,6 +186,7 @@ class SGLangProtocol:
         profiling_enabled: bool = False,
         nsys_prefix: list[str] | None = None,
         dump_config_path: Path | None = None,
+        metrics_enabled: bool = False,
     ) -> list[str]:
         """Build the command to start an SGLang worker process.
 
@@ -197,6 +198,7 @@ class SGLangProtocol:
             profiling_enabled: Whether profiling is enabled (forces sglang.launch_server)
             nsys_prefix: Optional nsys profiling command prefix
             dump_config_path: Path to dump config JSON
+            metrics_enabled: Whether to enable Prometheus metrics endpoint
         """
         from srtctl.core.slurm import get_hostname_ip
 
@@ -282,6 +284,10 @@ class SGLangProtocol:
 
         # Add all config flags
         cmd.extend(_config_to_cli_args(config))
+
+        # Enable Prometheus metrics endpoint if metrics collection is enabled
+        if metrics_enabled:
+            cmd.append("--enable-metrics")
 
         return cmd
 

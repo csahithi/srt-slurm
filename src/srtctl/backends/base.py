@@ -76,6 +76,7 @@ class BackendProtocol(Protocol):
         profiling_enabled: bool = False,
         nsys_prefix: list[str] | None = None,
         dump_config_path: Optional["Path"] = None,
+        metrics_enabled: bool = False,
     ) -> list[str]:
         """Build command to start a worker process."""
         ...
