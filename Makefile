@@ -2,6 +2,7 @@
 
 NATS_VERSION ?= v2.10.28
 ETCD_VERSION ?= v3.5.21
+PROMETHEUS_VERSION ?= 3.8.1
 LOGS_DIR ?= logs
 ARCH ?= $(shell uname -m)
 
@@ -76,6 +77,14 @@ setup:
 	tar -xzf "configs/$$ETCD_TAR" --strip-components=1 -C configs etcd-$(ETCD_VERSION)-linux-$$ARCH_SHORT/etcd etcd-$(ETCD_VERSION)-linux-$$ARCH_SHORT/etcdctl; \
 	chmod +x configs/etcd configs/etcdctl; \
 	rm "configs/$$ETCD_TAR"; \
+	echo "⬇️  Downloading Prometheus ($(PROMETHEUS_VERSION)) for $$ARCH_SHORT..."; \
+	PROM_TAR="prometheus-$(PROMETHEUS_VERSION).linux-$$ARCH_SHORT.tar.gz"; \
+	PROM_URL="https://github.com/prometheus/prometheus/releases/download/v$(PROMETHEUS_VERSION)/$$PROM_TAR"; \
+	wget -q --show-progress --tries=3 --waitretry=5 "$$PROM_URL" -O "configs/$$PROM_TAR"; \
+	echo "📁 Extracting Prometheus binary..."; \
+	tar -xzf "configs/$$PROM_TAR" --strip-components=1 -C configs prometheus-$(PROMETHEUS_VERSION).linux-$$ARCH_SHORT/prometheus; \
+	chmod +x configs/prometheus; \
+	rm "configs/$$PROM_TAR"; \
 	echo "✅ Done. Contents of configs directory:"; \
 	ls -lh configs/; \
 	echo ""; \

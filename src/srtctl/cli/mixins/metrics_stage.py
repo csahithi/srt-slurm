@@ -186,12 +186,12 @@ class MetricsStageMixin:
 
         # Log file for Prometheus
         prometheus_log = self.runtime.log_dir / f"prometheus_{prometheus_node}.out"
-
-        # Prometheus command
-        # Using the container path for config since log_dir is mounted at /logs
         prometheus_port = self.config.metrics.prometheus_port
+
+        # Run Prometheus binary directly (like nats/etcd pattern)
+        # Binary installed via `make setup`, mounted at /configs
         cmd = [
-            "prometheus",
+            "/configs/prometheus",
             "--config.file=/logs/prometheus.yml",
             f"--web.listen-address=:{prometheus_port}",
             "--storage.tsdb.path=/logs/prometheus_data",
@@ -207,6 +207,7 @@ class MetricsStageMixin:
             output=str(prometheus_log),
             container_image=str(self.runtime.container_image),
             container_mounts=self.runtime.container_mounts,
+            use_bash_wrapper=False,
         )
 
         processes["prometheus"] = ManagedProcess(
