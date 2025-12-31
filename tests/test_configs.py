@@ -259,22 +259,24 @@ class TestFrontendConfig:
 
         frontend = FrontendConfig()
 
-        assert frontend.use_sglang_router is False
+        assert frontend.type == "dynamo"
         assert frontend.enable_multiple_frontends is True
+        assert frontend.args is None
+        assert frontend.env is None
 
-    def test_router_args_list(self):
-        """Test router args list generation."""
+    def test_frontend_sglang_type(self):
+        """Test sglang frontend config."""
         from srtctl.core.schema import FrontendConfig
 
         frontend = FrontendConfig(
-            use_sglang_router=True,
-            sglang_router_args={"policy": "round_robin", "verbose": True},
+            type="sglang",
+            args={"policy": "round_robin", "verbose": True},
+            env={"MY_VAR": "value"},
         )
 
-        args = frontend.get_router_args_list()
-        assert "--policy" in args
-        assert "round_robin" in args
-        assert "--verbose" in args
+        assert frontend.type == "sglang"
+        assert frontend.args == {"policy": "round_robin", "verbose": True}
+        assert frontend.env == {"MY_VAR": "value"}
 
 
 class TestSetupScript:

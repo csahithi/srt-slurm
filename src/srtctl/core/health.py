@@ -343,7 +343,7 @@ def wait_for_model(
     poll_interval: float = 1.0,
     timeout: float = 600.0,
     report_every: float = 60.0,
-    use_sglang_router: bool = False,
+    frontend_type: str = "dynamo",
     stop_event: threading.Event | None = None,
 ) -> bool:
     """Wait for model to be ready with expected worker counts.
@@ -359,16 +359,16 @@ def wait_for_model(
         poll_interval: Seconds between health checks
         timeout: Maximum wait time in seconds
         report_every: Log progress every N seconds
-        use_sglang_router: If True, use /workers endpoint; else /health
+        frontend_type: Frontend type - "sglang" uses /workers, "dynamo" uses /health
         stop_event: Optional threading.Event to abort waiting
 
     Returns:
         True if model is ready with expected workers, False if timeout/aborted
     """
-    if use_sglang_router:
+    if frontend_type == "sglang":
         health_url = f"http://{host}:{port}/workers"
         logger.info(
-            "Polling %s every %.1fs for %d prefills and %d decodes (sglang router mode)",
+            "Polling %s every %.1fs for %d prefills and %d decodes (sglang frontend)",
             health_url,
             poll_interval,
             n_prefill,
@@ -405,8 +405,8 @@ def wait_for_model(
             if response.status_code == 200:
                 response_json = response.json()
 
-                # Check worker counts
-                if use_sglang_router:
+                # Check worker counts based on frontend type
+                if frontend_type == "sglang":
                     result = check_sglang_router_health(response_json, n_prefill, n_decode)
                 else:
                     result = check_dynamo_health(response_json, n_prefill, n_decode)

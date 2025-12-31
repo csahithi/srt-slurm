@@ -3,13 +3,13 @@
 
 """Tests for frontend topology logic (nginx + multiple frontends)."""
 
-from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from srtctl.cli.do_sweep import FrontendTopology, SweepOrchestrator
+from srtctl.cli.do_sweep import SweepOrchestrator
+from srtctl.cli.mixins.frontend_stage import FrontendTopology
 from srtctl.core.runtime import Nodes, RuntimeContext
 from srtctl.core.schema import FrontendConfig, ResourceConfig, SrtConfig
 
@@ -18,7 +18,7 @@ def make_config(
     *,
     enable_multiple_frontends: bool = True,
     num_additional_frontends: int = 9,
-    use_sglang_router: bool = False,
+    frontend_type: str = "dynamo",
 ) -> SrtConfig:
     """Create a minimal SrtConfig for testing."""
     return SrtConfig(
@@ -31,9 +31,9 @@ def make_config(
             decode_nodes=1,
         ),
         frontend=FrontendConfig(
+            type=frontend_type,
             enable_multiple_frontends=enable_multiple_frontends,
             num_additional_frontends=num_additional_frontends,
-            use_sglang_router=use_sglang_router,
         ),
     )
 
@@ -191,7 +191,7 @@ class TestNginxConfigGeneration:
         )
 
         with patch.object(orchestrator, "runtime", runtime):
-            with patch("srtctl.cli.do_sweep.get_hostname_ip", side_effect=lambda x: f"10.0.0.{x[-1]}"):
+            with patch("srtctl.cli.mixins.frontend_stage.get_hostname_ip", side_effect=lambda x: f"10.0.0.{x[-1]}"):
                 nginx_config = orchestrator._generate_nginx_config(topology)
 
         assert "server 10.0.0.1:8080" in nginx_config
@@ -210,7 +210,7 @@ class TestNginxConfigGeneration:
             public_port=8000,
         )
 
-        with patch("srtctl.cli.do_sweep.get_hostname_ip", side_effect=lambda x: f"10.0.0.{x[-1]}"):
+        with patch("srtctl.cli.mixins.frontend_stage.get_hostname_ip", side_effect=lambda x: f"10.0.0.{x[-1]}"):
             nginx_config = orchestrator._generate_nginx_config(topology)
 
         # All three frontends should be in the upstream
@@ -223,12 +223,14 @@ class TestNginxConfigGeneration:
 class TestStartFrontendIntegration:
     """Integration tests for start_frontend method."""
 
-    @patch("srtctl.cli.do_sweep.start_srun_process")
-    def test_single_node_starts_one_dynamo_frontend(self, mock_srun):
+    @patch("srtctl.frontends.dynamo.start_srun_process")
+    @patch("srtctl.cli.mixins.frontend_stage.start_srun_process")
+    def test_single_node_starts_one_dynamo_frontend(self, mock_mixin_srun, mock_dynamo_srun):
         """Single node starts one dynamo frontend, no nginx."""
-        mock_srun.return_value = MagicMock()
+        mock_mixin_srun.return_value = MagicMock()
+        mock_dynamo_srun.return_value = MagicMock()
 
-        config = make_config(enable_multiple_frontends=True, use_sglang_router=False)
+        config = make_config(enable_multiple_frontends=True, frontend_type="dynamo")
         runtime = make_runtime(["node0"])
         orchestrator = SweepOrchestrator(config=config, runtime=runtime)
 
@@ -239,15 +241,17 @@ class TestStartFrontendIntegration:
         assert processes[0].name == "frontend_0"
         assert processes[0].node == "node0"
 
-    @patch("srtctl.cli.do_sweep.start_srun_process")
-    def test_single_node_starts_one_sglang_router(self, mock_srun):
+    @patch("srtctl.frontends.sglang.start_srun_process")
+    @patch("srtctl.cli.mixins.frontend_stage.start_srun_process")
+    def test_single_node_starts_one_sglang_router(self, mock_mixin_srun, mock_sglang_srun):
         """Single node starts one sglang router, no nginx."""
-        mock_srun.return_value = MagicMock()
+        mock_mixin_srun.return_value = MagicMock()
+        mock_sglang_srun.return_value = MagicMock()
 
-        config = make_config(enable_multiple_frontends=True, use_sglang_router=True)
+        config = make_config(enable_multiple_frontends=True, frontend_type="sglang")
         runtime = make_runtime(["node0"])
         orchestrator = SweepOrchestrator(config=config, runtime=runtime)
-        orchestrator.backend_processes = []  # No workers for this test
+        orchestrator._backend_processes = []  # No workers for this test
 
         registry = MagicMock()
         processes = orchestrator.start_frontend(registry)
@@ -256,12 +260,14 @@ class TestStartFrontendIntegration:
         assert processes[0].name == "sglang_router_0"
         assert processes[0].node == "node0"
 
-    @patch("srtctl.cli.do_sweep.start_srun_process")
-    def test_multi_node_starts_nginx_and_frontends(self, mock_srun, tmp_path):
+    @patch("srtctl.frontends.dynamo.start_srun_process")
+    @patch("srtctl.cli.mixins.frontend_stage.start_srun_process")
+    def test_multi_node_starts_nginx_and_frontends(self, mock_mixin_srun, mock_dynamo_srun, tmp_path):
         """Multi-node starts nginx on head + frontends on other nodes."""
-        mock_srun.return_value = MagicMock()
+        mock_mixin_srun.return_value = MagicMock()
+        mock_dynamo_srun.return_value = MagicMock()
 
-        config = make_config(enable_multiple_frontends=True, use_sglang_router=False)
+        config = make_config(enable_multiple_frontends=True, frontend_type="dynamo")
         runtime = make_runtime(["node0", "node1", "node2"])
         # Use tmp_path for log_dir so nginx config can be written
         runtime = RuntimeContext(
@@ -300,12 +306,14 @@ class TestStartFrontendIntegration:
         # Verify nginx config was written
         assert (tmp_path / "nginx.conf").exists()
 
-    @patch("srtctl.cli.do_sweep.start_srun_process")
-    def test_multi_node_sglang_with_nginx(self, mock_srun, tmp_path):
+    @patch("srtctl.frontends.sglang.start_srun_process")
+    @patch("srtctl.cli.mixins.frontend_stage.start_srun_process")
+    def test_multi_node_sglang_with_nginx(self, mock_mixin_srun, mock_sglang_srun, tmp_path):
         """Multi-node with sglang router starts nginx + routers."""
-        mock_srun.return_value = MagicMock()
+        mock_mixin_srun.return_value = MagicMock()
+        mock_sglang_srun.return_value = MagicMock()
 
-        config = make_config(enable_multiple_frontends=True, use_sglang_router=True)
+        config = make_config(enable_multiple_frontends=True, frontend_type="sglang")
         runtime = make_runtime(["node0", "node1", "node2"])
         # Use tmp_path for log_dir so nginx config can be written
         runtime = RuntimeContext(
@@ -322,7 +330,7 @@ class TestStartFrontendIntegration:
             environment=runtime.environment,
         )
         orchestrator = SweepOrchestrator(config=config, runtime=runtime)
-        orchestrator.backend_processes = []
+        orchestrator._backend_processes = []
 
         registry = MagicMock()
         processes = orchestrator.start_frontend(registry)
@@ -334,12 +342,14 @@ class TestStartFrontendIntegration:
         assert "sglang_router_0" in names
         assert "sglang_router_1" in names
 
-    @patch("srtctl.cli.do_sweep.start_srun_process")
-    def test_frontends_disabled_single_frontend_only(self, mock_srun):
+    @patch("srtctl.frontends.dynamo.start_srun_process")
+    @patch("srtctl.cli.mixins.frontend_stage.start_srun_process")
+    def test_frontends_disabled_single_frontend_only(self, mock_mixin_srun, mock_dynamo_srun):
         """enable_multiple_frontends=False: only one frontend, no nginx."""
-        mock_srun.return_value = MagicMock()
+        mock_mixin_srun.return_value = MagicMock()
+        mock_dynamo_srun.return_value = MagicMock()
 
-        config = make_config(enable_multiple_frontends=False, use_sglang_router=False)
+        config = make_config(enable_multiple_frontends=False, frontend_type="dynamo")
         runtime = make_runtime(["node0", "node1", "node2", "node3"])
         orchestrator = SweepOrchestrator(config=config, runtime=runtime)
 
@@ -350,4 +360,3 @@ class TestStartFrontendIntegration:
         assert len(processes) == 1
         assert processes[0].name == "frontend_0"
         assert processes[0].node == "node0"
-

@@ -90,7 +90,7 @@ if registry.check_failures():
 
 ### Health Checks
 
-HTTP-based health checking for different backends:
+HTTP-based health checking for different frontends:
 
 ```python
 from srtctl.core.health import wait_for_model
@@ -98,13 +98,13 @@ from srtctl.core.health import wait_for_model
 # Wait for all workers to register
 wait_for_model(
     host=head_ip, port=8000,
-    expected_prefill=2, expected_decode=4,
-    use_sglang_router=True,
+    n_prefill=2, n_decode=4,
+    frontend_type="sglang",  # or "dynamo"
     timeout=300,
 )
 ```
 
-For aggregated mode, pass `expected_prefill=0, expected_decode=num_agg`.
+For aggregated mode, pass `n_prefill=0, n_decode=num_agg`.
 
 ### BackendProtocol
 

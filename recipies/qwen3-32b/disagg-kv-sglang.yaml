@@ -22,9 +22,9 @@ resources:
   decode_workers: 2
 
 frontend:
-  use_sglang_router: true
+  type: sglang
   enable_multiple_frontends: false
-  sglang_router_args:
+  args:
     policy: "cache_aware"
 
 backend:

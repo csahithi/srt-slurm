@@ -555,27 +555,23 @@ class DynamoConfig:
 
 @dataclass(frozen=True)
 class FrontendConfig:
-    """Frontend/router configuration."""
+    """Frontend/router configuration.
 
-    use_sglang_router: bool = False
+    Attributes:
+        type: Frontend type - "dynamo" (default) or "sglang"
+        enable_multiple_frontends: Scale with nginx + multiple routers
+        num_additional_frontends: Additional routers beyond master (default: 9)
+        args: CLI arguments passed to the frontend/router process
+        env: Environment variables for frontend processes
+    """
+
+    type: str = "dynamo"
     enable_multiple_frontends: bool = True
     num_additional_frontends: int = 9
-    sglang_router_args: dict[str, Any] | None = None
-    dynamo_frontend_args: dict[str, Any] | None = None
+    args: dict[str, Any] | None = None
+    env: dict[str, str] | None = None
 
-    def get_router_args_list(self) -> list[str]:
-        args = self.sglang_router_args if self.use_sglang_router else self.dynamo_frontend_args
-        if not args:
-            return []
-        result = []
-        for key, value in args.items():
-            if value is True:
-                result.append(f"--{key}")
-            elif value is not False and value is not None:
-                result.extend([f"--{key}", str(value)])
-        return result
-
-    Schema: ClassVar[type[Schema]] = Schema
+    Schema: ClassVar[builtins.type[Schema]] = Schema
 
 
 @dataclass(frozen=True)

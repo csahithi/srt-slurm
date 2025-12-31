@@ -122,7 +122,6 @@ def submit_with_orchestrator(
         tags: Optional tags for the run
         setup_script: Optional custom setup script name (overrides config)
     """
-    from dataclasses import replace
 
     if config is None:
         config = load_config(config_path)
@@ -197,7 +196,7 @@ def submit_with_orchestrator(
             },
             # Backend and frontend
             "backend_type": config.backend_type,
-            "use_sglang_router": config.frontend.use_sglang_router,
+            "frontend_type": config.frontend.type,
             # Benchmark config
             "benchmark": {
                 "type": config.benchmark.type,

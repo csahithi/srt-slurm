@@ -182,7 +182,7 @@ class SGLangProtocol:
         process: "Process",
         endpoint_processes: list["Process"],
         runtime: "RuntimeContext",
-        use_sglang_router: bool = False,
+        frontend_type: str = "dynamo",
         profiling_enabled: bool = False,
         nsys_prefix: list[str] | None = None,
         dump_config_path: Path | None = None,
@@ -193,7 +193,7 @@ class SGLangProtocol:
             process: The process to start
             endpoint_processes: All processes for this endpoint (for multi-node)
             runtime: Runtime context with paths and settings
-            use_sglang_router: Use sglang.launch_server instead of dynamo.sglang
+            frontend_type: Frontend type - "sglang" uses sglang.launch_server, "dynamo" uses dynamo.sglang
             profiling_enabled: Whether profiling is enabled (forces sglang.launch_server)
             nsys_prefix: Optional nsys profiling command prefix
             dump_config_path: Path to dump config JSON
@@ -213,7 +213,7 @@ class SGLangProtocol:
 
         # Choose Python module
         # When profiling is enabled, always use sglang.launch_server (not dynamo.sglang)
-        use_sglang = use_sglang_router or profiling_enabled
+        use_sglang = frontend_type == "sglang" or profiling_enabled
         python_module = "sglang.launch_server" if use_sglang else "dynamo.sglang"
 
         # Get served model name from config
@@ -248,11 +248,11 @@ class SGLangProtocol:
         if use_sglang:
             cmd.extend(["--port", str(process.http_port)])
 
-        # Add disaggregation mode for prefill/decode workers (both dynamo and sglang router)
+        # Add disaggregation mode for prefill/decode workers (both dynamo and sglang frontend)
         if mode != "agg":
             cmd.extend(["--disaggregation-mode", mode])
-            # Bootstrap port only needed for sglang router (dynamo handles internally)
-            if use_sglang_router and mode == "prefill" and process.bootstrap_port is not None:
+            # Bootstrap port only needed for sglang frontend (dynamo handles internally)
+            if frontend_type == "sglang" and mode == "prefill" and process.bootstrap_port is not None:
                 cmd.extend(["--disaggregation-bootstrap-port", str(process.bootstrap_port)])
 
         # Add multi-node coordination flags
@@ -269,8 +269,8 @@ class SGLangProtocol:
                 ]
             )
 
-        # Add config dump path (not when using sglang router)
-        if dump_config_path and not use_sglang_router:
+        # Add config dump path (not when using sglang frontend)
+        if dump_config_path and frontend_type != "sglang":
             cmd.extend(["--dump-config-to", str(dump_config_path)])
 
         # Add kv-events-config if enabled for this mode and we have an allocated port

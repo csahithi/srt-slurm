@@ -50,3 +50,5 @@ configs/*.tar.gz
 
 .ruff_cache/
 *.egg-info/
+
+.coverage
