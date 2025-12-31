@@ -173,11 +173,11 @@ class FrontendStageMixin:
             listen_port=topology.public_port,
         )
 
-    def start_frontend(self, registry: "ProcessRegistry") -> list[ManagedProcess]:
+    def start_frontend(self, registry: "ProcessRegistry") -> tuple[list[ManagedProcess], FrontendTopology]:
         """Start the frontend layer (nginx + frontends if applicable).
 
         Returns:
-            List of ManagedProcess instances for all frontend processes.
+            Tuple of (List of ManagedProcess instances, FrontendTopology).
         """
         logger.info("Starting frontend layer")
         topology = self._compute_frontend_topology()
@@ -199,4 +199,4 @@ class FrontendStageMixin:
         )
 
         processes.extend(frontend_procs)
-        return processes
+        return processes, topology

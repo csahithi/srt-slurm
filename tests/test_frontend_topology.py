@@ -235,7 +235,7 @@ class TestStartFrontendIntegration:
         orchestrator = SweepOrchestrator(config=config, runtime=runtime)
 
         registry = MagicMock()
-        processes = orchestrator.start_frontend(registry)
+        processes, topology = orchestrator.start_frontend(registry)
 
         assert len(processes) == 1
         assert processes[0].name == "frontend_0"
@@ -254,7 +254,7 @@ class TestStartFrontendIntegration:
         orchestrator._backend_processes = []  # No workers for this test
 
         registry = MagicMock()
-        processes = orchestrator.start_frontend(registry)
+        processes, topology = orchestrator.start_frontend(registry)
 
         assert len(processes) == 1
         assert processes[0].name == "sglang_router_0"
@@ -286,7 +286,7 @@ class TestStartFrontendIntegration:
         orchestrator = SweepOrchestrator(config=config, runtime=runtime)
 
         registry = MagicMock()
-        processes = orchestrator.start_frontend(registry)
+        processes, topology = orchestrator.start_frontend(registry)
 
         # Should have: 1 nginx + 2 frontends = 3 processes
         assert len(processes) == 3
@@ -333,7 +333,7 @@ class TestStartFrontendIntegration:
         orchestrator._backend_processes = []
 
         registry = MagicMock()
-        processes = orchestrator.start_frontend(registry)
+        processes, topology = orchestrator.start_frontend(registry)
 
         # Should have: 1 nginx + 2 routers = 3 processes
         assert len(processes) == 3
@@ -354,7 +354,7 @@ class TestStartFrontendIntegration:
         orchestrator = SweepOrchestrator(config=config, runtime=runtime)
 
         registry = MagicMock()
-        processes = orchestrator.start_frontend(registry)
+        processes, topology = orchestrator.start_frontend(registry)
 
         # Only one frontend, no nginx
         assert len(processes) == 1

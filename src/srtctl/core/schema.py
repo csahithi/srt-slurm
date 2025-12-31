@@ -595,6 +595,27 @@ class HealthCheckConfig:
     Schema: ClassVar[type[Schema]] = Schema
 
 
+@dataclass(frozen=True)
+class MetricsConfig:
+    """Metrics collection configuration.
+
+    When enabled, launches a Prometheus server to scrape metrics from all
+    dynamo worker endpoints. The Prometheus server runs on a non-head node
+    when possible.
+
+    Attributes:
+        enabled: Whether to enable metrics collection
+        prometheus_port: Port for Prometheus server (default: 9090)
+        scrape_interval: Prometheus scrape interval (default: "5s")
+    """
+
+    enabled: bool = False
+    prometheus_port: int = 9090
+    scrape_interval: str = "5s"
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
 # ============================================================================
 # Main Configuration Dataclass
 # ============================================================================
@@ -622,6 +643,7 @@ class SrtConfig:
     profiling: ProfilingConfig = field(default_factory=ProfilingConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     health_check: HealthCheckConfig = field(default_factory=HealthCheckConfig)
+    metrics: MetricsConfig = field(default_factory=MetricsConfig)
 
     environment: dict[str, str] = field(default_factory=dict)
     container_mounts: dict[

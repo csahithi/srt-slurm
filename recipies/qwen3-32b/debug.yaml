@@ -1,0 +1,58 @@
+name: "debug"
+
+model:
+  path: "qwen3-32b"
+  container: "0.5.6.post2"
+  precision: "bf16"
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  # Aggregated mode: 8 TP2 workers = 16 GPUs across 2 nodes
+  agg_nodes: 2
+  agg_workers: 8
+
+dynamo:
+  top_of_tree: true
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: false
+  args:
+    router-mode: "kv"
+    router-reset-states: true
+
+metrics:
+    enabled: true
+    prometheus_port: 9090
+    scrape_interval: "2s"
+
+backend:
+  type: sglang
+
+  aggregated_environment:
+    DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
+    DYN_REQUEST_PLANE: "nats"
+
+  kv_events_config:
+    aggregated: true
+
+  sglang_config:
+    aggregated:
+      served-model-name: "Qwen/Qwen3-32B"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 1
+      mem-fraction-static: 0.90
+      # Rope scaling for extended context
+      json-model-override-args: '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768},"max_position_embeddings":131072}'
+      context-length: 131072
+      page-size: 64
+
+# Mooncake benchmark using aiperf
+benchmark:
+  type: "sa-bench"
+  isl: 100
+  osl: 100
+  concurrencies: "1x2x4"
+  req_rate: "inf"
