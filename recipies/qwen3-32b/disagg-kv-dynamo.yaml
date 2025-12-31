@@ -26,8 +26,9 @@ dynamo:
   hash: "da865d5d9da2e43f03caac1e456f617f4a9a1c92"
 
 frontend:
+  type: dynamo
   enable_multiple_frontends: false
-  dynamo_frontend_args:
+  args:
     router-mode: "kv"
     router-reset-states: true
 

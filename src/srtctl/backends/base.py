@@ -72,7 +72,7 @@ class BackendProtocol(Protocol):
         process: "Process",
         endpoint_processes: list["Process"],
         runtime: "RuntimeContext",
-        use_sglang_router: bool = False,
+        frontend_type: str = "dynamo",
         profiling_enabled: bool = False,
         nsys_prefix: list[str] | None = None,
         dump_config_path: Optional["Path"] = None,

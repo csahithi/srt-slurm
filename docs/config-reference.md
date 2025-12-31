@@ -21,7 +21,7 @@ slurm: # Optional: SLURM overrides
   time_limit: "02:00:00"
 
 frontend: # Optional: router/frontend config
-  use_sglang_router: false
+  type: dynamo
 
 backend: # Optional: worker config
   type: sglang
@@ -132,32 +132,31 @@ Frontend/router configuration.
 
 ```yaml
 frontend:
-  # Router type
-  use_sglang_router: false # true = sglang-router, false = dynamo frontend
+  # Frontend type: "dynamo" (default) or "sglang"
+  type: dynamo
 
   # Scaling
   enable_multiple_frontends: true # Enable nginx + multiple routers
   num_additional_frontends: 9 # Additional routers (total = 1 + this)
 
-  # Router args (for sglang-router)
-  sglang_router_args:
-    kv-overlap-score-weight: 1
-    router-temperature: 0
+  # CLI args passed to the frontend/router
+  args:
+    router-mode: "kv" # dynamo: router-mode
+    policy: "cache_aware" # sglang: policy
     no-kv-events: true # boolean flags
 
-  # Frontend args (for dynamo frontend)
-  dynamo_frontend_args:
-    router-mode: "kv"
-    router-reset-states: true
+  # Environment variables for frontend processes
+  env:
+    MY_VAR: "value"
 ```
 
 | Field                       | Type | Default | Description                         |
 | --------------------------- | ---- | ------- | ----------------------------------- |
-| `use_sglang_router`         | bool | false   | Use sglang-router instead of dynamo |
+| `type`                      | str  | dynamo  | Frontend type: "dynamo" or "sglang" |
 | `enable_multiple_frontends` | bool | true    | Scale with nginx + multiple routers |
 | `num_additional_frontends`  | int  | 9       | Additional routers beyond master    |
-| `sglang_router_args`        | dict | {}      | CLI args for sglang-router          |
-| `dynamo_frontend_args`      | dict | {}      | CLI args for dynamo frontend        |
+| `args`                      | dict | null    | CLI args for the frontend           |
+| `env`                       | dict | null    | Env vars for frontend processes     |
 
 See [SGLang Router](sglang-router.md) for detailed architecture.
 
@@ -409,9 +408,9 @@ slurm:
   time_limit: "04:00:00"
 
 frontend:
-  use_sglang_router: false
+  type: dynamo
   enable_multiple_frontends: true
-  dynamo_frontend_args:
+  args:
     router-mode: "kv"
 
 backend:

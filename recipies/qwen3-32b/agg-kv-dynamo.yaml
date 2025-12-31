@@ -16,8 +16,9 @@ dynamo:
   top_of_tree: true
 
 frontend:
+  type: dynamo
   enable_multiple_frontends: false
-  dynamo_frontend_args:
+  args:
     router-mode: "kv"
     router-reset-states: true
 

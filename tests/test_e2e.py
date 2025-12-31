@@ -321,10 +321,10 @@ class TestQwen32BCluster:
                 assert config.resources.gpus_per_node == 8
 
     def test_disagg_kv_router_shared_node_allocation(self):
-        """disagg-kv-router.yaml: 6P+2D on 2 nodes with decode_nodes=0."""
-        recipe_path = RECIPES_DIR / "qwen3-32b" / "disagg-kv-router.yaml"
+        """disagg-kv-sglang.yaml: 6P+2D on 2 nodes with decode_nodes=0."""
+        recipe_path = RECIPES_DIR / "qwen3-32b" / "disagg-kv-sglang.yaml"
         if not recipe_path.exists():
-            pytest.skip("disagg-kv-router.yaml not found")
+            pytest.skip("disagg-kv-sglang.yaml not found")
 
         with patch.dict(os.environ, self.RACK.slurm_env(), clear=False):
             with patch("subprocess.run", side_effect=self.RACK.mock_scontrol()):
@@ -381,9 +381,9 @@ class TestQwen32BCluster:
 
     def test_disagg_kv_router_cuda_visible_devices(self):
         """Processes on shared node have non-overlapping CUDA_VISIBLE_DEVICES."""
-        recipe_path = RECIPES_DIR / "qwen3-32b" / "disagg-kv-router.yaml"
+        recipe_path = RECIPES_DIR / "qwen3-32b" / "disagg-kv-sglang.yaml"
         if not recipe_path.exists():
-            pytest.skip("disagg-kv-router.yaml not found")
+            pytest.skip("disagg-kv-sglang.yaml not found")
 
         with patch.dict(os.environ, self.RACK.slurm_env(), clear=False):
             with patch("subprocess.run", side_effect=self.RACK.mock_scontrol()):
@@ -433,9 +433,9 @@ class TestQwen32BCluster:
 
     def test_disagg_kv_router_total_allocation_fits(self):
         """Total GPU allocation fits within declared nodes."""
-        recipe_path = RECIPES_DIR / "qwen3-32b" / "disagg-kv-router.yaml"
+        recipe_path = RECIPES_DIR / "qwen3-32b" / "disagg-kv-sglang.yaml"
         if not recipe_path.exists():
-            pytest.skip("disagg-kv-router.yaml not found")
+            pytest.skip("disagg-kv-sglang.yaml not found")
 
         with patch.dict(os.environ, self.RACK.slurm_env(), clear=False):
             with patch("subprocess.run", side_effect=self.RACK.mock_scontrol()):

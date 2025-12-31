@@ -20,7 +20,7 @@ Enable sglang router in your recipe's `frontend` section:
 
 ```yaml
 frontend:
-  use_sglang_router: true
+  type: sglang
 ```
 
 That's it. The workers will launch with `sglang.launch_server` instead of `dynamo.sglang`, and the router will handle request distribution.
@@ -31,15 +31,34 @@ Pass extra CLI args to the router:
 
 ```yaml
 frontend:
-  use_sglang_router: true
-  sglang_router_args:
+  type: sglang
+  args:
     kv-overlap-score-weight: 1
     router-temperature: 0
     no-kv-events: true # boolean flags (no value)
     router-ttl: 120.0
 ```
 
-For dynamo frontend, use `dynamo_frontend_args` instead.
+For dynamo frontend, use the same `args` field:
+
+```yaml
+frontend:
+  type: dynamo
+  args:
+    router-mode: "kv"
+    router-reset-states: true
+```
+
+### Frontend Environment Variables
+
+Pass environment variables to frontend processes:
+
+```yaml
+frontend:
+  type: sglang
+  env:
+    MY_CUSTOM_VAR: "value"
+```
 
 ## Architecture Modes
 
@@ -49,7 +68,7 @@ The simplest mode - one router on node 0, no nginx:
 
 ```yaml
 frontend:
-  use_sglang_router: true
+  type: sglang
   enable_multiple_frontends: false
 ```
 
@@ -73,7 +92,7 @@ Nginx load balances across multiple router instances:
 
 ```yaml
 frontend:
-  use_sglang_router: true
+  type: sglang
   enable_multiple_frontends: true # default
   num_additional_frontends: 9 # default, total = 1 + 9 = 10 routers
 ```
@@ -160,7 +179,7 @@ resources:
   decode_workers: 2
 
 frontend:
-  use_sglang_router: true
+  type: sglang
   enable_multiple_frontends: true
   num_additional_frontends: 3 # 4 total routers
 
