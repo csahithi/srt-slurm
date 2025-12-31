@@ -12,9 +12,6 @@ resources:
   agg_nodes: 2
   agg_workers: 8
 
-dynamo:
-  top_of_tree: true
-
 frontend:
   type: dynamo
   enable_multiple_frontends: false
