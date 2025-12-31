@@ -83,9 +83,10 @@ echo ""
 
 # Run orchestrator on the HOST (not in container) so it has access to srun
 # The orchestrator will spawn containerized workers
-python3 -u -m srtctl.cli.do_sweep "{{ config_path }}" 2>&1 | tee "${LOG_DIR}/orchestrator_${SLURM_JOB_ID}.log"
+# Output goes to SLURM's --output (sweep_%j.log)
+python3 -u -m srtctl.cli.do_sweep "{{ config_path }}"
 
-EXIT_CODE=${PIPESTATUS[0]}
+EXIT_CODE=$?
 
 echo ""
 echo "=========================================="
