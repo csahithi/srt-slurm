@@ -644,6 +644,19 @@ class SrtConfig:
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._validate_profiling()
+        self._validate_metrics()
+
+    def _validate_metrics(self):
+        """Validate metrics configuration requires Dynamo frontend."""
+        # Only SGLangProtocol has metrics config
+        if not isinstance(self.backend, SGLangProtocol):
+            return
+        if not self.backend.metrics.enabled:
+            return
+        if self.frontend.type != "dynamo":
+            raise ValidationError(
+                f"Metrics collection requires frontend.type='dynamo', got '{self.frontend.type}'"
+            )
 
     def _validate_profiling(self):
         """Validate profiling configuration matches serving mode."""

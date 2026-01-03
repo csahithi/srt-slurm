@@ -165,13 +165,9 @@ class MetricsStageMixin:
         """
         processes: NamedProcesses = {}
 
-        # Check if metrics collection is enabled (only supported with Dynamo frontend)
+        # Check if metrics collection is enabled
         if not self.config.backend.metrics.enabled:
             logger.info("Metrics collection not enabled")
-            return processes
-
-        if self.config.frontend.type != "dynamo":
-            logger.warning("Metrics collection only supported with Dynamo frontend, skipping")
             return processes
 
         logger.info("Starting Prometheus metrics collection")

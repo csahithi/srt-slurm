@@ -8,8 +8,11 @@ from pathlib import Path
 
 import pytest
 
+from marshmallow import ValidationError
+
 from srtctl.backends import SGLangProtocol, SGLangServerConfig
-from srtctl.core.schema import SrtConfig
+from srtctl.backends.sglang import MetricsConfig
+from srtctl.core.schema import FrontendConfig, ResourceConfig, SrtConfig
 
 
 class TestConfigLoading:
@@ -383,3 +386,29 @@ class TestSetupScript:
             config = replace(config, setup_script=setup_script_override)
 
         assert config.setup_script == "install-sglang-main.sh"
+
+
+class TestMetricsValidation:
+    """Tests for metrics configuration validation."""
+
+    def test_metrics_requires_dynamo_frontend(self):
+        """Metrics enabled with non-dynamo frontend raises ValidationError."""
+        with pytest.raises(ValidationError, match="requires frontend.type='dynamo'"):
+            SrtConfig(
+                name="test",
+                model={"path": "model", "container": "c.sqsh", "precision": "fp16"},
+                resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+                frontend=FrontendConfig(type="sglang"),
+                backend=SGLangProtocol(metrics=MetricsConfig(enabled=True)),
+            )
+
+    def test_metrics_with_dynamo_frontend_ok(self):
+        """Metrics enabled with dynamo frontend is valid."""
+        config = SrtConfig(
+            name="test",
+            model={"path": "model", "container": "c.sqsh", "precision": "fp16"},
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+            frontend=FrontendConfig(type="dynamo"),
+            backend=SGLangProtocol(metrics=MetricsConfig(enabled=True)),
+        )
+        assert config.backend.metrics.enabled is True
