@@ -59,6 +59,11 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
         --max-concurrency "$concurrency"
 done
 
+# Sleep before starting main benchmark
+echo "Sleeping for 60 seconds before starting main benchmark..."
+echo "This will help show a viisble difference in any graphs..."
+sleep 60
+
 # Benchmark
 result_dir="/logs/sa-bench_isl_${ISL}_osl_${OSL}"
 mkdir -p "$result_dir"
