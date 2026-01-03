@@ -46,6 +46,17 @@ class SGLangServerConfig:
 
 
 @dataclass(frozen=True)
+class MetricsConfig:
+    """Prometheus metrics collection configuration."""
+
+    enabled: bool = False
+    prometheus_port: int = 9090
+    scrape_interval: str = "5s"
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+@dataclass(frozen=True)
 class SGLangProtocol:
     """SGLang protocol - implements BackendProtocol.
 
@@ -80,6 +91,9 @@ class SGLangProtocol:
     # Per-mode: {"prefill": true, "decode": {"publisher": "zmq", "topic": "custom"}}
     # Or global: true (enables for prefill+decode with defaults)
     kv_events_config: bool | dict[str, Any] | None = None
+
+    # Metrics config - enables Prometheus metrics collection
+    metrics: MetricsConfig = field(default_factory=MetricsConfig)
 
     Schema: ClassVar[builtins.type[Schema]] = Schema
 

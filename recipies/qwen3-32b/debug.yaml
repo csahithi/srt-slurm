@@ -19,13 +19,13 @@ frontend:
     router-mode: "kv"
     router-reset-states: true
 
-metrics:
+backend:
+  type: sglang
+
+  metrics:
     enabled: true
     prometheus_port: 9090
     scrape_interval: "2s"
-
-backend:
-  type: sglang
 
   aggregated_environment:
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"

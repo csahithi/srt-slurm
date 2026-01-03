@@ -106,7 +106,7 @@ class WorkerStageMixin:
             profiling_enabled=profiling.enabled,
             nsys_prefix=nsys_prefix,
             dump_config_path=config_dump,
-            metrics_enabled=self.config.metrics.enabled,
+            metrics_enabled=self.config.backend.metrics.enabled,
         )
 
         # Environment variables

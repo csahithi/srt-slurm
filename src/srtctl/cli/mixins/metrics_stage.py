@@ -96,8 +96,6 @@ class MetricsStageMixin:
         Returns:
             Prometheus configuration as YAML string.
         """
-        metrics_config = self.config.metrics
-
         # Build scrape targets from backend processes
         worker_targets: list[dict] = []
         for process in self.backend_processes:
@@ -145,8 +143,8 @@ class MetricsStageMixin:
 
         prometheus_config = {
             "global": {
-                "scrape_interval": metrics_config.scrape_interval,
-                "evaluation_interval": metrics_config.scrape_interval,
+                "scrape_interval": self.config.backend.metrics.scrape_interval,
+                "evaluation_interval": self.config.backend.metrics.scrape_interval,
             },
             "scrape_configs": scrape_configs,
         }
@@ -168,7 +166,7 @@ class MetricsStageMixin:
         processes: NamedProcesses = {}
 
         # Check if metrics collection is enabled
-        if not self.config.metrics.enabled:
+        if not self.config.backend.metrics.enabled:
             logger.info("Metrics collection not enabled")
             return processes
 
@@ -186,7 +184,7 @@ class MetricsStageMixin:
 
         # Log file for Prometheus
         prometheus_log = self.runtime.log_dir / f"prometheus_{prometheus_node}.out"
-        prometheus_port = self.config.metrics.prometheus_port
+        prometheus_port = self.config.backend.metrics.prometheus_port
 
         # Run Prometheus binary directly (like nats/etcd pattern)
         # Binary installed via `make setup`, mounted at /configs

@@ -90,4 +90,5 @@ exclude = [
 python-version = "3.10"
 
 [tool.ty.rules]
-# All defaults for now
+# Suppress for mixin protocol stubs that use `...` bodies
+invalid-return-type = "ignore"

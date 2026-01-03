@@ -8,10 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import yaml
 
+from srtctl.backends import SGLangProtocol
+from srtctl.backends.sglang import MetricsConfig
 from srtctl.cli.do_sweep import SweepOrchestrator
 from srtctl.cli.mixins.frontend_stage import FrontendTopology
 from srtctl.core.runtime import Nodes, RuntimeContext
-from srtctl.core.schema import FrontendConfig, MetricsConfig, ResourceConfig, SrtConfig
+from srtctl.core.schema import FrontendConfig, ResourceConfig, SrtConfig
 
 
 def make_config(
@@ -33,10 +35,12 @@ def make_config(
             decode_workers=1,
         ),
         frontend=FrontendConfig(type="dynamo"),
-        metrics=MetricsConfig(
-            enabled=metrics_enabled,
-            prometheus_port=prometheus_port,
-            scrape_interval=scrape_interval,
+        backend=SGLangProtocol(
+            metrics=MetricsConfig(
+                enabled=metrics_enabled,
+                prometheus_port=prometheus_port,
+                scrape_interval=scrape_interval,
+            ),
         ),
     )
 

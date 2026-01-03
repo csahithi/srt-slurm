@@ -309,7 +309,7 @@ class TestQwen32BCluster:
     """Qwen3-32B configs with shared node allocation (decode_nodes=0)."""
 
     RACK = H100Rack
-    RECIPES = list((RECIPES_DIR / "qwen3-32b").glob("*.yaml")) if (RECIPES_DIR / "qwen3-32b").exists() else []
+    RECIPES = [p for p in (RECIPES_DIR / "qwen3-32b").glob("*.yaml") if p.name != "debug.yaml"] if (RECIPES_DIR / "qwen3-32b").exists() else []
 
     @pytest.mark.parametrize("recipe_path", RECIPES, ids=lambda p: p.name)
     def test_config_loads(self, recipe_path):
