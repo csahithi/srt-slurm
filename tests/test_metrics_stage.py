@@ -21,6 +21,7 @@ def make_config(
     metrics_enabled: bool = False,
     prometheus_port: int = 9090,
     scrape_interval: str = "5s",
+    frontend_type: str = "dynamo",
 ) -> SrtConfig:
     """Create a minimal SrtConfig for testing."""
     return SrtConfig(
@@ -34,7 +35,7 @@ def make_config(
             prefill_workers=1,
             decode_workers=1,
         ),
-        frontend=FrontendConfig(type="dynamo"),
+        frontend=FrontendConfig(type=frontend_type),
         backend=SGLangProtocol(
             metrics=MetricsConfig(
                 enabled=metrics_enabled,
@@ -245,6 +246,17 @@ class TestMetricsCollectionStartup:
     def test_disabled_returns_empty(self):
         """When metrics disabled, start_metrics_collection returns empty dict."""
         config = make_config(metrics_enabled=False)
+        runtime = make_runtime(["node0", "node1"])
+        topology = make_frontend_topology(["node0"])
+
+        orchestrator = SweepOrchestrator(config=config, runtime=runtime)
+        processes = orchestrator.start_metrics_collection(topology)
+
+        assert processes == {}
+
+    def test_non_dynamo_frontend_returns_empty(self):
+        """When frontend is not dynamo, metrics collection is skipped."""
+        config = make_config(metrics_enabled=True, frontend_type="sglang")
         runtime = make_runtime(["node0", "node1"])
         topology = make_frontend_topology(["node0"])
 
