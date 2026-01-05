@@ -148,7 +148,7 @@ backend:
       disaggregation-mode: "decode"
 
       # Memory and token limits
-      mem-fraction-static: 0.73
+      mem-fraction-static: 0.63
       max-total-tokens: 3122380
       chunked-prefill-size: 786432
 
