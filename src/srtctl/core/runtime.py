@@ -146,7 +146,7 @@ class RuntimeContext:
         # 1. A path to a container file (e.g., /containers/sglang.sqsh) - validate it exists
         # 2. An image name (e.g., nvcr.io/nvidia/pytorch:23.12) - don't validate
         container_image_str = os.path.expandvars(config.model.container)
-        
+
         # If it looks like a file path (starts with / or ./), validate it exists
         # Image names are typically registry paths without leading / or ./
         if container_image_str.startswith("/") or container_image_str.startswith("./"):
