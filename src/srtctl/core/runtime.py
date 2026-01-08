@@ -136,9 +136,28 @@ class RuntimeContext:
 
         # Resolve model path (expand env vars)
         model_path = Path(os.path.expandvars(config.model.path)).resolve()
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model path does not exist: {model_path}")
+        if not model_path.is_dir():
+            raise ValueError(f"Model path is not a directory: {model_path}")
 
         # Resolve container image (expand env vars)
-        container_image = Path(os.path.expandvars(config.model.container)).resolve()
+        # container_image can be either:
+        # 1. A path to a container file (e.g., /containers/sglang.sqsh) - validate it exists
+        # 2. An image name (e.g., nvcr.io/nvidia/pytorch:23.12) - don't validate
+        container_image_str = os.path.expandvars(config.model.container)
+        
+        # If it looks like a file path (starts with / or ./), validate it exists
+        # Image names are typically registry paths without leading / or ./
+        if container_image_str.startswith("/") or container_image_str.startswith("./"):
+            container_image = Path(container_image_str).resolve()
+            if not container_image.exists():
+                raise FileNotFoundError(f"Container image path does not exist: {container_image}")
+            if not container_image.is_file():
+                raise ValueError(f"Container image path is not a file: {container_image}")
+        else:
+            # Image name (e.g., nvcr.io/nvidia/pytorch:23.12) - keep as string, convert to Path for type compatibility
+            container_image = Path(container_image_str)
 
         # Build container mounts
         container_mounts: dict[Path, Path] = {

@@ -160,7 +160,7 @@ benchmark:
 
 After completion, results are saved to the logs directory:
 
-```
+```bash
 /logs/accuracy/longbenchv2_<model_name>.json
 ```
 
