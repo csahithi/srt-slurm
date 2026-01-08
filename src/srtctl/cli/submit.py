@@ -233,6 +233,8 @@ def submit_single(
     dry_run: bool = False,
     setup_script: str | None = None,
     tags: list[str] | None = None,
+    model_overrides: dict | None = None,
+    slurm_overrides: dict | None = None,
 ):
     """Submit a single job from YAML config.
 
@@ -244,9 +246,11 @@ def submit_single(
         dry_run: If True, don't submit to SLURM
         setup_script: Optional custom setup script name
         tags: Optional list of tags
+        model_overrides: Optional model overrides dict
+        slurm_overrides: Optional SLURM overrides dict
     """
     if config is None and config_path:
-        config = load_config(config_path)
+        config = load_config(config_path, model_overrides=model_overrides, slurm_overrides=slurm_overrides)
 
     if config is None:
         raise ValueError("Either config_path or config must be provided")
@@ -276,6 +280,8 @@ def submit_sweep(
     dry_run: bool = False,
     setup_script: str | None = None,
     tags: list[str] | None = None,
+    model_overrides: dict | None = None,
+    slurm_overrides: dict | None = None,
 ):
     """Submit parameter sweep.
 
@@ -284,6 +290,8 @@ def submit_sweep(
         dry_run: If True, don't submit to SLURM
         setup_script: Optional custom setup script name
         tags: Optional list of tags
+        model_overrides: Optional model overrides dict (applied to each sweep config)
+        slurm_overrides: Optional SLURM overrides dict (applied to each sweep config)
     """
     from srtctl.core.sweep import generate_sweep_configs
 
@@ -350,13 +358,19 @@ def submit_sweep(
             with os.fdopen(fd, "w") as f:
                 yaml.dump(config_dict, f)
 
-            config = load_config(Path(temp_config_path))
+            config = load_config(
+                Path(temp_config_path),
+                model_overrides=model_overrides,
+                slurm_overrides=slurm_overrides,
+            )
             submit_single(
                 config_path=Path(temp_config_path),
                 config=config,
                 dry_run=False,
                 setup_script=setup_script,
                 tags=tags,
+                model_overrides=None,  # Already applied in load_config
+                slurm_overrides=None,  # Already applied in load_config
             )
         finally:
             with contextlib.suppress(OSError):
@@ -393,6 +407,16 @@ def main():
         p.add_argument("-f", "--file", type=Path, required=True, dest="config", help="YAML config file")
         p.add_argument("--sweep", action="store_true", help="Force sweep mode")
         p.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompts")
+        p.add_argument(
+            "--model",
+            type=str,
+            help='JSON model overrides: {"path": "...", "container": "...", "precision": "..."}',
+        )
+        p.add_argument(
+            "--slurm",
+            type=str,
+            help='JSON SLURM overrides: {"account": "...", "partition": "...", "time_limit": "..."}',
+        )
 
     apply_parser = subparsers.add_parser("apply", help="Submit job(s) to SLURM")
     add_common_args(apply_parser)
@@ -408,6 +432,18 @@ def main():
         console.print(f"[bold red]Config not found:[/] {args.config}")
         sys.exit(1)
 
+    # Parse CLI overrides
+    model_overrides = None
+    slurm_overrides = None
+    try:
+        if getattr(args, "model", None):
+            model_overrides = json.loads(args.model)
+        if getattr(args, "slurm", None):
+            slurm_overrides = json.loads(args.slurm)
+    except json.JSONDecodeError as e:
+        console.print(f"[bold red]Invalid JSON in override:[/] {e}")
+        sys.exit(1)
+
     is_dry_run = args.command == "dry-run"
     is_sweep = args.sweep or is_sweep_config(args.config)
     tags = [t.strip() for t in (getattr(args, "tags", "") or "").split(",") if t.strip()] or None
@@ -416,9 +452,25 @@ def main():
         setup_script = getattr(args, "setup_script", None)
 
         if is_sweep:
-            submit_sweep(args.config, dry_run=is_dry_run, setup_script=setup_script, tags=tags)
+            # For sweeps, overrides apply to each generated config
+            # We'll need to modify submit_sweep to accept overrides
+            submit_sweep(
+                args.config,
+                dry_run=is_dry_run,
+                setup_script=setup_script,
+                tags=tags,
+                model_overrides=model_overrides,
+                slurm_overrides=slurm_overrides,
+            )
         else:
-            submit_single(config_path=args.config, dry_run=is_dry_run, setup_script=setup_script, tags=tags)
+            submit_single(
+                config_path=args.config,
+                dry_run=is_dry_run,
+                setup_script=setup_script,
+                tags=tags,
+                model_overrides=model_overrides,
+                slurm_overrides=slurm_overrides,
+            )
     except Exception as e:
         console.print(f"[bold red]Error:[/] {e}")
         logging.debug("Full traceback:", exc_info=True)

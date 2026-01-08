@@ -383,3 +383,210 @@ class TestSetupScript:
             config = replace(config, setup_script=setup_script_override)
 
         assert config.setup_script == "install-sglang-main.sh"
+
+
+class TestCLIOverrides:
+    """Tests for CLI overrides functionality."""
+
+    def test_model_overrides(self, tmp_path):
+        """Test that model overrides work correctly."""
+        from srtctl.core.config import load_config
+
+        # Create a minimal test config
+        config_file = tmp_path / "test.yaml"
+        config_file.write_text(
+            """
+name: "test"
+model:
+  path: "/original/model"
+  container: "/original/container.sqsh"
+  precision: "fp8"
+resources:
+  gpu_type: "h100"
+  gpus_per_node: 8
+  agg_nodes: 1
+"""
+        )
+
+        # Load without overrides
+        config = load_config(config_file)
+        assert config.model.path == "/original/model"
+        assert config.model.container == "/original/container.sqsh"
+        assert config.model.precision == "fp8"
+
+        # Load with model overrides
+        model_overrides = {
+            "path": "/overridden/model",
+            "container": "/overridden/container.sqsh",
+            "precision": "bf16",
+        }
+        config = load_config(config_file, model_overrides=model_overrides)
+        assert config.model.path == "/overridden/model"
+        assert config.model.container == "/overridden/container.sqsh"
+        assert config.model.precision == "bf16"
+
+    def test_slurm_overrides(self, tmp_path):
+        """Test that SLURM overrides work correctly."""
+        from srtctl.core.config import load_config
+
+        # Create a minimal test config
+        config_file = tmp_path / "test.yaml"
+        config_file.write_text(
+            """
+name: "test"
+model:
+  path: "/model"
+  container: "/container.sqsh"
+  precision: "fp8"
+resources:
+  gpu_type: "h100"
+  gpus_per_node: 8
+  agg_nodes: 1
+slurm:
+  account: "original-account"
+  partition: "original-partition"
+  time_limit: "01:00:00"
+"""
+        )
+
+        # Load without overrides
+        config = load_config(config_file)
+        assert config.slurm.account == "original-account"
+        assert config.slurm.partition == "original-partition"
+        assert config.slurm.time_limit == "01:00:00"
+
+        # Load with SLURM overrides
+        slurm_overrides = {
+            "account": "overridden-account",
+            "partition": "overridden-partition",
+            "time_limit": "02:00:00",
+        }
+        config = load_config(config_file, slurm_overrides=slurm_overrides)
+        assert config.slurm.account == "overridden-account"
+        assert config.slurm.partition == "overridden-partition"
+        assert config.slurm.time_limit == "02:00:00"
+
+    def test_partial_overrides(self, tmp_path):
+        """Test that partial overrides only override specified fields."""
+        from srtctl.core.config import load_config
+
+        # Create a minimal test config
+        config_file = tmp_path / "test.yaml"
+        config_file.write_text(
+            """
+name: "test"
+model:
+  path: "/original/model"
+  container: "/original/container.sqsh"
+  precision: "fp8"
+resources:
+  gpu_type: "h100"
+  gpus_per_node: 8
+  agg_nodes: 1
+slurm:
+  account: "original-account"
+  partition: "original-partition"
+  time_limit: "01:00:00"
+"""
+        )
+
+        # Partial model override (only path)
+        model_overrides = {"path": "/overridden/model"}
+        config = load_config(config_file, model_overrides=model_overrides)
+        assert config.model.path == "/overridden/model"
+        assert config.model.container == "/original/container.sqsh"  # Unchanged
+        assert config.model.precision == "fp8"  # Unchanged
+
+        # Partial SLURM override (only account)
+        slurm_overrides = {"account": "overridden-account"}
+        config = load_config(config_file, slurm_overrides=slurm_overrides)
+        assert config.slurm.account == "overridden-account"
+        assert config.slurm.partition == "original-partition"  # Unchanged
+        assert config.slurm.time_limit == "01:00:00"  # Unchanged
+
+    def test_overrides_without_slurm_section(self, tmp_path):
+        """Test that SLURM overrides work even when config has no slurm section."""
+        from srtctl.core.config import load_config
+
+        # Create a minimal test config without slurm section
+        config_file = tmp_path / "test.yaml"
+        config_file.write_text(
+            """
+name: "test"
+model:
+  path: "/model"
+  container: "/container.sqsh"
+  precision: "fp8"
+resources:
+  gpu_type: "h100"
+  gpus_per_node: 8
+  agg_nodes: 1
+"""
+        )
+
+        # Load with SLURM overrides (should create slurm section)
+        slurm_overrides = {
+            "account": "test-account",
+            "partition": "test-partition",
+            "time_limit": "02:00:00",
+        }
+        config = load_config(config_file, slurm_overrides=slurm_overrides)
+        assert config.slurm.account == "test-account"
+        assert config.slurm.partition == "test-partition"
+        assert config.slurm.time_limit == "02:00:00"
+
+    def test_overrides_priority_over_cluster_defaults(self, tmp_path, monkeypatch):
+        """Test that CLI overrides take priority over cluster defaults."""
+        from srtctl.core.config import load_config
+
+        # Create a minimal test config
+        config_file = tmp_path / "test.yaml"
+        config_file.write_text(
+            """
+name: "test"
+model:
+  path: "/model"
+  container: "/container.sqsh"
+  precision: "fp8"
+resources:
+  gpu_type: "h100"
+  gpus_per_node: 8
+  agg_nodes: 1
+"""
+        )
+
+        # Create a mock cluster config
+        cluster_config_file = tmp_path / "srtslurm.yaml"
+        cluster_config_file.write_text(
+            """
+default_account: "cluster-account"
+default_partition: "cluster-partition"
+default_time_limit: "04:00:00"
+"""
+        )
+
+        # Change to tmp_path so srtslurm.yaml is found
+        import os
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+
+            # Load without overrides - should use cluster defaults
+            config = load_config(config_file)
+            assert config.slurm.account == "cluster-account"
+            assert config.slurm.partition == "cluster-partition"
+            assert config.slurm.time_limit == "04:00:00"
+
+            # Load with SLURM overrides - should override cluster defaults
+            slurm_overrides = {
+                "account": "cli-account",
+                "partition": "cli-partition",
+                "time_limit": "01:00:00",
+            }
+            config = load_config(config_file, slurm_overrides=slurm_overrides)
+            assert config.slurm.account == "cli-account"
+            assert config.slurm.partition == "cli-partition"
+            assert config.slurm.time_limit == "01:00:00"
+        finally:
+            os.chdir(original_cwd)

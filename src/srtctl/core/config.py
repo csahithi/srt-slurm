@@ -65,6 +65,33 @@ def load_cluster_config() -> dict[str, Any] | None:
         return None
 
 
+def merge_cli_overrides(config_dict: dict[str, Any], model_overrides: dict[str, Any] | None = None, slurm_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Merge CLI overrides into config dict.
+
+    CLI overrides take highest priority - they override both YAML config and cluster defaults.
+
+    Args:
+        config_dict: Base config dict from YAML
+        model_overrides: Model overrides dict (e.g., {"path": "...", "container": "...", "precision": "..."})
+        slurm_overrides: SLURM overrides dict (e.g., {"account": "...", "partition": "...", "time_limit": "..."})
+
+    Returns:
+        Config dict with overrides merged in
+    """
+    config = copy.deepcopy(config_dict)
+
+    if model_overrides:
+        config.setdefault("model", {}).update(model_overrides)
+        logger.debug(f"Applied model overrides: {model_overrides}")
+
+    if slurm_overrides:
+        config.setdefault("slurm", {}).update(slurm_overrides)
+        logger.debug(f"Applied SLURM overrides: {slurm_overrides}")
+
+    return config
+
+
 def resolve_config_with_defaults(user_config: dict[str, Any], cluster_config: dict[str, Any] | None) -> dict[str, Any]:
     """
     Resolve user config by applying cluster defaults and aliases.
@@ -140,14 +167,25 @@ def get_srtslurm_setting(key: str, default: Any = None) -> Any:
     return default
 
 
-def load_config(path: Path | str) -> SrtConfig:
+def load_config(
+    path: Path | str,
+    model_overrides: dict[str, Any] | None = None,
+    slurm_overrides: dict[str, Any] | None = None,
+) -> SrtConfig:
     """
-    Load and validate YAML config, applying cluster defaults.
+    Load and validate YAML config, applying cluster defaults and CLI overrides.
+
+    Priority order (highest to lowest):
+    1. CLI overrides (model_overrides, slurm_overrides)
+    2. YAML config file values
+    3. Cluster defaults from srtslurm.yaml
 
     Returns a fully typed, frozen SrtConfig dataclass ready for use.
 
     Args:
         path: Path to the YAML configuration file
+        model_overrides: Optional model overrides dict (e.g., {"path": "...", "container": "...", "precision": "..."})
+        slurm_overrides: Optional SLURM overrides dict (e.g., {"account": "...", "partition": "...", "time_limit": "..."})
 
     Returns:
         SrtConfig frozen dataclass
@@ -163,6 +201,10 @@ def load_config(path: Path | str) -> SrtConfig:
     # Load raw user config
     with open(path) as f:
         user_config = yaml.safe_load(f)
+
+    # Apply CLI overrides first (highest priority)
+    if model_overrides or slurm_overrides:
+        user_config = merge_cli_overrides(user_config, model_overrides, slurm_overrides)
 
     # Load cluster defaults (optional)
     cluster_config = load_cluster_config()
