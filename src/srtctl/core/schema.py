@@ -24,6 +24,7 @@ from typing import (
     Any,
     ClassVar,
     Literal,
+    Optional,
 )
 
 import yaml
@@ -316,11 +317,11 @@ class ResourceConfig:
 class SlurmConfig:
     """SLURM job settings."""
 
-    account: str | None = None
-    partition: str | None = None
-    time_limit: str | None = None
-    use_gpus_per_node_directive: bool | None = None
-    use_segment_sbatch_directive: bool | None = None
+    account: Optional[str] = None
+    partition: Optional[str] = None
+    time_limit: Optional[str] = None
+    use_gpus_per_node_directive: Optional[bool] = None
+    use_segment_sbatch_directive: Optional[bool] = None
 
     Schema: ClassVar[type[Schema]] = Schema
 
