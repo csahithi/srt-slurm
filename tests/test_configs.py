@@ -670,3 +670,122 @@ sbatch_directives:
         assert config.sbatch_directives["mail-user"] == "original@example.com"  # Preserved
         assert config.sbatch_directives["qos"] == "high"  # Overridden
         assert config.sbatch_directives["constraint"] == "volta"  # New
+
+
+class TestCLIOverrideE2E:
+    """E2E tests for CLI override functionality via dry-run."""
+
+    def test_cli_model_override_via_dry_run(self, tmp_path, monkeypatch):
+        """Test that CLI model overrides work via dry-run command."""
+        from srtctl.cli.submit import submit_single
+
+        # Create a minimal test config
+        config_file = tmp_path / "test.yaml"
+        config_file.write_text(
+            """
+name: "test"
+model:
+  path: "/original/model"
+  container: "/original/container.sqsh"
+  precision: "fp8"
+resources:
+  gpu_type: "h100"
+  gpus_per_node: 8
+  agg_nodes: 1
+"""
+        )
+
+        # Mock subprocess.run to avoid actually calling sbatch
+        import subprocess
+        from unittest.mock import MagicMock
+
+        def mock_sbatch(cmd, **kwargs):
+            if cmd[0] == "sbatch":
+                result = MagicMock()
+                result.stdout = "Submitted batch job 12345\n"
+                result.returncode = 0
+                return result
+            raise subprocess.CalledProcessError(1, cmd)
+
+        monkeypatch.setattr("subprocess.run", mock_sbatch)
+
+        # Test with model overrides via dry-run (should not call sbatch)
+        model_overrides = {
+            "path": "/overridden/model",
+            "container": "/overridden/container.sqsh",
+            "precision": "bf16",
+        }
+
+        # This should work without errors
+        submit_single(
+            config_path=config_file,
+            dry_run=True,
+            model_overrides=model_overrides,
+        )
+
+        # Verify the override was applied by loading config directly
+        from srtctl.core.config import load_config
+
+        config = load_config(config_file, model_overrides=model_overrides)
+        assert config.model.path == "/overridden/model"
+        assert config.model.container == "/overridden/container.sqsh"
+        assert config.model.precision == "bf16"
+
+    def test_cli_slurm_override_via_dry_run(self, tmp_path, monkeypatch):
+        """Test that CLI SLURM overrides work via dry-run command."""
+        from srtctl.cli.submit import submit_single
+
+        # Create a minimal test config
+        config_file = tmp_path / "test.yaml"
+        config_file.write_text(
+            """
+name: "test"
+model:
+  path: "/model"
+  container: "/container.sqsh"
+  precision: "fp8"
+resources:
+  gpu_type: "h100"
+  gpus_per_node: 8
+  agg_nodes: 1
+slurm:
+  account: "original-account"
+  partition: "original-partition"
+  time_limit: "01:00:00"
+"""
+        )
+
+        # Mock subprocess.run
+        import subprocess
+        from unittest.mock import MagicMock
+
+        def mock_sbatch(cmd, **kwargs):
+            if cmd[0] == "sbatch":
+                result = MagicMock()
+                result.stdout = "Submitted batch job 12345\n"
+                result.returncode = 0
+                return result
+            raise subprocess.CalledProcessError(1, cmd)
+
+        monkeypatch.setattr("subprocess.run", mock_sbatch)
+
+        # Test with SLURM overrides
+        slurm_overrides = {
+            "account": "overridden-account",
+            "time_limit": "02:00:00",
+            "qos": "high",  # Should go to sbatch_directives
+        }
+
+        submit_single(
+            config_path=config_file,
+            dry_run=True,
+            slurm_overrides=slurm_overrides,
+        )
+
+        # Verify the override was applied
+        from srtctl.core.config import load_config
+
+        config = load_config(config_file, slurm_overrides=slurm_overrides)
+        assert config.slurm.account == "overridden-account"
+        assert config.slurm.time_limit == "02:00:00"
+        assert config.sbatch_directives["qos"] == "high"
