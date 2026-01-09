@@ -21,6 +21,8 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 from srtctl.cli.mixins import BenchmarkStageMixin, FrontendStageMixin, WorkerStageMixin
 from srtctl.core.config import load_config
 from srtctl.core.health import wait_for_port
@@ -254,6 +256,12 @@ def main():
         # Type narrowing: job_id is str after the check above
         assert job_id is not None
         runtime = RuntimeContext.from_config(config, job_id)
+        
+        # Save resolved config (with aliases and defaults applied)
+        resolved_dict = SrtConfig.Schema().dump(config)
+        with open(runtime.log_dir / "config_resolved.yaml", "w") as f:
+            yaml.dump(resolved_dict, f, default_flow_style=False, sort_keys=False)
+        
         orchestrator = SweepOrchestrator(config=config, runtime=runtime)
         exit_code = orchestrator.run()
 

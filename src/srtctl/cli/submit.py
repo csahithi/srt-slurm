@@ -104,27 +104,35 @@ def generate_minimal_sbatch_script(
     return rendered
 
 
-def submit_with_orchestrator(
-    config_path: Path,
+def submit_single(
+    config_path: Path | None = None,
     config: SrtConfig | None = None,
     dry_run: bool = False,
-    tags: list[str] | None = None,
     setup_script: str | None = None,
-) -> None:
-    """Submit job using the new Python orchestrator.
+    tags: list[str] | None = None,
+    model_overrides: dict | None = None,
+    slurm_overrides: dict | None = None,
+):
+    """Submit a single job from YAML config.
 
-    This uses the minimal sbatch template that calls srtctl.cli.do_sweep.
+    Uses the Python orchestrator (srtctl.cli.do_sweep) to run the job.
 
     Args:
         config_path: Path to YAML config file
-        config: Pre-loaded SrtConfig (or None to load from path)
+        config: Pre-loaded SrtConfig (or None if loading from path)
         dry_run: If True, print script but don't submit
-        tags: Optional tags for the run
-        setup_script: Optional custom setup script name (overrides config)
+        setup_script: Optional custom setup script name
+        tags: Optional list of tags
+        model_overrides: Optional model overrides dict
+        slurm_overrides: Optional SLURM overrides dict (standard fields go to slurm section, others to sbatch_directives)
     """
+    if config is None and config_path:
+        config = load_config(config_path, model_overrides=model_overrides, slurm_overrides=slurm_overrides)
 
     if config is None:
-        config = load_config(config_path)
+        raise ValueError("Either config_path or config must be provided")
+
+    config_path = config_path or Path("./config.yaml")
 
     script_content = generate_minimal_sbatch_script(
         config=config,
@@ -173,6 +181,12 @@ def submit_with_orchestrator(
 
         shutil.copy(config_path, output_dir / "config.yaml")
         shutil.copy(script_path, output_dir / "sbatch_script.sh")
+        
+        # Save resolved config (with aliases and defaults applied)
+        from srtctl.core.schema import SrtConfig
+        resolved_dict = SrtConfig.Schema().dump(config)
+        with open(output_dir / "config_resolved.yaml", "w") as f:
+            yaml.dump(resolved_dict, f, default_flow_style=False, sort_keys=False)
 
         # Build comprehensive job metadata
         metadata = {
@@ -225,44 +239,6 @@ def submit_with_orchestrator(
     finally:
         with contextlib.suppress(OSError):
             os.remove(script_path)
-
-
-def submit_single(
-    config_path: Path | None = None,
-    config: SrtConfig | None = None,
-    dry_run: bool = False,
-    setup_script: str | None = None,
-    tags: list[str] | None = None,
-    model_overrides: dict | None = None,
-    slurm_overrides: dict | None = None,
-):
-    """Submit a single job from YAML config.
-
-    Uses the orchestrator by default. This is the recommended submission method.
-
-    Args:
-        config_path: Path to YAML config file
-        config: Pre-loaded SrtConfig (or None if loading from path)
-        dry_run: If True, don't submit to SLURM
-        setup_script: Optional custom setup script name
-        tags: Optional list of tags
-        model_overrides: Optional model overrides dict
-        slurm_overrides: Optional SLURM overrides dict (standard fields go to slurm section, others to sbatch_directives)
-    """
-    if config is None and config_path:
-        config = load_config(config_path, model_overrides=model_overrides, slurm_overrides=slurm_overrides)
-
-    if config is None:
-        raise ValueError("Either config_path or config must be provided")
-
-    # Always use orchestrator mode
-    submit_with_orchestrator(
-        config_path=config_path or Path("./config.yaml"),
-        config=config,
-        dry_run=dry_run,
-        tags=tags,
-        setup_script=setup_script,
-    )
 
 
 def is_sweep_config(config_path: Path) -> bool:
