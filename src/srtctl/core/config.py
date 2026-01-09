@@ -71,10 +71,15 @@ def merge_cli_overrides(config_dict: dict[str, Any], model_overrides: dict[str, 
 
     CLI overrides take highest priority - they override both YAML config and cluster defaults.
 
+    SLURM overrides are routed intelligently:
+    - Standard fields (account, partition, time_limit) -> slurm section
+    - Other fields (qos, constraint, segment, etc.) -> sbatch_directives
+
     Args:
         config_dict: Base config dict from YAML
         model_overrides: Model overrides dict (e.g., {"path": "...", "container": "...", "precision": "..."})
-        slurm_overrides: SLURM overrides dict (e.g., {"account": "...", "partition": "...", "time_limit": "..."})
+        slurm_overrides: SLURM overrides dict. Standard fields go to slurm section,
+                        others go to sbatch_directives (e.g., {"account": "...", "qos": "...", "constraint": "..."})
 
     Returns:
         Config dict with overrides merged in
@@ -86,8 +91,20 @@ def merge_cli_overrides(config_dict: dict[str, Any], model_overrides: dict[str, 
         logger.debug(f"Applied model overrides: {model_overrides}")
 
     if slurm_overrides:
-        config.setdefault("slurm", {}).update(slurm_overrides)
-        logger.debug(f"Applied SLURM overrides: {slurm_overrides}")
+        # Standard slurm fields that go in the slurm section
+        standard_slurm_fields = {"account", "partition", "time_limit", "use_gpus_per_node_directive", "use_segment_sbatch_directive"}
+        
+        slurm_section = config.setdefault("slurm", {})
+        sbatch_directives = config.setdefault("sbatch_directives", {})
+        
+        for key, value in slurm_overrides.items():
+            if key in standard_slurm_fields:
+                slurm_section[key] = value
+                logger.debug(f"Applied SLURM override [{key}]: {value}")
+            else:
+                # Route to sbatch_directives (empty string means flag without value)
+                sbatch_directives[key] = value if value is not None else ""
+                logger.debug(f"Applied sbatch_directive override [{key}]: {value}")
 
     return config
 
@@ -185,7 +202,8 @@ def load_config(
     Args:
         path: Path to the YAML configuration file
         model_overrides: Optional model overrides dict (e.g., {"path": "...", "container": "...", "precision": "..."})
-        slurm_overrides: Optional SLURM overrides dict (e.g., {"account": "...", "partition": "...", "time_limit": "..."})
+        slurm_overrides: Optional SLURM overrides dict. Standard fields (account, partition, time_limit)
+                        go to slurm section, others go to sbatch_directives (e.g., {"account": "...", "qos": "...", "constraint": "..."})
 
     Returns:
         SrtConfig frozen dataclass

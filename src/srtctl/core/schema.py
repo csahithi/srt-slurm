@@ -319,6 +319,8 @@ class SlurmConfig:
     account: str | None = None
     partition: str | None = None
     time_limit: str | None = None
+    use_gpus_per_node_directive: bool | None = None
+    use_segment_sbatch_directive: bool | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 

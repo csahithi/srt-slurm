@@ -93,8 +93,8 @@ def generate_minimal_sbatch_script(
         time_limit=config.slurm.time_limit or "01:00:00",
         config_path=str(config_path.resolve()),
         timestamp=timestamp,
-        use_gpus_per_node_directive=get_srtslurm_setting("use_gpus_per_node_directive", True),
-        use_segment_sbatch_directive=get_srtslurm_setting("use_segment_sbatch_directive", True),
+        use_gpus_per_node_directive=config.slurm.use_gpus_per_node_directive if config.slurm.use_gpus_per_node_directive is not None else get_srtslurm_setting("use_gpus_per_node_directive", True),
+        use_segment_sbatch_directive=config.slurm.use_segment_sbatch_directive if config.slurm.use_segment_sbatch_directive is not None else get_srtslurm_setting("use_segment_sbatch_directive", True),
         sbatch_directives=config.sbatch_directives,
         container_image=container_image,
         srtctl_source=str(srtctl_source.resolve()),
@@ -247,7 +247,7 @@ def submit_single(
         setup_script: Optional custom setup script name
         tags: Optional list of tags
         model_overrides: Optional model overrides dict
-        slurm_overrides: Optional SLURM overrides dict
+        slurm_overrides: Optional SLURM overrides dict (standard fields go to slurm section, others to sbatch_directives)
     """
     if config is None and config_path:
         config = load_config(config_path, model_overrides=model_overrides, slurm_overrides=slurm_overrides)
@@ -291,7 +291,7 @@ def submit_sweep(
         setup_script: Optional custom setup script name
         tags: Optional list of tags
         model_overrides: Optional model overrides dict (applied to each sweep config)
-        slurm_overrides: Optional SLURM overrides dict (applied to each sweep config)
+        slurm_overrides: Optional SLURM overrides dict (applied to each sweep config; standard fields go to slurm section, others to sbatch_directives)
     """
     from srtctl.core.sweep import generate_sweep_configs
 
@@ -415,7 +415,8 @@ def main():
         p.add_argument(
             "--slurm",
             type=str,
-            help='JSON SLURM overrides: {"account": "...", "partition": "...", "time_limit": "..."}',
+            help='JSON SLURM overrides. Standard fields (account, partition, time_limit) go to slurm section, '
+                 'others go to sbatch_directives. Example: {"account": "...", "qos": "...", "constraint": "...", "segment": "..."}',
         )
 
     apply_parser = subparsers.add_parser("apply", help="Submit job(s) to SLURM")

@@ -590,3 +590,83 @@ default_time_limit: "04:00:00"
             assert config.slurm.time_limit == "01:00:00"
         finally:
             os.chdir(original_cwd)
+
+    def test_slurm_overrides_routing_to_sbatch_directives(self, tmp_path):
+        """Test that non-standard SLURM fields are routed to sbatch_directives."""
+        from srtctl.core.config import load_config
+
+        # Create a minimal test config
+        config_file = tmp_path / "test.yaml"
+        config_file.write_text(
+            """
+name: "test"
+model:
+  path: "/model"
+  container: "/container.sqsh"
+  precision: "fp8"
+resources:
+  gpu_type: "h100"
+  gpus_per_node: 8
+  agg_nodes: 1
+"""
+        )
+
+        # Load with mixed SLURM overrides (standard + sbatch_directives)
+        slurm_overrides = {
+            "account": "test-account",  # Standard field -> slurm section
+            "qos": "high",  # Non-standard -> sbatch_directives
+            "constraint": "volta",  # Non-standard -> sbatch_directives
+            "segment": "4",  # Non-standard -> sbatch_directives
+            "exclusive": "",  # Flag without value -> sbatch_directives
+        }
+        config = load_config(config_file, slurm_overrides=slurm_overrides)
+
+        # Standard fields should be in slurm section
+        assert config.slurm.account == "test-account"
+
+        # Non-standard fields should be in sbatch_directives
+        assert config.sbatch_directives["qos"] == "high"
+        assert config.sbatch_directives["constraint"] == "volta"
+        assert config.sbatch_directives["segment"] == "4"
+        assert config.sbatch_directives["exclusive"] == ""
+
+    def test_slurm_overrides_mixed_standard_and_sbatch(self, tmp_path):
+        """Test mixing standard slurm fields with sbatch_directives in one override."""
+        from srtctl.core.config import load_config
+
+        # Create a minimal test config with existing sbatch_directives
+        config_file = tmp_path / "test.yaml"
+        config_file.write_text(
+            """
+name: "test"
+model:
+  path: "/model"
+  container: "/container.sqsh"
+  precision: "fp8"
+resources:
+  gpu_type: "h100"
+  gpus_per_node: 8
+  agg_nodes: 1
+sbatch_directives:
+  mail-user: "original@example.com"
+  qos: "low"
+"""
+        )
+
+        # Override both standard and non-standard fields
+        slurm_overrides = {
+            "account": "new-account",  # Standard -> slurm
+            "time_limit": "02:00:00",  # Standard -> slurm
+            "qos": "high",  # Non-standard -> sbatch_directives (overrides existing)
+            "constraint": "volta",  # Non-standard -> sbatch_directives (new)
+        }
+        config = load_config(config_file, slurm_overrides=slurm_overrides)
+
+        # Standard fields in slurm section
+        assert config.slurm.account == "new-account"
+        assert config.slurm.time_limit == "02:00:00"
+
+        # Non-standard fields in sbatch_directives (merged with existing)
+        assert config.sbatch_directives["mail-user"] == "original@example.com"  # Preserved
+        assert config.sbatch_directives["qos"] == "high"  # Overridden
+        assert config.sbatch_directives["constraint"] == "volta"  # New
