@@ -50,6 +50,75 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 
+# Default prompt template for AI-powered failure analysis
+DEFAULT_AI_ANALYSIS_PROMPT = """
+You are analyzing benchmark failure logs for an LLM serving system (SGLang/Dynamo).
+
+You have access to:
+- Log files in {log_dir}
+- The `gh` CLI tool (authenticated) to search GitHub PRs
+
+Your task:
+1. Read the log files and identify the root cause of failure
+2. Search recent PRs (last {pr_days} days) in {repos} for potentially related changes
+3. Write your analysis to ai_analysis.md in {log_dir}
+
+Your analysis should include:
+- Summary of the failure
+- Root cause identification
+- Key error messages found
+- Related PRs (if any)
+- Suggested next steps
+
+Start by listing and reading the log files, then investigate.
+"""
+
+
+@dataclass(frozen=True)
+class AIAnalysisConfig:
+    """AI-powered failure analysis configuration.
+
+    This config is typically set in srtslurm.yaml (cluster config) to centralize
+    secrets and allow cluster-wide customization. Individual job configs can
+    override with `ai_analysis.enabled: false` to disable for specific jobs.
+
+    Attributes:
+        enabled: Whether to run AI analysis on benchmark failures
+        anthropic_api_key: API key for Claude (falls back to ANTHROPIC_API_KEY env var)
+        gh_token: GitHub token for gh CLI (falls back to GH_TOKEN env var)
+        repos_to_search: GitHub repos to search for related PRs
+        pr_search_days: Number of days to look back for PRs
+        prompt: Custom prompt template (uses DEFAULT_AI_ANALYSIS_PROMPT if None)
+            Available variables: {log_dir}, {repos}, {pr_days}
+    """
+
+    enabled: bool = False
+    anthropic_api_key: str | None = None
+    gh_token: str | None = None
+    repos_to_search: list[str] = field(default_factory=lambda: ["sgl-project/sglang", "ai-dynamo/dynamo"])
+    pr_search_days: int = 14
+    prompt: str | None = None
+
+    def get_prompt(self, log_dir: str) -> str:
+        """Get the formatted prompt for AI analysis.
+
+        Args:
+            log_dir: Path to the log directory
+
+        Returns:
+            Formatted prompt string
+        """
+        template = self.prompt or DEFAULT_AI_ANALYSIS_PROMPT
+        repos_str = ", ".join(self.repos_to_search)
+        return template.format(
+            log_dir=log_dir,
+            repos=repos_str,
+            pr_days=self.pr_search_days,
+        )
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
 @dataclass
 class ClusterConfig:
     """Cluster configuration from srtslurm.yaml."""
@@ -65,6 +134,7 @@ class ClusterConfig:
     model_paths: dict[str, str] | None = None
     containers: dict[str, str] | None = None
     cloud: dict[str, str] | None = None
+    ai_analysis: AIAnalysisConfig | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 

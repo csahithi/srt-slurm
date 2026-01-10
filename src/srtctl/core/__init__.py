@@ -46,6 +46,8 @@ from .processes import (
 )
 from .runtime import Nodes, RuntimeContext
 from .schema import (
+    DEFAULT_AI_ANALYSIS_PROMPT,
+    AIAnalysisConfig,
     BenchmarkConfig,
     ClusterConfig,
     FrontendConfig,
@@ -91,6 +93,8 @@ __all__ = [
     "OutputConfig",
     "HealthCheckConfig",
     "ClusterConfig",
+    "AIAnalysisConfig",
+    "DEFAULT_AI_ANALYSIS_PROMPT",
     # Backend configs (re-exported from backends)
     "SGLangProtocol",
     "SGLangServerConfig",
