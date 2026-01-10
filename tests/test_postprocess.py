@@ -19,7 +19,7 @@ class TestAIAnalysisConfig:
         config = AIAnalysisConfig()
 
         assert config.enabled is False
-        assert config.anthropic_api_key is None
+        assert config.openrouter_api_key is None
         assert config.gh_token is None
         assert config.repos_to_search == ["sgl-project/sglang", "ai-dynamo/dynamo"]
         assert config.pr_search_days == 14
@@ -29,7 +29,7 @@ class TestAIAnalysisConfig:
         """Test custom configuration values."""
         config = AIAnalysisConfig(
             enabled=True,
-            anthropic_api_key="sk-test-key",
+            openrouter_api_key="sk-or-test-key",
             gh_token="ghp_test_token",
             repos_to_search=["my-org/my-repo"],
             pr_search_days=7,
@@ -37,7 +37,7 @@ class TestAIAnalysisConfig:
         )
 
         assert config.enabled is True
-        assert config.anthropic_api_key == "sk-test-key"
+        assert config.openrouter_api_key == "sk-or-test-key"
         assert config.gh_token == "ghp_test_token"
         assert config.repos_to_search == ["my-org/my-repo"]
         assert config.pr_search_days == 7
@@ -106,13 +106,13 @@ class TestClusterConfigIntegration:
             default_account="test-account",
             ai_analysis=AIAnalysisConfig(
                 enabled=True,
-                anthropic_api_key="sk-test",
+                openrouter_api_key="sk-or-test",
             ),
         )
 
         assert cluster_config.ai_analysis is not None
         assert cluster_config.ai_analysis.enabled is True
-        assert cluster_config.ai_analysis.anthropic_api_key == "sk-test"
+        assert cluster_config.ai_analysis.openrouter_api_key == "sk-or-test"
 
     def test_cluster_config_without_ai_analysis(self):
         """Test ClusterConfig works without AIAnalysisConfig."""
@@ -204,7 +204,7 @@ class TestPostProcessStageMixin:
         """Test run_postprocess calls _run_ai_analysis when enabled."""
         from srtctl.cli.mixins.postprocess_stage import PostProcessStageMixin
 
-        config = AIAnalysisConfig(enabled=True, anthropic_api_key="sk-test")
+        config = AIAnalysisConfig(enabled=True, openrouter_api_key="sk-or-test")
 
         mixin = PostProcessStageMixin()
         mixin._get_ai_analysis_config = MagicMock(return_value=config)
@@ -231,7 +231,7 @@ class TestAIAnalysisConfigSchema:
         schema = AIAnalysisConfig.Schema()
         config = schema.load({
             "enabled": True,
-            "anthropic_api_key": "sk-test",
+            "openrouter_api_key": "sk-or-test",
             "gh_token": "ghp_test",
             "repos_to_search": ["my/repo"],
             "pr_search_days": 7,
@@ -239,7 +239,7 @@ class TestAIAnalysisConfigSchema:
         })
 
         assert config.enabled is True
-        assert config.anthropic_api_key == "sk-test"
+        assert config.openrouter_api_key == "sk-or-test"
         assert config.gh_token == "ghp_test"
         assert config.repos_to_search == ["my/repo"]
         assert config.pr_search_days == 7
@@ -249,11 +249,11 @@ class TestAIAnalysisConfigSchema:
         """Test dumping config to dict."""
         config = AIAnalysisConfig(
             enabled=True,
-            anthropic_api_key="sk-test",
+            openrouter_api_key="sk-or-test",
         )
         schema = AIAnalysisConfig.Schema()
         data = schema.dump(config)
 
         assert data["enabled"] is True
-        assert data["anthropic_api_key"] == "sk-test"
+        assert data["openrouter_api_key"] == "sk-or-test"
         assert data["pr_search_days"] == 14  # default

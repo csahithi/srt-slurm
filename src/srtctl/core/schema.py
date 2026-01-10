@@ -82,9 +82,13 @@ class AIAnalysisConfig:
     secrets and allow cluster-wide customization. Individual job configs can
     override with `ai_analysis.enabled: false` to disable for specific jobs.
 
+    Uses OpenRouter for Claude Code authentication, which provides a simple API key
+    approach that works well in headless/automated environments.
+    See: https://openrouter.ai/docs/guides/guides/claude-code-integration
+
     Attributes:
         enabled: Whether to run AI analysis on benchmark failures
-        anthropic_api_key: API key for Claude (falls back to ANTHROPIC_API_KEY env var)
+        openrouter_api_key: OpenRouter API key (falls back to OPENROUTER_API_KEY env var)
         gh_token: GitHub token for gh CLI (falls back to GH_TOKEN env var)
         repos_to_search: GitHub repos to search for related PRs
         pr_search_days: Number of days to look back for PRs
@@ -93,7 +97,7 @@ class AIAnalysisConfig:
     """
 
     enabled: bool = False
-    anthropic_api_key: str | None = None
+    openrouter_api_key: str | None = None
     gh_token: str | None = None
     repos_to_search: list[str] = field(default_factory=lambda: ["sgl-project/sglang", "ai-dynamo/dynamo"])
     pr_search_days: int = 14

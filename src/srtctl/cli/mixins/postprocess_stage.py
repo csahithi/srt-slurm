@@ -5,6 +5,8 @@
 Post-process stage mixin for SweepOrchestrator.
 
 Handles AI-powered failure analysis using Claude Code CLI in headless mode.
+Uses OpenRouter for authentication (simple API key, works in headless environments).
+See: https://openrouter.ai/docs/guides/guides/claude-code-integration
 """
 
 import logging
@@ -101,17 +103,20 @@ class PostProcessStageMixin:
         self._run_ai_analysis(ai_config)
 
     def _run_ai_analysis(self, config: AIAnalysisConfig) -> None:
-        """Run AI analysis using Claude Code CLI.
+        """Run AI analysis using Claude Code CLI via OpenRouter.
+
+        Uses OpenRouter for authentication which works well in headless environments.
+        See: https://openrouter.ai/docs/guides/guides/claude-code-integration
 
         Args:
             config: AI analysis configuration
         """
         # Resolve secrets
-        api_key = self._resolve_secret(config.anthropic_api_key, "ANTHROPIC_API_KEY")
+        openrouter_key = self._resolve_secret(config.openrouter_api_key, "OPENROUTER_API_KEY")
         gh_token = self._resolve_secret(config.gh_token, "GH_TOKEN")
 
-        if not api_key:
-            logger.error("AI analysis requires ANTHROPIC_API_KEY (set in srtslurm.yaml or environment)")
+        if not openrouter_key:
+            logger.error("AI analysis requires OPENROUTER_API_KEY (set in srtslurm.yaml or environment)")
             return
 
         if not gh_token:
@@ -124,9 +129,12 @@ class PostProcessStageMixin:
         logger.info("Log directory: %s", log_dir)
         logger.info("Repos to search: %s", ", ".join(config.repos_to_search))
 
-        # Build environment variables for the srun job
+        # Build environment variables for OpenRouter integration
+        # Per https://openrouter.ai/docs/guides/guides/claude-code-integration
         env_to_set = {
-            "ANTHROPIC_API_KEY": api_key,
+            "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+            "ANTHROPIC_AUTH_TOKEN": openrouter_key,
+            "ANTHROPIC_API_KEY": "",  # Must be explicitly empty to prevent conflicts
         }
         if gh_token:
             env_to_set["GH_TOKEN"] = gh_token
