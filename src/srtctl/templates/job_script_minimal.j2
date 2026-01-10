@@ -25,7 +25,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Orchestrator runs on HOST (needs srun access), spawns containerized workers
-# Config: {{ config_path }}
+# Original Config: {{ config_path }}
+# Resolved Config: {{ resolved_config_path }}
 # Generated: {{ timestamp }}
 
 set -e
@@ -87,7 +88,7 @@ echo ""
 # The orchestrator will spawn containerized workers
 # Output goes to SLURM's --output (sweep_%j.log)
 set +e  # Temporarily disable exit-on-error to capture exit code
-python3 -u -m srtctl.cli.do_sweep "{{ config_path }}"
+python3 -u -m srtctl.cli.do_sweep "{{ resolved_config_path }}"
 EXIT_CODE=$?
 set -e  # Re-enable exit-on-error
 

@@ -50,6 +50,7 @@ def setup_logging(level: int = logging.INFO) -> None:
 def generate_minimal_sbatch_script(
     config: SrtConfig,
     config_path: Path,
+    resolved_config_path: Path | None = None,
     setup_script: str | None = None,
 ) -> str:
     """Generate minimal sbatch script that calls the Python orchestrator.
@@ -59,7 +60,9 @@ def generate_minimal_sbatch_script(
 
     Args:
         config: Typed SrtConfig
-        config_path: Path to the YAML config file
+        config_path: Path to the original YAML config file (for display/copying)
+        resolved_config_path: Path to the resolved config with CLI overrides applied.
+                             If provided, do_sweep will use this instead of config_path.
         setup_script: Optional setup script override (passed via env var)
 
     Returns:
@@ -84,6 +87,9 @@ def generate_minimal_sbatch_script(
     # Resolve container image path (expand aliases from srtslurm.yaml)
     container_image = os.path.expandvars(config.model.container)
 
+    # Use resolved config for do_sweep if provided, otherwise use original
+    do_sweep_config_path = str((resolved_config_path or config_path).resolve())
+
     rendered = template.render(
         job_name=config.name,
         total_nodes=total_nodes,
@@ -91,7 +97,8 @@ def generate_minimal_sbatch_script(
         account=config.slurm.account or os.environ.get("SLURM_ACCOUNT", "default"),
         partition=config.slurm.partition or os.environ.get("SLURM_PARTITION", "default"),
         time_limit=config.slurm.time_limit or "01:00:00",
-        config_path=str(config_path.resolve()),
+        config_path=str(config_path.resolve()),  # Original config for display
+        resolved_config_path=do_sweep_config_path,  # Config for do_sweep to use
         timestamp=timestamp,
         use_gpus_per_node_directive=config.slurm.use_gpus_per_node_directive if config.slurm.use_gpus_per_node_directive is not None else get_srtslurm_setting("use_gpus_per_node_directive", True),
         use_segment_sbatch_directive=config.slurm.use_segment_sbatch_directive if config.slurm.use_segment_sbatch_directive is not None else get_srtslurm_setting("use_segment_sbatch_directive", True),
@@ -134,9 +141,30 @@ def submit_single(
 
     config_path = config_path or Path("./config.yaml")
 
+    # Determine if we have CLI overrides that need a resolved config
+    has_overrides = model_overrides or slurm_overrides
+    resolved_config_path: Path | None = None
+
+    if has_overrides:
+        # Save resolved config to srtctl outputs directory (shared filesystem)
+        # Use timestamp to avoid collisions
+        srtctl_root = get_srtslurm_setting("srtctl_root")
+        srtctl_source = Path(srtctl_root) if srtctl_root else Path(__file__).parent.parent.parent.parent
+        pending_dir = srtctl_source / "outputs" / ".pending"
+        pending_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        resolved_config_path = pending_dir / f"config_resolved_{timestamp}.yaml"
+
+        from srtctl.core.schema import SrtConfig
+        resolved_dict = SrtConfig.Schema().dump(config)
+        with open(resolved_config_path, "w") as f:
+            yaml.dump(resolved_dict, f, default_flow_style=False, sort_keys=False)
+
     script_content = generate_minimal_sbatch_script(
         config=config,
         config_path=config_path,
+        resolved_config_path=resolved_config_path,
         setup_script=setup_script,
     )
 
@@ -152,6 +180,10 @@ def submit_single(
         console.print()
         syntax = Syntax(script_content, "bash", theme="monokai", line_numbers=True)
         console.print(Panel(syntax, title="Generated sbatch Script", border_style="cyan"))
+
+        # Clean up pending resolved config for dry-run
+        if resolved_config_path and resolved_config_path.exists():
+            resolved_config_path.unlink()
         return
 
     # Write script to temp file
@@ -162,6 +194,8 @@ def submit_single(
 
     console.print(f"[bold cyan]🚀 Submitting:[/] {config.name}")
     logging.debug(f"Script: {script_path}")
+    if resolved_config_path:
+        logging.debug(f"Resolved config: {resolved_config_path}")
 
     try:
         result = subprocess.run(
@@ -179,14 +213,14 @@ def submit_single(
         output_dir = srtctl_source / "outputs" / job_id
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Copy configs and script to output dir
         shutil.copy(config_path, output_dir / "config.yaml")
         shutil.copy(script_path, output_dir / "sbatch_script.sh")
-        
-        # Save resolved config (with aliases and defaults applied)
-        from srtctl.core.schema import SrtConfig
-        resolved_dict = SrtConfig.Schema().dump(config)
-        with open(output_dir / "config_resolved.yaml", "w") as f:
-            yaml.dump(resolved_dict, f, default_flow_style=False, sort_keys=False)
+
+        # Copy resolved config to output dir (if it exists)
+        # Note: We copy, not move, because the job needs the file at the pending path
+        if resolved_config_path and resolved_config_path.exists():
+            shutil.copy(resolved_config_path, output_dir / "config_resolved.yaml")
 
         # Build comprehensive job metadata
         metadata = {
