@@ -2,7 +2,7 @@ name: "gb200-fp4-1p2d"
 
 model:
   path: "dsfp4"
-  container: "0.5.5.post2"
+  container: "lmsysorg/sglang:dev-cu13"
   precision: "fp4"
 
 resources:
