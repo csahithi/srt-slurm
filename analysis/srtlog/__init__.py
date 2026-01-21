@@ -10,6 +10,7 @@ from .config_reader import (
     get_all_configs,
     get_command_line_args,
     get_environment_variables,
+    is_backend_command,
     parse_command_line_from_err,
     parse_command_line_to_dict,
 )
@@ -19,6 +20,7 @@ from .models import (
     BenchmarkRun,
     MemoryMetrics,
     NodeMetrics,
+    ProfilerMetadata,
     ProfilerResults,
     RunMetadata,
 )
@@ -30,6 +32,7 @@ __all__ = [
     "NodeAnalyzer",
     "BenchmarkRun",
     "RunMetadata",
+    "ProfilerMetadata",
     "ProfilerResults",
     "NodeMetrics",
     "BatchMetrics",
@@ -39,6 +42,7 @@ __all__ = [
     "get_all_configs",
     "get_command_line_args",
     "get_environment_variables",
+    "is_backend_command",
     "parse_command_line_from_err",
     "parse_command_line_to_dict",
 ]

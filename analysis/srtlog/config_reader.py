@@ -285,6 +285,37 @@ def parse_command_line_to_dict(cmd_args: list[str]) -> dict[str, str]:
     return parsed
 
 
+def is_backend_command(line: str) -> tuple[bool, str | None]:
+    """Check if a line contains a backend command and identify the backend type.
+
+    Supported backends:
+    - sglang: python3 -m sglang.launch_server ... or python3 -m dynamo.sglang ...
+    - trtllm: python3 -m dynamo.trtllm ... or python3 dynamo.trtllm ...
+
+    Args:
+        line: Log line to check
+
+    Returns:
+        Tuple of (is_command, backend_type) where backend_type is 'sglang', 'trtllm', or None
+    """
+    if "python" not in line or "--" not in line:
+        return False, None
+
+    # SGLang patterns
+    if "sglang" in line:
+        return True, "sglang"
+
+    # TRT-LLM patterns
+    if "trtllm" in line or "tensorrt" in line.lower():
+        return True, "trtllm"
+
+    # Generic dynamo pattern (could be any backend)
+    if "dynamo" in line:
+        return True, "dynamo"
+
+    return False, None
+
+
 def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
     """Parse .err/.out files to find explicitly set flags and service topology.
 
@@ -292,7 +323,11 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
 
     Expected file format:
     - Filename pattern: <node>_<service>_<id>.err or .out (e.g., watchtower-navy-cn01_prefill_w0.err)
-    - Contains line with: python3 -m ... sglang --flag1 value1 --flag2 value2 ...
+    - Contains line with backend command: python3 -m ... --flag1 value1 --flag2 value2 ...
+
+    Supported backends:
+    - sglang: python3 -m sglang.launch_server ... or python3 -m dynamo.sglang ...
+    - trtllm: python3 -m dynamo.trtllm ... or python3 dynamo.trtllm ...
 
     Args:
         run_path: Path to the run directory containing .err/.out files
@@ -300,7 +335,9 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
     Returns:
         {
             'explicit_flags': set of flag names that were explicitly set,
-            'services': {node_name: [service_types]}
+            'services': {node_name: [service_types]},
+            'backend_type': detected backend type ('sglang', 'trtllm', 'dynamo', or None),
+            'commands': {node_name: command_line}
         }
     """
     import os
@@ -327,18 +364,40 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
                     services[node_name] = []
                 services[node_name].append(service_type)
 
+            # Reconstruct commands dict
+            commands: dict[str, str] = {}
+            command_rows = cached_df[cached_df["type"] == "command"]
+            for _, row in command_rows.iterrows():
+                commands[row["node_name"]] = row["name"]
+
+            # Get backend type
+            backend_rows = cached_df[cached_df["type"] == "backend"]
+            backend_type = backend_rows.iloc[0]["name"] if not backend_rows.empty else None
+
             logger.info(f"Loaded {len(explicit_flags)} flags and {len(services)} nodes from cache")
-            return {"explicit_flags": explicit_flags, "services": services}
+            return ParsedCommandInfo(
+                explicit_flags=explicit_flags,
+                services=services,
+                backend_type=backend_type,
+                commands=commands,
+            )
 
     # Cache miss - parse from .err/.out files
     explicit_flags: set = set()
     services: dict[str, list[str]] = {}
+    commands: dict[str, str] = {}
+    backend_type: str | None = None
     log_files_found = 0
     commands_found = 0
 
     if not os.path.exists(run_path):
         logger.error(f"Run path does not exist: {run_path}")
-        return {"explicit_flags": explicit_flags, "services": services}
+        return ParsedCommandInfo(
+            explicit_flags=explicit_flags,
+            services=services,
+            backend_type=None,
+            commands=commands,
+        )
 
     # Scan all .err and .out files
     for filename in os.listdir(run_path):
@@ -348,6 +407,7 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
 
             # Extract node name and service type from filename
             # Pattern: watchtower-navy-cn01_prefill_w0.err or r02-p01-dgx-c11_prefill_w0.out -> cn01/c11, prefill
+            # Also support: worker-10_prefill_w0.out (for TRT-LLM style logs)
             # Use greedy match (.+) since node names can contain underscores
             match = re.match(r"(.+)_(prefill|decode|frontend|nginx|nats|etcd)", filename)
             if match:
@@ -367,11 +427,22 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
             try:
                 with open(filepath) as f:
                     for line in f:
-                        if "python" in line and "sglang" in line and "--" in line:
+                        is_cmd, detected_backend = is_backend_command(line)
+                        if is_cmd:
                             # Extract all --flag-name patterns
                             flags = re.findall(r"--([a-z0-9-]+)", line)
                             explicit_flags.update(flags)
                             commands_found += 1
+
+                            # Store the command line
+                            if match:
+                                node_key = f"{match.group(1)}_{match.group(2)}"
+                                commands[node_key] = line.strip()
+
+                            # Set backend type if not already set
+                            if backend_type is None and detected_backend:
+                                backend_type = detected_backend
+
                             break  # Only need to find the command once per file
             except Exception as e:
                 logger.warning(f"Error reading {filepath}: {e}")
@@ -383,13 +454,13 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
 
     if commands_found == 0 and log_files_found > 0:
         logger.warning(
-            f"Found {log_files_found} log files but no sglang commands. "
-            f"Expected format: 'python3 -m ... sglang --flag ...' "
+            f"Found {log_files_found} log files but no backend commands. "
+            f"Expected format: 'python3 -m dynamo.sglang/trtllm --flag ...' "
             f"Log structure may have changed."
         )
 
     logger.info(
-        f"Parsed {log_files_found} log files, found {commands_found} commands, "
+        f"Parsed {log_files_found} log files, found {commands_found} commands ({backend_type or 'unknown'} backend), "
         f"{len(explicit_flags)} unique flags, {len(services)} nodes"
     )
 
@@ -402,9 +473,20 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
     for node_name, service_types in services.items():
         for service_type in service_types:
             cache_rows.append({"type": "service", "name": service_type, "node_name": node_name})
+    # Store commands
+    for node_name, cmd in commands.items():
+        cache_rows.append({"type": "command", "name": cmd, "node_name": node_name})
+    # Store backend type
+    if backend_type:
+        cache_rows.append({"type": "backend", "name": backend_type, "node_name": None})
 
     if cache_rows:
         cache_df = pd.DataFrame(cache_rows)
         cache_mgr.save_to_cache("config_topology", cache_df, source_patterns)
 
-    return {"explicit_flags": explicit_flags, "services": services}
+    return ParsedCommandInfo(
+        explicit_flags=explicit_flags,
+        services=services,
+        backend_type=backend_type,
+        commands=commands,
+    )

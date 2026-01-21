@@ -20,6 +20,7 @@ class BackendType(str, Enum):
     """Supported backend types."""
 
     SGLANG = "sglang"
+    TRTLLM = "trtllm"
 
 
 class BackendProtocol(Protocol):

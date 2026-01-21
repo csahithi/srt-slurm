@@ -6,14 +6,19 @@ All parsing logic encapsulated in the NodeAnalyzer class.
 
 import logging
 import os
+from pathlib import Path
 import re
-
+import yaml
 import pandas as pd
+
+from analysis.srtlog.models import NodeConfig, NodeInfo, NodeMetrics, BatchMetrics, MemoryMetrics
+from srtctl.backends import BackendType
 
 from .cache_manager import CacheManager
 
 # Configure logging
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class NodeAnalyzer:
@@ -62,22 +67,62 @@ class NodeAnalyzer:
             logger.error(f"Run path does not exist: {run_path}")
             return nodes
 
+        # Detect backend type from config.yaml
+        backend_type: BackendType | None = self._detect_backend_type_from_config(run_path)
+        if backend_type is None:
+            logger.error(f"Could not detect backend type from config.yaml in {run_path}")
+            return nodes
+        
+        logger.info(f"Detected backend type: {backend_type}")
+
         total_err_files = 0
         parsed_successfully = 0
 
-        for file in os.listdir(run_path):
-            if (file.endswith(".err") or file.endswith(".out")) and ("prefill" in file or "decode" in file):
-                total_err_files += 1
-                filepath = os.path.join(run_path, file)
-                node = self.parse_single_log(filepath)
-                if node:
-                    nodes.append(node)
+        # Search in both run_path and run_path/logs/ (TRT-LLM uses logs/ subdirectory)
+        search_dirs = [run_path]
+        logs_subdir = os.path.join(run_path, "logs")
+        if os.path.exists(logs_subdir):
+            search_dirs.append(logs_subdir)
+
+        for search_dir in search_dirs:
+            for file in os.listdir(search_dir):
+                if (file.endswith(".err") or file.endswith(".out")) and ("prefill" in file or "decode" in file):
+                    total_err_files += 1
+                    filepath = os.path.join(search_dir, file)
+
+                    node_info = self._extract_node_info_from_filename(filepath)
+                    if not node_info:
+                        logger.warning(
+                            f"Could not extract node info from filename: {filepath}. "
+                            f"Expected format: <node>_<service>_<id>.err or .out"
+                        )
+                        continue
+
+                    node_config = self._parse_node_config(
+                        filepath, backend_type, node_info)
+                        
+                    batch_metrics = self._parse_batch_metrics(
+                        filepath, backend_type, node_info)
+
+                    memory_metrics = self._parse_memory_metrics(
+                        filepath, backend_type, node_info)
+                    
+                    node_metrics = NodeMetrics(
+                        node_info=node_info,
+                        batches=batch_metrics,
+                        memory_snapshots=memory_metrics,
+                        config=node_config,
+                    )
+                    nodes.append(node_metrics)
                     parsed_successfully += 1
 
-        logger.info(f"Parsed {parsed_successfully}/{total_err_files} prefill/decode log files from {run_path}")
+        logger.info(
+            f"Parsed {parsed_successfully}/{total_err_files} prefill/decode log files from {run_path} "
+            f"(backend: {backend_type})"
+        )
 
         if total_err_files == 0:
-            logger.warning(f"No prefill/decode log files found in {run_path}")
+            logger.warning(f"No prefill/decode log files found in {run_path} or {run_path}/logs/")
 
         # Save to cache if we have data
         if nodes:
@@ -86,127 +131,169 @@ class NodeAnalyzer:
 
         return nodes
 
-    def parse_single_log(self, filepath: str):
-        """Parse a single node log file.
+    def _parse_node_config(self, filepath: str, backend_type: BackendType, node_info: NodeInfo) -> NodeConfig | None:
+        """Parse node configuration from config files located in the log directory
 
+        The log directory is the directory containing the log files.
+        trtllm_config_{worker_type}.yaml is the config file for the worker type.
+        config.yaml is the main config file. The environment variables are in the main config file.
+        
         Args:
-            filepath: Path to the .err/.out log file
-
+        
+            filepath: Path to the log file (used to locate config files)
+            backend_type: Backend type
+            node_info: Node info
         Returns:
-            NodeMetrics object or None if parsing failed
-        """
-        from .models import BatchMetrics, MemoryMetrics, NodeMetrics
+            NodeConfig object or None if not found
 
-        node_info = self._extract_node_info_from_filename(filepath)
-        if not node_info:
-            logger.warning(
-                f"Could not extract node info from filename: {filepath}. "
-                f"Expected format: <node>_<service>_<id>.err or .out"
-            )
+        Raises:
+            NotImplementedError: For SGLang backend (uses different config format)
+        """
+
+        if backend_type == BackendType.SGLANG.value:
+            raise NotImplementedError("SGLang config parsing not implemented.")
+        
+        logger.info(f"Parsing node config for {node_info.worker_type} worker type with backend type: {backend_type}")
+
+        # TRT-LLM: Load config from YAML file based on worker type
+        log_dir = Path(filepath).parent
+        yaml_path = log_dir / f"trtllm_config_{node_info.worker_type}.yaml"
+
+        if not yaml_path.exists():
+            logger.warning(f"TRT-LLM config file not found: {yaml_path}")
             return None
 
-        batches = []
-        memory_snapshots = []
-        config = {}
+        node_config = NodeConfig(
+            filename=yaml_path.name,
+            gpu_info={},
+            server_args={},
+            environment={},
+        )
+
+        if not yaml_path.exists():
+            logger.debug(f"TRT-LLM config file not found: {yaml_path}")
+            return None
+
+        # get server config from yaml file
 
         try:
-            with open(filepath) as f:
+            with yaml_path.open() as f:
+                yaml_config = yaml.safe_load(f)
+                if yaml_config:
+                    # Flatten all nested keys with dot notation
+                    node_config.server_args = self._flatten_dict(yaml_config)
+        except Exception as e:
+            logger.warning(f"Failed to parse {yaml_path}: {e}")
+
+        # get environment from main config.yaml 
+        config_path = log_dir / "config.yaml"
+        if not config_path.exists():
+            config_path = log_dir.parent / "config.yaml"
+        with config_path.open() as f:
+            config = yaml.safe_load(f)
+            if config:
+                node_config.environment = config.get("backend").get(f"{node_info.worker_type}_environment", {})
+
+        # Extract command from log file (pattern: "Rank0 run python3 ... in background")
+        command = self._extract_command_from_log(filepath)
+        if command:
+            node_config.server_args["command"] = command
+
+        return node_config
+
+    def _extract_command_from_log(self, filepath: str) -> str | None:
+        """Extract the command line from a TRT-LLM log file.
+
+        Looks for lines like: "Rank0 run python3 -m dynamo.trtllm ... in background"
+
+        Args:
+            filepath: Path to the log file
+
+        Returns:
+            Command string or None if not found
+        """
+        import re
+
+        command_pattern = re.compile(r"Rank0 run (python3.*?) in background")
+
+        try:
+            with open(filepath, encoding="utf-8", errors="replace") as f:
                 for line in f:
-                    # Parse prefill batch metrics
-                    batch_metrics = self._parse_prefill_batch_line(line)
-                    if batch_metrics:
-                        batches.append(
-                            BatchMetrics(
-                                timestamp=batch_metrics["timestamp"],
-                                dp=batch_metrics["dp"],
-                                tp=batch_metrics["tp"],
-                                ep=batch_metrics["ep"],
-                                batch_type=batch_metrics["type"],
-                                new_seq=batch_metrics.get("new_seq"),
-                                new_token=batch_metrics.get("new_token"),
-                                cached_token=batch_metrics.get("cached_token"),
-                                token_usage=batch_metrics.get("token_usage"),
-                                running_req=batch_metrics.get("running_req"),
-                                queue_req=batch_metrics.get("queue_req"),
-                                prealloc_req=batch_metrics.get("prealloc_req"),
-                                inflight_req=batch_metrics.get("inflight_req"),
-                                input_throughput=batch_metrics.get("input_throughput"),
-                            )
-                        )
+                    if "Rank0 run python3" in line:
+                        # Strip ANSI escape codes
+                        clean_line = re.sub(r"\x1b\[[0-9;]*m", "", line)
+                        match = command_pattern.search(clean_line)
+                        if match:
+                            return match.group(1).strip()
+        except Exception as e:
+            logger.warning(f"Error extracting command from {filepath}: {e}")
 
-                    # Parse decode batch metrics
-                    decode_metrics = self._parse_decode_batch_line(line)
-                    if decode_metrics:
-                        batches.append(
-                            BatchMetrics(
-                                timestamp=decode_metrics["timestamp"],
-                                dp=decode_metrics["dp"],
-                                tp=decode_metrics["tp"],
-                                ep=decode_metrics["ep"],
-                                batch_type=decode_metrics["type"],
-                                running_req=decode_metrics.get("running_req"),
-                                queue_req=decode_metrics.get("queue_req"),
-                                prealloc_req=decode_metrics.get("prealloc_req"),
-                                transfer_req=decode_metrics.get("transfer_req"),
-                                token_usage=decode_metrics.get("token_usage"),
-                                preallocated_usage=decode_metrics.get("preallocated_usage"),
-                                num_tokens=decode_metrics.get("num_tokens"),
-                                gen_throughput=decode_metrics.get("gen_throughput"),
-                            )
-                        )
+        return None
 
-                    # Parse memory metrics
-                    mem_metrics = self._parse_memory_line(line)
-                    if mem_metrics:
+    def _parse_batch_metrics(self, filepath: str, backend_type: BackendType, node_info: NodeInfo) -> list:
+        """Parse batch metrics from log file.
+
+        Args:
+            filepath: Path to the log file
+            backend_type: Backend type
+            node_info: Node info
+
+        Returns:
+            List of BatchMetrics objects
+
+        Raises:
+            NotImplementedError: For SGLang backend
+        """
+        if backend_type == BackendType.SGLANG:
+            raise NotImplementedError(
+                "SGLang batch metrics parsing not implemented. "
+                "Use parse_single_log() for SGLang logs."
+            )
+
+        # TRT-LLM doesn't log batch metrics like SGLang
+        # Return empty list for TRT-LLM
+        return []
+
+    def _parse_memory_metrics(self, filepath: str, backend_type: BackendType, node_info: NodeInfo) -> list:
+        """Parse memory metrics from log file.
+
+        Args:
+            filepath: Path to the log file
+            backend_type: Backend type
+            node_info: Node info
+
+        Returns:
+            List of MemoryMetrics objects
+
+        Raises:
+            NotImplementedError: For SGLang backend
+        """
+        if backend_type == BackendType.SGLANG:
+            raise NotImplementedError(
+                "SGLang memory metrics parsing not implemented. "
+                "Use parse_single_log() for SGLang logs."
+            )
+
+        # TRT-LLM: Parse KV cache metrics from log
+        memory_snapshots = []
+
+        try:
+            with open(filepath, encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    mem_metrics = self._parse_trtllm_memory_line(line)
+                    if mem_metrics and mem_metrics.get("type") == "kv_cache":
                         memory_snapshots.append(
                             MemoryMetrics(
-                                timestamp=mem_metrics["timestamp"],
-                                dp=mem_metrics["dp"],
-                                tp=mem_metrics["tp"],
-                                ep=mem_metrics["ep"],
-                                metric_type=mem_metrics["type"],
-                                avail_mem_gb=mem_metrics.get("avail_mem_gb"),
-                                mem_usage_gb=mem_metrics.get("mem_usage_gb"),
+                                timestamp=mem_metrics.get("timestamp", ""),
+                                metric_type="kv_cache",
                                 kv_cache_gb=mem_metrics.get("kv_cache_gb"),
                                 kv_tokens=mem_metrics.get("kv_tokens"),
                             )
                         )
-
-                    # Extract TP/DP/EP configuration from command line
-                    if "--tp-size" in line:
-                        tp_match = re.search(r"--tp-size\s+(\d+)", line)
-                        dp_match = re.search(r"--dp-size\s+(\d+)", line)
-                        ep_match = re.search(r"--ep-size\s+(\d+)", line)
-
-                        if tp_match:
-                            config["tp_size"] = int(tp_match.group(1))
-                        if dp_match:
-                            config["dp_size"] = int(dp_match.group(1))
-                        if ep_match:
-                            config["ep_size"] = int(ep_match.group(1))
-
         except Exception as e:
-            logger.error(f"Error parsing {filepath}: {e}")
-            return None
+            logger.error(f"Error parsing memory metrics from {filepath}: {e}")
 
-        # Validation: Log if we found no metrics
-        total_metrics = len(batches) + len(memory_snapshots)
-
-        if total_metrics == 0:
-            logger.warning(
-                f"Parsed {filepath} but found no metrics. "
-                f"Expected to find lines with DP/TP/EP tags. "
-                f"Log format may have changed."
-            )
-
-        logger.debug(f"Parsed {filepath}: {len(batches)} batches, " f"{len(memory_snapshots)} memory snapshots")
-
-        return NodeMetrics(
-            node_info=node_info,
-            batches=batches,
-            memory_snapshots=memory_snapshots,
-            config=config,
-        )
+        return memory_snapshots
 
     def get_prefill_nodes(self, nodes: list):
         """Filter for prefill nodes only.
@@ -272,19 +359,44 @@ class NodeAnalyzer:
 
         for node in nodes:
             node_info = node.node_info
-            config = node.config
+            config = node.config or {}  # Handle None config
+
+            # Extract node info values (handle both NodeInfo dataclass and dict)
+            if hasattr(node_info, "node_name"):
+                # NodeInfo dataclass
+                node_name = node_info.node_name
+                worker_type = node_info.worker_type
+                worker_id = node_info.worker_id
+            else:
+                # Legacy dict format
+                node_name = node_info.get("node", "") if node_info else ""
+                worker_type = node_info.get("worker_type", "") if node_info else ""
+                worker_id = node_info.get("worker_id", "") if node_info else ""
+
+            # Extract config values (handle both dict and NodeConfig types)
+            if hasattr(config, "server_args"):
+                # NodeConfig dataclass
+                server_args = config.server_args or {}
+                tp_size = server_args.get("tp_size")
+                dp_size = server_args.get("dp_size")
+                ep_size = server_args.get("ep_size")
+            else:
+                # Legacy dict format
+                tp_size = config.get("tp_size") if config else None
+                dp_size = config.get("dp_size") if config else None
+                ep_size = config.get("ep_size") if config else None
 
             # Serialize batch metrics
             for batch in node.batches:
                 row = {
                     # Node identification
-                    "node": node_info.get("node", ""),
-                    "worker_type": node_info.get("worker_type", ""),
-                    "worker_id": node_info.get("worker_id", ""),
+                    "node": node_name,
+                    "worker_type": worker_type,
+                    "worker_id": worker_id,
                     # Config
-                    "tp_size": config.get("tp_size"),
-                    "dp_size": config.get("dp_size"),
-                    "ep_size": config.get("ep_size"),
+                    "tp_size": tp_size,
+                    "dp_size": dp_size,
+                    "ep_size": ep_size,
                     # Metric type
                     "metric_type": "batch",
                     # Batch data
@@ -313,13 +425,13 @@ class NodeAnalyzer:
             for mem in node.memory_snapshots:
                 row = {
                     # Node identification
-                    "node": node_info.get("node", ""),
-                    "worker_type": node_info.get("worker_type", ""),
-                    "worker_id": node_info.get("worker_id", ""),
+                    "node": node_name,
+                    "worker_type": worker_type,
+                    "worker_id": worker_id,
                     # Config
-                    "tp_size": config.get("tp_size"),
-                    "dp_size": config.get("dp_size"),
-                    "ep_size": config.get("ep_size"),
+                    "tp_size": tp_size,
+                    "dp_size": dp_size,
+                    "ep_size": ep_size,
                     # Metric type
                     "metric_type": "memory",
                     # Memory data
@@ -590,22 +702,212 @@ class NodeAnalyzer:
 
         return metrics if "type" in metrics else None
 
-    def _extract_node_info_from_filename(self, filename: str) -> dict | None:
+    def _flatten_dict(self, d: dict, parent_key: str = "", sep: str = ".") -> dict:
+        """Flatten a nested dictionary using dot notation for keys.
+
+        Example:
+            {"kv_cache_config": {"dtype": "fp8"}} -> {"kv_cache_config.dtype": "fp8"}
+
+        Args:
+            d: Dictionary to flatten
+            parent_key: Prefix for keys (used in recursion)
+            sep: Separator to use between nested keys
+
+        Returns:
+            Flattened dictionary with dot-separated keys
+        """
+        items: list[tuple[str, any]] = []
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                # Recurse into nested dicts
+                items.extend(self._flatten_dict(v, new_key, sep).items())
+            elif isinstance(v, list):
+                # Convert lists to comma-separated strings for CSV compatibility
+                items.append((new_key, ",".join(str(x) for x in v) if v else None))
+            else:
+                items.append((new_key, v))
+        return dict(items)
+
+    def _extract_node_info_from_filename(self, filename: str) -> NodeInfo | None:
         """Extract node name and worker info from filename.
 
         Example: watchtower-navy-cn01_prefill_w0.err or r02-p01-dgx-c11_prefill_w0.out
-        Returns: {'node': 'watchtower-navy-cn01', 'worker_type': 'prefill', 'worker_id': 'w0'}
+        Returns: NodeInfo(node_name='cn01', worker_type='prefill', worker_id='w0')
         """
         # Use greedy match for node name up to _(prefill|decode|frontend)_
         match = re.match(r"(.+)_(prefill|decode|frontend)_([^.]+)\.(err|out)", os.path.basename(filename))
+        if not match:
+            return None
+        return NodeInfo(
+            node_name=match.group(1).replace("watchtower-navy-", ""),
+            worker_type=match.group(2),
+            worker_id=match.group(3),
+        )
+
+    # TRT-LLM specific parsing methods
+
+    def _parse_trtllm_timestamp(self, line: str) -> str | None:
+        """Parse TRT-LLM timestamp from log line.
+
+        Supports formats:
+        - [01/15/2026-06:43:26] [TRT-LLM] ...
+        - [2026-01-15 06:43:25] INFO ...
+
+        Returns:
+            Timestamp string in ISO 8601 format, or None
+        """
+        from datetime import datetime
+
+        # Format: [MM/DD/YYYY-HH:MM:SS]
+        match = re.search(r"\[(\d{2})/(\d{2})/(\d{4})-(\d{2}:\d{2}:\d{2})\]", line)
         if match:
-            return {
-                "node": match.group(1),
-                "worker_type": match.group(2),
-                "worker_id": match.group(3),
-            }
+            month, day, year, time = match.groups()
+            dt = datetime.strptime(f"{year}-{month}-{day} {time}", "%Y-%m-%d %H:%M:%S")
+            return dt.isoformat()
+
+        # Format: [YYYY-MM-DD HH:MM:SS]
+        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]", line)
+        if match:
+            dt = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S")
+            return dt.isoformat()
+
         return None
 
+    def _parse_trtllm_config(self, line: str) -> dict | None:
+        """Parse TRT-LLM Config(...) line to extract configuration.
+
+        Example:
+        Initializing the worker with config: Config(namespace=dynamo, component=prefill,
+        tensor_parallel_size=1, pipeline_parallel_size=1, max_batch_size=2048, ...)
+
+        Returns:
+            Dict with parsed config values, or None
+        """
+        if "Config(" not in line:
+            return None
+
+        config = {}
+
+        # Extract key=value pairs from Config(...)
+        patterns = {
+            "component": r"component=(\w+)",
+            "tensor_parallel_size": r"tensor_parallel_size=(\d+)",
+            "pipeline_parallel_size": r"pipeline_parallel_size=(\d+)",
+            "expert_parallel_size": r"expert_parallel_size=(\d+)",
+            "max_batch_size": r"max_batch_size=(\d+)",
+            "max_num_tokens": r"max_num_tokens=(\d+)",
+            "disaggregation_mode": r"disaggregation_mode=DisaggregationMode\.(\w+)",
+            "served_model_name": r"served_model_name=([^,\)]+)",
+            "model_path": r"model_path=([^,\)]+)",
+        }
+
+        for key, pattern in patterns.items():
+            match = re.search(pattern, line)
+            if match:
+                value = match.group(1)
+                # Convert numeric strings to int
+                if value.isdigit():
+                    config[key] = int(value)
+                else:
+                    config[key] = value
+
+        return config if config else None
+
+    def _parse_trtllm_engine_args(self, line: str) -> dict | None:
+        """Parse TRT-LLM engine args line.
+
+        Example:
+        TensorRT-LLM engine args: {'tensor_parallel_size': 8, 'pipeline_parallel_size': 1, ...}
+
+        Returns:
+            Dict with engine args, or None
+        """
+        if "TensorRT-LLM engine args:" not in line:
+            return None
+
+        config = {}
+
+        patterns = {
+            "tp_size": r"'tensor_parallel_size':\s*(\d+)",
+            "pp_size": r"'pipeline_parallel_size':\s*(\d+)",
+            "ep_size": r"'moe_expert_parallel_size':\s*(\d+)",
+            "max_num_tokens": r"'max_num_tokens':\s*(\d+)",
+            "backend": r"'backend':\s*'(\w+)'",
+        }
+
+        for key, pattern in patterns.items():
+            match = re.search(pattern, line)
+            if match:
+                value = match.group(1)
+                config[key] = int(value) if value.isdigit() else value
+
+        return config if config else None
+
+    def _parse_trtllm_memory_line(self, line: str) -> dict | None:
+        """Parse TRT-LLM memory allocation lines.
+
+        Examples:
+        [MemUsageChange] Allocated 0.54 GiB for max tokens in paged KV cache (16576).
+        Max KV cache blocks per sequence: 129 [window size=8232], tokens per block=64
+
+        Returns:
+            Dict with memory metrics, or None
+        """
+        timestamp = self._parse_trtllm_timestamp(line)
+
+        metrics = {}
+
+        # Parse memory allocation
+        mem_match = re.search(r"\[MemUsageChange\] Allocated ([\d.]+) GiB for max tokens in paged KV cache \((\d+)\)", line)
+        if mem_match:
+            metrics["kv_cache_gb"] = float(mem_match.group(1))
+            metrics["kv_tokens"] = int(mem_match.group(2))
+            metrics["type"] = "kv_cache"
+            metrics["timestamp"] = timestamp or ""
+            return metrics
+
+        # Parse KV cache blocks info
+        kv_match = re.search(r"Max KV cache blocks per sequence:\s*(\d+).*tokens per block=(\d+)", line)
+        if kv_match:
+            metrics["kv_blocks_per_seq"] = int(kv_match.group(1))
+            metrics["tokens_per_block"] = int(kv_match.group(2))
+            metrics["type"] = "kv_config"
+            metrics["timestamp"] = timestamp or ""
+            return metrics
+
+        return None
+
+    def _detect_backend_type_from_config(self, run_path: str) -> BackendType:
+        """Detect backend type from config.yaml in run directory.
+
+        Looks for backend.type field in config.yaml.
+
+        Args:
+            run_path: Path to run directory (or logs subdirectory)
+
+        Returns:
+            BackendType
+        """
+        import yaml
+
+        # Try run_path directly, then parent (in case run_path is logs/)
+        paths_to_try = [
+            os.path.join(run_path, "config.yaml"),
+            os.path.join(os.path.dirname(run_path), "config.yaml"),
+        ]
+
+        for config_path in paths_to_try:
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path) as f:
+                        config = yaml.safe_load(f)
+                    backend_type = BackendType(config.get("backend", {}).get("type", "").lower())
+                    logger.info(f"Detected backend type '{backend_type}' from {config_path}")
+                    return backend_type
+                except Exception as e:
+                    logger.warning(f"Error reading config.yaml: {e}")
+        return None
 
 # Standalone helper function for visualizations
 def get_node_label(node_data: dict) -> str:

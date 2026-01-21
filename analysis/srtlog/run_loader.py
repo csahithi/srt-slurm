@@ -4,6 +4,7 @@ RunLoader service for loading and parsing benchmark runs
 Clean, JSON-only implementation - requires {jobid}.json in each run directory.
 """
 
+from dataclasses import dataclass
 import json
 import logging
 import os
@@ -16,6 +17,28 @@ from .models import BenchmarkRun
 
 logger = logging.getLogger(__name__)
 
+
+@dataclass
+class PairJobIdAndRunDir:
+    job_id: int
+    run_dir: str
+
+    @classmethod
+    def from_path(cls, path: str) -> "PairJobIdAndRunDir | None":  # pyright: ignore[reportUndefinedVariable]
+        """Create a PairJobIdAndRunDir from a path.
+
+        Args:
+            path: Path to the run directory
+
+        Returns:
+            PairJobIdAndRunDir object
+        """
+        dirname = os.path.basename(path)
+        try:
+            job_id = int(dirname.split("_")[0])
+        except ValueError:
+            return None
+        return cls(int(job_id), path)
 
 class RunLoader:
     """Service for loading benchmark run data from directories.
@@ -50,54 +73,60 @@ class RunLoader:
             - runs_with_data: List of BenchmarkRun objects with benchmark results
             - skipped_runs: List of tuples (job_id, run_dir, reason)
         """
-        paths = self._find_run_directories()
-
         runs = []
         skipped = []
 
-        for path in sorted(paths, key=lambda p: self._extract_job_id(os.path.basename(p)), reverse=True):
-            run_dir = os.path.basename(path)
+        # Add runs without metadata to skipped list
+        for run_id_path_pair in self.get_runs_without_metadata():
+            reason = "No metadata JSON file"
+            logger.warning(f"No metadata JSON found for {run_id_path_pair.run_dir}")
+            skipped.append((run_id_path_pair.job_id, run_id_path_pair.run_dir, reason))
 
+        # Process only runs with metadata
+        runs_with_metadata: list[PairJobIdAndRunDir] = self.get_runs_with_metadata()
+
+        for run_id_path_pair in sorted(runs_with_metadata, key=lambda p: p.job_id, reverse=True):
             try:
-                run = BenchmarkRun.from_json_file(path)
-                if run is not None:
-                    # Skip profiling jobs (they don't have benchmark results)
-                    if run.profiler.profiler_type == "torch-profiler":
-                        reason = "Profiling job (no benchmark results)"
-                        logger.debug(f"Skipping profiling job {run.job_id}")
-                        skipped.append((run.job_id, run_dir, reason))
-                        continue
+                job_id = run_id_path_pair.job_id
+                run_dir = run_id_path_pair.run_dir
+                
+                run = BenchmarkRun.from_json_file(run_dir, job_id=job_id)
+                
+                if run is None:
+                    # Should not happen since we pre-filtered, but handle gracefully
+                    skipped.append((job_id, run_dir, "Failed to parse metadata JSON"))
+                    continue
 
-                    # Load benchmark results from profiler output files
-                    self._load_benchmark_results(run)
-
-                    # Check if all expected results are present
-                    run.check_completeness()
-
-                    # Warn if job is incomplete
-                    if not run.is_complete:
-                        logger.warning(
-                            f"Job {run.job_id} is incomplete - missing concurrencies: {run.missing_concurrencies}"
-                        )
-
-                    # Only include runs with benchmark data
-                    if run.profiler.output_tps:
-                        runs.append(run)
-                    else:
-                        reason = "No benchmark results found"
-                        logger.debug(f"Skipping run {run.job_id} - {reason}")
-                        skipped.append((run.job_id, run_dir, reason))
-                else:
-                    # Extract job ID from directory name for skipped list
-                    job_id = run_dir.split("_")[0] if "_" in run_dir else run_dir
-                    reason = "No metadata JSON file"
-                    logger.warning(f"No metadata JSON found for {run_dir}")
+                # Skip profiling jobs (they don't have benchmark results)
+                if run.profiler.profiler_type == "torch-profiler":
+                    reason = "Profiling job (no benchmark results)"
+                    logger.debug(f"Skipping profiling job {job_id}")
                     skipped.append((job_id, run_dir, reason))
+                    continue
+
+                # Load benchmark results from profiler output files
+                self._load_benchmark_results(run)
+
+                # Check if all expected results are present
+                run.check_completeness()
+
+                # Warn if job is incomplete
+                if not run.is_complete:
+                    logger.warning(
+                        f"Job {job_id} is incomplete - missing concurrencies: {run.missing_concurrencies}"
+                    )
+
+                # Only include runs with benchmark data
+                if run.profiler.output_tps:
+                    runs.append(run)
+                else:
+                    reason = "No benchmark results found"
+                    logger.debug(f"Skipping run {job_id} - {reason}")
+                    skipped.append((job_id, run_dir, reason))
+
             except Exception as e:
-                # Extract job ID from directory name for skipped list
-                job_id = run_dir.split("_")[0] if "_" in run_dir else run_dir
                 reason = f"Error loading: {str(e)}"
-                logger.error(f"Error loading run from {path}: {e}")
+                logger.error(f"Error loading run from {run_dir}: {e}")
                 skipped.append((job_id, run_dir, reason))
                 continue
 
@@ -133,34 +162,28 @@ class RunLoader:
             logger.error(f"Error loading run from {run_path}: {e}")
             return None
 
-    def has_metadata_json(self, run_dir: str) -> bool:
+    def has_metadata_json(self, pair: PairJobIdAndRunDir) -> bool:
         """Check if a run directory has a metadata JSON file.
 
         Args:
-            run_dir: Path to run directory
+            pair: PairJobIdAndRunDir object
 
         Returns:
-            True if {jobid}.json exists, False otherwise
+            True if metadata JSON file exists, False otherwise
         """
-        # Handle both relative and absolute paths
-        run_path = os.path.join(self.logs_dir, run_dir) if not os.path.isabs(run_dir) else run_dir
+        return os.path.exists(os.path.join(pair.run_dir, f"{pair.job_id}.json"))
 
-        dirname = os.path.basename(run_path)
-        job_id = dirname.split("_")[0]
-        json_path = os.path.join(run_path, f"{job_id}.json")
-        return os.path.exists(json_path)
-
-    def _find_run_directories(self) -> list[str]:
+    def _find_run_directories(self) -> list[PairJobIdAndRunDir]:
         """Find all valid benchmark run directories in logs_dir.
 
         Returns:
-            List of absolute paths to run directories
+            List of PairJobIdAndRunDir objects
         """
-        paths = []
+        pairs = []
 
         if not os.path.exists(self.logs_dir):
             logger.error(f"Logs directory does not exist: {self.logs_dir}")
-            return paths
+            return []
 
         for entry in os.listdir(self.logs_dir):
             # Skip hidden directories and files
@@ -182,9 +205,9 @@ class RunLoader:
             if not first_part.isdigit():
                 continue
 
-            paths.append(full_path)
+            pairs.append(PairJobIdAndRunDir.from_path(full_path))
 
-        return paths
+        return pairs
 
     def _extract_job_id(self, dirname: str) -> int:
         """Extract numeric job ID from directory name for sorting.
@@ -484,33 +507,32 @@ class RunLoader:
         """
         return len(self._find_run_directories())
 
-    def get_runs_with_metadata(self) -> list[str]:
+    def get_runs_with_metadata(self) -> list[PairJobIdAndRunDir]:
         """Get list of run directories that have metadata JSON files.
 
         Returns:
-            List of run directory names (not full paths)
+            List of PairJobIdAndRunDir objects
         """
-        runs_with_metadata = []
+        runs_with_metadata: list[PairJobIdAndRunDir] = []
 
-        for path in self._find_run_directories():
-            if self.has_metadata_json(path):
-                runs_with_metadata.append(os.path.basename(path))
-
+        for run_id_path_pair in self._find_run_directories():
+            if self.has_metadata_json(run_id_path_pair):
+                runs_with_metadata.append(run_id_path_pair)
         return runs_with_metadata
 
-    def get_runs_without_metadata(self) -> list[str]:
+    def get_runs_without_metadata(self) -> list[PairJobIdAndRunDir]:
         """Get list of run directories that DON'T have metadata JSON files.
 
         Useful for identifying which runs need metadata file generation.
 
         Returns:
-            List of run directory names (not full paths)
+            List of PairJobIdAndRunDir objects
         """
-        runs_without_metadata = []
+        runs_without_metadata: list[PairJobIdAndRunDir] = []
 
-        for path in self._find_run_directories():
-            if not self.has_metadata_json(path):
-                runs_without_metadata.append(os.path.basename(path))
+        for run_id_path_pair in self._find_run_directories():
+            if not self.has_metadata_json(run_id_path_pair):
+                runs_without_metadata.append(run_id_path_pair)
 
         return runs_without_metadata
 

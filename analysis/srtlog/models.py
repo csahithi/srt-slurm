@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, TypedDict
 
+import json
+import os
 
 @dataclass
 class RunMetadata:
@@ -35,9 +37,12 @@ class RunMetadata:
     agg_nodes: int = 0
     agg_workers: int = 0
 
+
     @classmethod
     def from_json(cls, json_data: dict, run_path: str) -> "RunMetadata":
         """Create from {jobid}.json metadata format.
+
+        Supports both v1.0 (run_metadata section) and v2.0 (flat structure) formats.
 
         Args:
             json_data: Parsed JSON from {jobid}.json file
@@ -46,29 +51,58 @@ class RunMetadata:
         Returns:
             RunMetadata instance
         """
-        run_meta = json_data.get("run_metadata", {})
-        mode = run_meta.get("mode", "disaggregated")
+        # Check for v2.0 format (has "version": "2.0" or "orchestrator": true)
+        is_v2 = json_data.get("version") == "2.0" or json_data.get("orchestrator")
 
-        return cls(
-            job_id=run_meta.get("slurm_job_id", ""),
-            path=run_path,
-            run_date=run_meta.get("run_date", ""),
-            container=run_meta.get("container", ""),
-            prefill_nodes=run_meta.get("prefill_nodes", 0),
-            decode_nodes=run_meta.get("decode_nodes", 0),
-            prefill_workers=run_meta.get("prefill_workers", 0),
-            decode_workers=run_meta.get("decode_workers", 0),
-            mode=mode,
-            job_name=run_meta.get("job_name", ""),
-            partition=run_meta.get("partition", ""),
-            model_dir=run_meta.get("model_dir", ""),
-            gpus_per_node=run_meta.get("gpus_per_node", 0),
-            gpu_type=run_meta.get("gpu_type", ""),
-            enable_multiple_frontends=run_meta.get("enable_multiple_frontends", False),
-            num_additional_frontends=run_meta.get("num_additional_frontends", 0),
-            agg_nodes=run_meta.get("agg_nodes", 0),
-            agg_workers=run_meta.get("agg_workers", 0),
-        )
+        if is_v2:
+            # v2.0 format: flat structure with resources section
+            resources = json_data.get("resources", {})
+            model = json_data.get("model", {})
+            return cls(
+                job_id=str(json_data.get("job_id", "")),
+                path=run_path,
+                run_date=json_data.get("generated_at", ""),
+                container=model.get("container", ""),
+                prefill_nodes=resources.get("prefill_nodes", 0),
+                decode_nodes=resources.get("decode_nodes", 0),
+                prefill_workers=resources.get("prefill_workers", 0),
+                decode_workers=resources.get("decode_workers", 0),
+                mode="disaggregated" if resources.get("prefill_nodes", 0) > 0 else "aggregated",
+                job_name=json_data.get("job_name", ""),
+                partition=json_data.get("partition", ""),
+                model_dir=model.get("path", ""),
+                gpus_per_node=resources.get("gpus_per_node", 0),
+                gpu_type=resources.get("gpu_type", ""),
+                enable_multiple_frontends=json_data.get("enable_multiple_frontends", False),
+                num_additional_frontends=json_data.get("num_additional_frontends", 0),
+                agg_nodes=resources.get("agg_nodes", 0),
+                agg_workers=resources.get("agg_workers", 0),
+            )
+        else:
+            # v1.0 format: run_metadata section
+            run_meta = json_data.get("run_metadata", {})
+            mode = run_meta.get("mode", "disaggregated")
+
+            return cls(
+                job_id=run_meta.get("slurm_job_id", ""),
+                path=run_path,
+                run_date=run_meta.get("run_date", ""),
+                container=run_meta.get("container", ""),
+                prefill_nodes=run_meta.get("prefill_nodes", 0),
+                decode_nodes=run_meta.get("decode_nodes", 0),
+                prefill_workers=run_meta.get("prefill_workers", 0),
+                decode_workers=run_meta.get("decode_workers", 0),
+                mode=mode,
+                job_name=run_meta.get("job_name", ""),
+                partition=run_meta.get("partition", ""),
+                model_dir=run_meta.get("model_dir", ""),
+                gpus_per_node=run_meta.get("gpus_per_node", 0),
+                gpu_type=run_meta.get("gpu_type", ""),
+                enable_multiple_frontends=run_meta.get("enable_multiple_frontends", False),
+                num_additional_frontends=run_meta.get("num_additional_frontends", 0),
+                agg_nodes=run_meta.get("agg_nodes", 0),
+                agg_workers=run_meta.get("agg_workers", 0),
+            )
 
     @property
     def is_aggregated(self) -> bool:
@@ -109,6 +143,37 @@ class RunMetadata:
 
 
 @dataclass
+class ProfilerMetadata:
+    """Metadata about the profiler configuration from {jobid}.json.
+
+    Attributes:
+        profiler_type: Type of profiler (e.g., 'sa-bench', 'vllm-bench')
+        isl: Input sequence length
+        osl: Output sequence length
+        concurrencies: Concurrency levels to test (e.g., '1x2x4x8')
+        req_rate: Request rate (e.g., 'inf' or numeric)
+    """
+
+    profiler_type: str
+    isl: str
+    osl: str
+    concurrencies: str = ""
+    req_rate: str = ""
+
+    @classmethod
+    def from_json(cls, json_data: dict) -> "ProfilerMetadata":
+        """Create from {jobid}.json profiler_metadata section."""
+        profiler_meta = json_data.get("profiler_metadata", json_data.get("benchmark", {}))
+        return cls(
+            profiler_type=profiler_meta.get("type", "unknown"),
+            isl=str(profiler_meta.get("isl", "")),
+            osl=str(profiler_meta.get("osl", "")),
+            concurrencies=profiler_meta.get("concurrencies", ""),
+            req_rate=profiler_meta.get("req-rate", ""),
+        )
+
+
+@dataclass
 class ProfilerResults:
     """Results from profiler benchmarks.
 
@@ -120,11 +185,7 @@ class ProfilerResults:
     - tokenizer_id, best_of, burstiness: Metadata not critical for dashboards
     """
 
-    profiler_type: str
-    isl: str
-    osl: str
-    concurrencies: str = ""
-    req_rate: str = ""
+    metadata: ProfilerMetadata
 
     # Primary throughput metrics (per concurrency level)
     output_tps: list[float] = field(default_factory=list)
@@ -180,15 +241,28 @@ class ProfilerResults:
         Returns:
             ProfilerResults instance (benchmark data added later from result files)
         """
-        profiler_meta = json_data.get("profiler_metadata", {})
+        return cls(metadata=ProfilerMetadata.from_json(json_data))
 
-        return cls(
-            profiler_type=profiler_meta.get("type", "unknown"),
-            isl=str(profiler_meta.get("isl", "")),
-            osl=str(profiler_meta.get("osl", "")),
-            concurrencies=profiler_meta.get("concurrencies", ""),
-            req_rate=profiler_meta.get("req-rate", ""),
-        )
+    # Backward-compatible properties delegating to metadata
+    @property
+    def profiler_type(self) -> str:
+        return self.metadata.profiler_type
+
+    @property
+    def isl(self) -> str:
+        return self.metadata.isl
+
+    @property
+    def osl(self) -> str:
+        return self.metadata.osl
+
+    @property
+    def concurrencies(self) -> str:
+        return self.metadata.concurrencies
+
+    @property
+    def req_rate(self) -> str:
+        return self.metadata.req_rate
 
     def add_benchmark_results(self, results: dict) -> None:
         """Add actual benchmark results from profiler output files.
@@ -252,21 +326,23 @@ class BenchmarkRun:
     tags: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_json_file(cls, run_path: str) -> "BenchmarkRun | None":
+    def from_json_file(cls, run_path: str, job_id: int | None = None) -> "BenchmarkRun | None":
         """Create from {jobid}.json file in the run directory.
 
         Args:
             run_path: Path to the run directory containing {jobid}.json
-
+            job_id: Job ID
         Returns:
             BenchmarkRun instance or None if file not found/invalid
         """
-        import json
-        import os
 
         # Extract job ID from directory name
-        dirname = os.path.basename(run_path)
-        job_id = dirname.split("_")[0]
+        if job_id is None:
+            dirname = os.path.basename(run_path)
+            job_id = dirname.split("_")[0]
+            if not job_id.isdigit():
+                raise ValueError(f"Invalid job ID: {job_id}")
+        
         json_path = os.path.join(run_path, f"{job_id}.json")
 
         if not os.path.exists(json_path):
@@ -360,47 +436,31 @@ class BatchMetrics:
 @dataclass
 class MemoryMetrics:
     """Memory metrics from log lines."""
-
-    timestamp: str
-    dp: int
-    tp: int
-    ep: int
     metric_type: str  # "memory" or "kv_cache"
+    timestamp: str = "" # trtllm does not echo timestamp in the log lines
+    dp: int = 0  # trtllm does not echo dp, tp, ep in the log lines
+    tp: int = 0  # trtllm does not echo dp, tp, ep in the log lines
+    ep: int = 0  # trtllm does not echo dp, tp, ep in the log lines
     avail_mem_gb: float | None = None
     mem_usage_gb: float | None = None
     kv_cache_gb: float | None = None
     kv_tokens: int | None = None
 
+@dataclass  
+class ParsedCommandInfo:
+    """Parsed command information from .err/.out log files.
 
-@dataclass
-class NodeMetrics:
-    """Metrics from a single node (prefill or decode worker), parsed from log files."""
+    Attributes:
+        explicit_flags: Set of CLI flag names that were explicitly set (e.g., {'tp-size', 'model-path'})
+        services: Mapping of node names to their service types (e.g., {'cn01': ['prefill', 'decode']})
+        backend_type: Detected backend type ('sglang', 'trtllm', 'dynamo', or None)
+        commands: Mapping of node_service keys to full command lines (e.g., {'cn01_prefill': 'python3 -m ...'})
+    """
 
-    node_info: dict  # Has node name, worker type, worker_id
-    batches: list[BatchMetrics] = field(default_factory=list)
-    memory_snapshots: list[MemoryMetrics] = field(default_factory=list)
-    config: dict = field(default_factory=dict)  # TP/DP/EP config
-    run_id: str = ""
-
-    @property
-    def node_name(self) -> str:
-        """Get node name."""
-        return self.node_info.get("node", "Unknown")
-
-    @property
-    def worker_type(self) -> str:
-        """Get worker type (prefill/decode/frontend)."""
-        return self.node_info.get("worker_type", "unknown")
-
-    @property
-    def is_prefill(self) -> bool:
-        """Check if this is a prefill node."""
-        return self.worker_type == "prefill"
-
-    @property
-    def is_decode(self) -> bool:
-        """Check if this is a decode node."""
-        return self.worker_type == "decode"
+    explicit_flags: set[str] = field(default_factory=set)
+    services: dict[str, list[str]] = field(default_factory=dict)
+    backend_type: str | None = None
+    commands: dict[str, str] = field(default_factory=dict)
 
 
 # Config-related TypedDicts (from config_reader.py)
@@ -415,36 +475,84 @@ class GPUInfo(TypedDict, total=False):
 
 
 class ServerArgs(TypedDict, total=False):
-    """Expected structure of server_args in node config.
+    """Server launch arguments from node config.
 
+    Contains parallelism settings, model configuration, and parsed command info.
     Note: This is partial - actual configs may have many more fields.
-    Use total=False to allow missing keys.
     """
 
-    tp_size: int
-    dp_size: int
-    pp_size: int
-    ep_size: int
-    served_model_name: str
-    attention_backend: str
-    kv_cache_dtype: str
-    max_total_tokens: int
-    chunked_prefill_size: int
-    disaggregation_mode: str
-    context_length: int
+    tp_size: int  # Tensor parallelism size
+    dp_size: int  # Data parallelism size
+    pp_size: int  # Pipeline parallelism size
+    ep_size: int  # Expert parallelism size (for MoE models)
+    served_model_name: str  # Model name exposed via API
+    attention_backend: str  # Attention implementation (e.g., 'flashinfer')
+    kv_cache_dtype: str  # KV cache data type (e.g., 'fp8_e5m2')
+    max_total_tokens: int  # Maximum tokens in KV cache
+    chunked_prefill_size: int  # Chunk size for prefill
+    disaggregation_mode: str  # Disaggregation mode (e.g., 'prefill', 'decode')
+    context_length: int  # Maximum context length
+    command: ParsedCommandInfo  # Parsed command line info
 
 
-class NodeConfig(TypedDict, total=False):
-    """Expected structure of a node config JSON file (*_config.json)."""
+@dataclass
+class NodeConfig:
+    """Node configuration from *_config.json files.
+
+    Attributes:
+        filename: Name of the config file (e.g., 'cn01_prefill_w0_config.json')
+        gpu_info: GPU hardware information including count, names, and memory
+        server_args: Server launch arguments (TP/DP/EP sizes, model config, etc.)
+        environment: Environment variables set for this node
+    """
 
     filename: str
     gpu_info: GPUInfo
-    config: dict[str, Any]  # Contains 'server_args' and other fields
-    environment: dict[str, str]
+    server_args: ServerArgs
+    environment: dict[str, str] = field(default_factory=dict)
 
+@dataclass
+class NodeInfo:
+    """Node information from log files."""
 
-class ParsedCommandInfo(TypedDict):
-    """Expected return structure from parse_command_line_from_err."""
+    node_name: str
+    worker_type: str
+    worker_id: str
 
-    explicit_flags: set
-    services: dict[str, list[str]]
+@dataclass
+class NodeMetrics:
+    """Metrics from a single node (prefill or decode worker), parsed from log files."""
+
+    node_info: NodeInfo | None = None  # Has node name, worker type, worker_id
+    batches: list[BatchMetrics] = field(default_factory=list)
+    memory_snapshots: list[MemoryMetrics] = field(default_factory=list)
+    config: NodeConfig | None = None  # Full node config from *_config.json
+    run_id: str = ""
+
+    @property
+    def node_name(self) -> str:
+        """Get node name."""
+        if hasattr(self.node_info, "node_name"):
+            # NodeInfo dataclass
+            return self.node_info.node_name
+        # Legacy dict format
+        return self.node_info.get("node", "Unknown") if self.node_info else "Unknown"
+
+    @property
+    def worker_type(self) -> str:
+        """Get worker type (prefill/decode/frontend)."""
+        if hasattr(self.node_info, "worker_type"):
+            # NodeInfo dataclass
+            return self.node_info.worker_type
+        # Legacy dict format
+        return self.node_info.get("worker_type", "unknown") if self.node_info else "unknown"
+
+    @property
+    def is_prefill(self) -> bool:
+        """Check if this is a prefill node."""
+        return self.worker_type == "prefill"
+
+    @property
+    def is_decode(self) -> bool:
+        """Check if this is a decode node."""
+        return self.worker_type == "decode"
