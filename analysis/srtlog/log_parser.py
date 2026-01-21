@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import yaml
 import pandas as pd
+from typing import Any
 
 from analysis.srtlog.models import NodeConfig, NodeInfo, NodeMetrics, BatchMetrics, MemoryMetrics
 from srtctl.backends import BackendType
@@ -28,7 +29,7 @@ class NodeAnalyzer:
     All parsing logic is encapsulated as methods.
     """
 
-    def parse_run_logs(self, run_path: str, return_dicts: bool = False) -> list:
+    def parse_run_logs(self, run_path: str, return_dicts: bool = False) -> list[NodeMetrics] | list[dict[str, Any]]:
         """Parse all node log files in a run directory.
 
         Uses parquet caching to avoid re-parsing on subsequent loads.

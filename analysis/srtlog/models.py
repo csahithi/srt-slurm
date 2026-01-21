@@ -5,12 +5,14 @@ Centralized location for all data models and type definitions.
 Includes both dataclasses (for objects) and TypedDicts (for dict typing).
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime
-from typing import Any, Literal, TypedDict
+from shutil import register_unpack_format
+from typing import Any, Literal
 
 import json
 import os
+from typing_extensions import override, TypedDict
 from pydantic import BaseModel, model_validator
 from pathlib import Path
 
@@ -220,7 +222,8 @@ class ProfilerMetadata(BaseModel):
             )
         else:
             raise ValueError("Unsupported version of {jobid}.json file.")
-
+    
+    
 
 @dataclass
 class ProfilerResults:
@@ -328,6 +331,21 @@ class ProfilerResults:
         self.completed = results.get("completed", [])
         self.num_prompts = results.get("num_prompts", [])
 
+    def get_datapoint(self, index: int) -> dict[str, Any]:
+        """Get a datapoint for a given index by iterating over all fields."""
+        
+        result: dict[str, Any] = {}
+        for f in fields(self):
+            values = getattr(self, f.name)
+            # Rename concurrency_values -> concurrency for output
+            key = "concurrency" if f.name == "concurrency_values" else f.name
+            if key == "concurrency":
+                default = 0
+            else:
+                default = None
+                
+            result[key] = values[index] if index < len(values) else default
+        return result
 
 @dataclass
 class BenchmarkRun:
@@ -539,7 +557,7 @@ class NodeInfo:
     worker_id: str
 
 @dataclass
-class NodeMetrics:
+class NodeMetrics():
     """Metrics from a single node (prefill or decode worker), parsed from log files."""
 
     node_info: NodeInfo | None = None  # Has node name, worker type, worker_id

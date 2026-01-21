@@ -18,32 +18,32 @@ import traceback
 from typing import TYPE_CHECKING, Any, Optional
 import json
 import pandas as pd
+from pydantic import BaseModel, Field, model_validator
 import yaml
 import os
 import numpy as np
 import sys
 
-from analysis.srtlog import BenchmarkRun, RunLoader
+from analysis.srtlog import BenchmarkRun, ProfilerMetadata, RunLoader
 from analysis.srtlog.cache_manager import CacheManager
 from analysis.srtlog.log_parser import NodeAnalyzer
-from analysis.srtlog.models import NodeMetrics, RunMetadata
+from analysis.srtlog.models import NodeMetrics, ProfilerResults, RunMetadata
 from srtctl.core.runtime import RuntimeContext
 from srtctl.core.schema import SrtConfig
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class BenchmarkDatapoint:
+class ReportDatapoint(BaseModel):
     """Single datapoint from a benchmark run."""
 
-    # Run metadata
+    # Run metadata (from RunMetadata)
     job_id: str
-    run_name: str
+    job_name: str  # run name
     run_date: str
-    benchmark_type: str
+    profiler_type: str  # benchmark type
 
-    # Resource config
+    # Resource config (from RunMetadata)
     gpu_type: str
     gpus_per_node: int
     prefill_nodes: int
@@ -51,13 +51,16 @@ class BenchmarkDatapoint:
     prefill_workers: int
     decode_workers: int
     agg_workers: int
+    
+    # Computed - must be provided explicitly
     total_gpus: int
 
-    # Benchmark params
+    # Benchmark params (from ProfilerMetadata)
     isl: int
     osl: int
-    concurrency: int
-    request_rate: float | None
+    concurrency: int  # from ProfilerResults.get_datapoint()
+    concurrencies: list[int] | str  # expected concurrencies from ProfilerMetadata
+    request_rate: float | str | None
 
     # Throughput metrics
     output_tps: float
@@ -98,9 +101,10 @@ class BenchmarkDatapoint:
     output_tps_per_user: float | None = None
 
     # Node metrics (shared across all datapoints from the same run)
-    node_metrics: list[NodeMetrics] = field(default_factory=list)
+    node_metrics: list[NodeMetrics] = Field(default_factory=list)
 
-    def __post_init__(self):
+    @model_validator(mode="after")
+    def compute_derived_metrics(self) -> "ReportDatapoint":
         """Compute derived metrics."""
         if self.total_gpus > 0:
             self.output_tps_per_gpu = self.output_tps / self.total_gpus
@@ -109,6 +113,132 @@ class BenchmarkDatapoint:
 
         if self.mean_tpot_ms is not None and self.mean_tpot_ms > 0:
             self.output_tps_per_user = 1000 / self.mean_tpot_ms
+        
+        return self
+
+    def summarize_node_metrics(self) -> dict[str, Any]:
+        """Summarize node metrics for DataFrame inclusion. 
+
+        Args:
+            node_metrics: List of NodeMetrics objects
+
+        Returns:
+            Dict with summary statistics
+        """
+        summary: dict[str, Any] = {
+            "num_nodes": len(self.node_metrics),
+            "num_prefill_nodes": sum(1 for n in self.node_metrics if n.is_prefill),
+            "num_decode_nodes": sum(1 for n in self.node_metrics if n.is_decode),
+            "total_batches": sum(len(n.batches) for n in self.node_metrics),
+            "total_memory_snapshots": sum(len(n.memory_snapshots) for n in self.node_metrics),
+        }
+
+        # Aggregate batch metrics across all nodes
+        all_batches = [b for n in self.node_metrics for b in n.batches]
+        if all_batches:
+            # Filter for batches that have batch_size attribute
+            batch_sizes = [b.batch_size for b in all_batches if hasattr(b, "batch_size") and b.batch_size is not None]
+            running_reqs = [b.running_req for b in all_batches if b.running_req is not None]
+            queue_reqs = [b.queue_req for b in all_batches if b.queue_req is not None]
+            
+            if batch_sizes:
+                summary["avg_batch_size"] = sum(batch_sizes) / len(batch_sizes)
+            if running_reqs:
+                summary["avg_running_reqs"] = sum(running_reqs) / len(running_reqs)
+            if queue_reqs:
+                summary["avg_pending_reqs"] = sum(queue_reqs) / len(queue_reqs)
+
+        # Aggregate memory metrics across all nodes
+        all_memory = [m for n in self.node_metrics for m in n.memory_snapshots]
+        if all_memory:
+            # Memory usage (filter out None values)
+            mem_values = [m.mem_usage_gb for m in all_memory if m.mem_usage_gb is not None]
+            if mem_values:
+                summary["avg_mem_usage_gb"] = sum(mem_values) / len(mem_values)
+                summary["peak_mem_usage_gb"] = max(mem_values)
+
+            # KV cache usage (filter out None values)
+            kv_values = [m.kv_cache_gb for m in all_memory if m.kv_cache_gb is not None]
+            if kv_values:
+                summary["avg_kv_cache_gb"] = sum(kv_values) / len(kv_values)
+                summary["peak_kv_cache_gb"] = max(kv_values)
+
+        # Extract prefill config (from first prefill node - same for all)
+        prefill_nodes = [n for n in self.node_metrics if n.is_prefill]
+        if prefill_nodes and prefill_nodes[0].config:
+            config = prefill_nodes[0].config
+            # Handle both NodeConfig dataclass and legacy dict
+            if hasattr(config, "server_args"):
+                # NodeConfig dataclass - server_args contains flattened config
+                server_args = config.server_args or {}
+                summary.update({
+                    f"prefill_config_{k}": v for k, v in server_args.items()
+                    if k != "command"
+                })
+                # Include environment variables
+                if hasattr(config, "environment") and config.environment:
+                    summary.update({
+                        f"prefill_env_{k}": v for k, v in config.environment.items()
+                    })
+            elif isinstance(config, dict) and "trtllm_config" in config:
+                # Legacy dict format
+                summary.update({
+                    f"prefill_config_{k}": v for k, v in config["trtllm_config"].items()
+                    if k != "command"
+                })
+
+            # Concatenate all commands from all prefill nodes
+            prefill_commands = []
+            for n in prefill_nodes:
+                if n.config and hasattr(n.config, "server_args") and n.config.server_args:
+                    cmd = n.config.server_args.get("command")
+                    if cmd:
+                        prefill_commands.append(f"{n.node_name}: {cmd}")
+            if prefill_commands:
+                summary["prefill_command"] = "\n".join(prefill_commands)
+
+        # Extract decode config (from first decode node - same for all)
+        decode_nodes = [n for n in self.node_metrics if n.is_decode]
+        if decode_nodes and decode_nodes[0].config:
+            config = decode_nodes[0].config
+            # Handle both NodeConfig dataclass and legacy dict
+            if hasattr(config, "server_args"):
+                # NodeConfig dataclass - server_args contains flattened config
+                server_args = config.server_args or {}
+                summary.update({
+                    f"decode_config_{k}": v for k, v in server_args.items()
+                    if k != "command"
+                })
+                # Include environment variables
+                if hasattr(config, "environment") and config.environment:
+                    summary.update({
+                        f"decode_env_{k}": v for k, v in config.environment.items()
+                    })
+            elif isinstance(config, dict) and "trtllm_config" in config:
+                # Legacy dict format
+                summary.update({
+                    f"decode_config_{k}": v for k, v in config["trtllm_config"].items()
+                    if k != "command"
+                })
+
+            # Concatenate all commands from all decode nodes
+            decode_commands = []
+            for n in decode_nodes:
+                if n.config and hasattr(n.config, "server_args") and n.config.server_args:
+                    cmd = n.config.server_args.get("command")
+                    if cmd:
+                        decode_commands.append(f"{n.node_name}: {cmd}")
+            if decode_commands:
+                summary["decode_command"] = "\n".join(decode_commands)
+
+        return summary
+
+    def get_summary(self) -> dict[str, Any]:
+        """Get a summary of the report datapoint."""
+        ret = self.model_dump()
+        ret.pop("node_metrics")
+        ret.update(self.summarize_node_metrics())   # this is a dict
+        return ret
 
 
 @dataclass
@@ -128,7 +258,7 @@ class ResultsExporter:
     config: Optional[SrtConfig] = None
     runtime: Optional[RuntimeContext] = None
     log_dir: Optional[str] = None
-    datapoints: list[BenchmarkDatapoint] = field(default_factory=list)
+    datapoints: list[ReportDatapoint] = field(default_factory=list)
 
     @classmethod
     def from_log_dir(cls, log_dir: str) -> "ResultsExporter":
@@ -151,13 +281,13 @@ class ResultsExporter:
             return str(self.runtime.log_dir)
         raise ValueError("Either log_dir or runtime must be provided")
 
-    def collect_results(self) -> list[BenchmarkDatapoint]:
+    def collect_results(self) -> list[ReportDatapoint]:
         """Collect benchmark results from the log directory.
 
         Uses RunLoader to parse benchmark runs from the log directory.
 
         Returns:
-            List of BenchmarkDatapoint objects
+            List of ReportDatapoint objects
         """
         log_dir = self._get_log_dir()
 
@@ -182,8 +312,8 @@ class ResultsExporter:
         logger.info(f"Collected {len(datapoints)} datapoints from {len(runs)} benchmark runs")
         return datapoints
 
-    def _convert_run_to_datapoints(self, run: BenchmarkRun) -> list[BenchmarkDatapoint]:
-        """Convert a BenchmarkRun to BenchmarkDatapoint objects.
+    def _convert_run_to_datapoints(self, run: BenchmarkRun) -> list[ReportDatapoint]:
+        """Convert a BenchmarkRun to ReportDatapoint objects.
 
         Each concurrency level in the run becomes a separate datapoint.
         Node metrics are fetched once and shared across all datapoints from the same run.
@@ -192,66 +322,25 @@ class ResultsExporter:
             run: BenchmarkRun object from RunLoader
 
         Returns:
-            List of BenchmarkDatapoint objects
+            List of ReportDatapoint objects
         """
         datapoints = []
-        meta: RunMetadata = run.metadata
-        profiler_results = run.profiler_results
-        profiler_metadata = run.profiler_metadata
+        run_metadata: RunMetadata = run.metadata
+        profiler_results: ProfilerResults = run.profiler_results
+        profiler_metadata: ProfilerMetadata = run.profiler_metadata
 
         # Fetch node metrics for this run (shared across all datapoints)
-        node_metrics = self._get_node_metrics_for_run(meta.path)
+        node_metrics: list[NodeMetrics] = self._get_node_metrics_for_run(run_metadata.path)
 
         # Create a datapoint for each concurrency level
         num_results = len(profiler_results.concurrency_values)
         for i in range(num_results):
-            datapoint = BenchmarkDatapoint(
-                # Run metadata
-                job_id=meta.job_id,
-                run_name=meta.job_name or (self.runtime.run_name if self.runtime else ""),
-                run_date=meta.run_date,
-                benchmark_type=profiler_metadata.profiler_type,
-                # Resource config
-                gpu_type=meta.gpu_type,
-                gpus_per_node=meta.gpus_per_node,
-                prefill_nodes=meta.prefill_nodes,
-                decode_nodes=meta.decode_nodes,
-                prefill_workers=meta.prefill_workers,
-                decode_workers=meta.decode_workers,
-                agg_workers=meta.agg_workers,
-                total_gpus=meta.total_gpus,
-                # Benchmark params
-                isl=int(profiler_metadata.isl) if profiler_metadata.isl else 0,
-                osl=int(profiler_metadata.osl) if profiler_metadata.osl else 0,
-                concurrency=profiler_results.concurrency_values[i] if i < len(profiler_results.concurrency_values) else 0,
-                request_rate=profiler_results.request_rate[i] if i < len(profiler_results.request_rate) else None,
-                # Throughput metrics
-                output_tps=profiler_results.output_tps[i],
-                total_tps=profiler_results.total_tps[i] if i < len(profiler_results.total_tps) else None,
-                request_throughput=profiler_results.request_throughput[i] if i < len(profiler_results.request_throughput) else None,
-                request_goodput=profiler_results.request_goodput[i] if i < len(profiler_results.request_goodput) else None,
-                # Mean latencies
-                mean_ttft_ms=profiler_results.mean_ttft_ms[i] if i < len(profiler_results.mean_ttft_ms) else None,
-                mean_tpot_ms=profiler_results.mean_tpot_ms[i] if i < len(profiler_results.mean_tpot_ms) else None,
-                mean_itl_ms=profiler_results.mean_itl_ms[i] if i < len(profiler_results.mean_itl_ms) else None,
-                mean_e2el_ms=profiler_results.mean_e2el_ms[i] if i < len(profiler_results.mean_e2el_ms) else None,
-                # Median latencies
-                median_ttft_ms=profiler_results.median_ttft_ms[i] if i < len(profiler_results.median_ttft_ms) else None,
-                median_tpot_ms=profiler_results.median_tpot_ms[i] if i < len(profiler_results.median_tpot_ms) else None,
-                median_itl_ms=profiler_results.median_itl_ms[i] if i < len(profiler_results.median_itl_ms) else None,
-                median_e2el_ms=profiler_results.median_e2el_ms[i] if i < len(profiler_results.median_e2el_ms) else None,
-                # P99 latencies
-                p99_ttft_ms=profiler_results.p99_ttft_ms[i] if i < len(profiler_results.p99_ttft_ms) else None,
-                p99_tpot_ms=profiler_results.p99_tpot_ms[i] if i < len(profiler_results.p99_tpot_ms) else None,
-                p99_itl_ms=profiler_results.p99_itl_ms[i] if i < len(profiler_results.p99_itl_ms) else None,
-                p99_e2el_ms=profiler_results.p99_e2el_ms[i] if i < len(profiler_results.p99_e2el_ms) else None,
-                # Token counts
-                total_input_tokens=profiler_results.total_input_tokens[i] if i < len(profiler_results.total_input_tokens) else None,
-                total_output_tokens=profiler_results.total_output_tokens[i] if i < len(profiler_results.total_output_tokens) else None,
-                # Run metadata
-                duration=profiler_results.duration[i] if i < len(profiler_results.duration) else None,
-                completed=profiler_results.completed[i] if i < len(profiler_results.completed) else None,
-                num_prompts=profiler_results.num_prompts[i] if i < len(profiler_results.num_prompts) else None,
+            datapoint = ReportDatapoint(
+                **run_metadata.model_dump(),
+                **profiler_metadata.model_dump(),
+                **profiler_results.get_datapoint(i),
+                # Computed fields not in model_dump()
+                total_gpus=run_metadata.total_gpus,
                 # Node metrics (shared across all concurrency levels in this run)
                 node_metrics=node_metrics,
             )
@@ -278,18 +367,6 @@ class ResultsExporter:
             logger.warning(f"Failed to parse node metrics for {run_path}: {traceback.format_exc()}")
             return []
 
-    def collect_node_metrics(self) -> list[dict[str, Any]]:
-        """Collect node-level metrics from log files.
-
-        Uses NodeAnalyzer to parse .err/.out files for detailed metrics.
-
-        Returns:
-            List of node metrics dicts
-        """
-        log_dir = self._get_log_dir()
-        analyzer = NodeAnalyzer()
-        return analyzer.parse_run_logs(log_dir, return_dicts=True)
-
     def to_dataframe(self, include_node_metrics: bool = True):
         """Convert datapoints to pandas DataFrame.
 
@@ -305,164 +382,10 @@ class ResultsExporter:
         if not self.datapoints:
             return pd.DataFrame()
 
-        # Convert datapoints to dicts
-        rows = []
-        for dp in self.datapoints:
-            row = {
-                # Run metadata
-                "job_id": dp.job_id,
-                "run_name": dp.run_name,
-                "run_date": dp.run_date,
-                "benchmark_type": dp.benchmark_type,
-                # Resource config
-                "gpu_type": dp.gpu_type,
-                "gpus_per_node": dp.gpus_per_node,
-                "prefill_nodes": dp.prefill_nodes,
-                "decode_nodes": dp.decode_nodes,
-                "prefill_workers": dp.prefill_workers,
-                "decode_workers": dp.decode_workers,
-                "agg_workers": dp.agg_workers,
-                "total_gpus": dp.total_gpus,
-                # Benchmark params
-                "isl": dp.isl,
-                "osl": dp.osl,
-                "concurrency": dp.concurrency,
-                "request_rate": dp.request_rate,
-                # Throughput metrics
-                "output_tps": dp.output_tps,
-                "total_tps": dp.total_tps,
-                "request_throughput": dp.request_throughput,
-                "request_goodput": dp.request_goodput,
-                # Computed throughput metrics
-                "output_tps_per_gpu": dp.output_tps_per_gpu,
-                "total_tps_per_gpu": dp.total_tps_per_gpu,
-                "output_tps_per_user": dp.output_tps_per_user,
-                # Mean latencies
-                "mean_ttft_ms": dp.mean_ttft_ms,
-                "mean_tpot_ms": dp.mean_tpot_ms,
-                "mean_itl_ms": dp.mean_itl_ms,
-                "mean_e2el_ms": dp.mean_e2el_ms,
-                # Median latencies
-                "median_ttft_ms": dp.median_ttft_ms,
-                "median_tpot_ms": dp.median_tpot_ms,
-                "median_itl_ms": dp.median_itl_ms,
-                "median_e2el_ms": dp.median_e2el_ms,
-                # P99 latencies
-                "p99_ttft_ms": dp.p99_ttft_ms,
-                "p99_tpot_ms": dp.p99_tpot_ms,
-                "p99_itl_ms": dp.p99_itl_ms,
-                "p99_e2el_ms": dp.p99_e2el_ms,
-                # Token counts
-                "total_input_tokens": dp.total_input_tokens,
-                "total_output_tokens": dp.total_output_tokens,
-                # Run metadata
-                "duration": dp.duration,
-                "completed": dp.completed,
-                "num_prompts": dp.num_prompts,
-            }
-
-            # Add node metrics summary
-            if include_node_metrics and dp.node_metrics:
-                node_summary = self._summarize_node_metrics(dp.node_metrics)
-                row.update(node_summary)
-
-            rows.append(row)
-
+        # Convert datapoints to summaries
+        rows = [dp.get_summary() for dp in self.datapoints]
         return pd.DataFrame(rows)
-
-    def _summarize_node_metrics(self, node_metrics: list[NodeMetrics]) -> dict[str, Any]:
-        """Summarize node metrics for DataFrame inclusion.
-
-        Args:
-            node_metrics: List of NodeMetrics objects
-
-        Returns:
-            Dict with summary statistics
-        """
-        summary: dict[str, Any] = {
-            "num_nodes": len(node_metrics),
-            "num_prefill_nodes": sum(1 for n in node_metrics if n.is_prefill),
-            "num_decode_nodes": sum(1 for n in node_metrics if n.is_decode),
-            "total_batches": sum(len(n.batches) for n in node_metrics),
-            "total_memory_snapshots": sum(len(n.memory_snapshots) for n in node_metrics),
-        }
-
-        # Aggregate batch metrics across all nodes
-        all_batches = [b for n in node_metrics for b in n.batches]
-        if all_batches:
-            summary["avg_batch_size"] = sum(b.batch_size for b in all_batches) / len(all_batches)
-            summary["avg_running_reqs"] = sum(b.running_reqs for b in all_batches) / len(all_batches)
-            summary["avg_pending_reqs"] = sum(b.pending_reqs for b in all_batches) / len(all_batches)
-
-        # Aggregate memory metrics across all nodes
-        all_memory = [m for n in node_metrics for m in n.memory_snapshots]
-        if all_memory:
-            # Memory usage (filter out None values)
-            mem_values = [m.mem_usage_gb for m in all_memory if m.mem_usage_gb is not None]
-            if mem_values:
-                summary["avg_mem_usage_gb"] = sum(mem_values) / len(mem_values)
-                summary["peak_mem_usage_gb"] = max(mem_values)
-
-            # KV cache usage (filter out None values)
-            kv_values = [m.kv_cache_gb for m in all_memory if m.kv_cache_gb is not None]
-            if kv_values:
-                summary["avg_kv_cache_gb"] = sum(kv_values) / len(kv_values)
-                summary["peak_kv_cache_gb"] = max(kv_values)
-
-        # Extract prefill config (from first prefill node - same for all)
-        prefill_nodes = [n for n in node_metrics if n.is_prefill]
-        if prefill_nodes and prefill_nodes[0].config:
-            config = prefill_nodes[0].config
-            # Handle both NodeConfig dataclass and legacy dict
-            if hasattr(config, "server_args"):
-                # NodeConfig dataclass - server_args contains flattened config
-                server_args = config.server_args or {}
-                summary.update({
-                    f"prefill_trtllm_config_{k}": v for k, v in server_args.items()
-                })
-            else:
-                # Legacy dict format
-                if "trtllm_config" in config:
-                    summary.update({
-                        f"prefill_trtllm_config_{k}": v for k, v in config["trtllm_config"].items()
-                        if k != "command"
-                    })
-            
-            # commands. concatenate all commands from all prefill nodes
-            prefill_commands = []
-            for n in prefill_nodes:
-                if n.config and n.config.server_args and n.config.server_args.get("command"):
-                    prefill_commands.append(f"{n.node_name}: {n.config.server_args['command']}")
-            summary["prefill_command"] = "\n".join(prefill_commands)
-
-        # Extract decode config (from first decode node - same for all)
-        decode_nodes = [n for n in node_metrics if n.is_decode]
-        if decode_nodes and decode_nodes[0].config:
-            config = decode_nodes[0].config
-            # Handle both NodeConfig dataclass and legacy dict
-            if hasattr(config, "server_args"):
-                # NodeConfig dataclass - server_args contains flattened config
-                server_args = config.server_args or {}
-                summary.update({
-                    f"decode_trtllm_config_{k}": v for k, v in server_args.items()
-                    if k != "command"
-                })
-            else:
-                # Legacy dict format
-                if "trtllm_config" in config:
-                    summary.update({
-                        f"decode_trtllm_config_{k}": v for k, v in config["trtllm_config"].items()
-                    })
-                    
-            # commands. concatenate all commands from all decode nodes
-            decode_commands = []
-            for n in decode_nodes:
-                if n.config and n.config.server_args and n.config.server_args.get("command"):
-                    decode_commands.append(f"{n.node_name}: {n.config.server_args['command']}")
-            summary["decode_command"] = "\n".join(decode_commands)
-
-        return summary
-
+    
     def export(self, output_dir: Path | None = None) -> dict[str, Path]:
         """Export results to CSV and Parquet formats.
 
@@ -620,7 +543,7 @@ if __name__ == "__main__":
 
     if not exporter.datapoints:
         logger.error("No datapoints found")
-        sys.exit(1)
+        sys.exit(0)
 
     logger.info(f"Found {len(exporter.datapoints)} datapoints")
 
