@@ -16,6 +16,7 @@ dependencies = [
     "requests>=2.31.0",
     "rich>=13.0.0",
     "questionary>=2.0.0",
+    "pydantic>=2.12.5",
 ]
 
 [project.scripts]

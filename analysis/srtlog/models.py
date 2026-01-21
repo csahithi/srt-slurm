@@ -7,36 +7,69 @@ Includes both dataclasses (for objects) and TypedDicts (for dict typing).
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 import json
 import os
+from pydantic import BaseModel, model_validator
+from pathlib import Path
 
-@dataclass
-class RunMetadata:
-    """Metadata about a benchmark run from {jobid}.json."""
+class RunMetadata(BaseModel):
+    """
+    Metadata about a benchmark run from {jobid}.json.
+    this provides a materialized view on disk for the srtctl.core.schema.SrtConfig class.
+    """
 
     job_id: str
-    path: str
+    job_name: str
     run_date: str
+
+    # modelconfig
+    model_dir: str
     container: str
-    prefill_nodes: int
-    decode_nodes: int
-    prefill_workers: int
-    decode_workers: int
-    mode: str
-    # Optional fields
-    job_name: str = ""
-    partition: str = ""
-    model_dir: str = ""
+    precision: str
+
+    # resourceconfig
+    gpu_type: str
     gpus_per_node: int = 0
-    gpu_type: str = ""
-    enable_multiple_frontends: bool = False
-    num_additional_frontends: int = 0
-    # Aggregated mode fields
+    prefill_nodes: int = 0
+    decode_nodes: int = 0
+    prefill_workers: int = 0
+    decode_workers: int = 0
     agg_nodes: int = 0
     agg_workers: int = 0
 
+    # Slurm configs
+    path: Path
+    partition: str
+    
+    # Frontend configs
+    frontend_type: str = "dynamo"
+    enable_multiple_frontends: bool = False
+    num_additional_frontends: int = 0
+
+    @model_validator(mode="after")
+    def validate_resource_config(self) -> "RunMetadata":
+        """
+        Make sure that resource config is correctly parsed.
+        1. either disagg fields are set or agg fields are set, but not both.
+        """
+        disagg_nodes_are_correct = self.prefill_nodes > 0 and self.decode_nodes > 0
+        disagg_workers_are_correct = self.prefill_workers + self.decode_workers > 0
+
+        agg_nodes_are_correct = self.agg_nodes > 0
+        agg_workers_are_correct = self.agg_workers > 0
+
+        # either disagg_nodes and workers or agg_nodes and workers are set, but not both.
+        if disagg_nodes_are_correct and disagg_workers_are_correct:
+            if agg_nodes_are_correct or agg_workers_are_correct:
+                raise ValueError("Disaggregated mode cannot have agg_nodes and agg_workers set.")
+
+        if agg_nodes_are_correct and agg_workers_are_correct:
+            if disagg_nodes_are_correct or disagg_workers_are_correct:
+                raise ValueError("Aggregated mode cannot have disagg_nodes and disagg_workers set.")
+
+        return self
 
     @classmethod
     def from_json(cls, json_data: dict, run_path: str) -> "RunMetadata":
@@ -60,49 +93,62 @@ class RunMetadata:
             model = json_data.get("model", {})
             return cls(
                 job_id=str(json_data.get("job_id", "")),
-                path=run_path,
+                job_name=json_data.get("job_name", ""),
                 run_date=json_data.get("generated_at", ""),
+                
+                model_dir=model.get("path", ""),
+                precision=model.get("precision", ""),
                 container=model.get("container", ""),
+                
                 prefill_nodes=resources.get("prefill_nodes", 0),
                 decode_nodes=resources.get("decode_nodes", 0),
                 prefill_workers=resources.get("prefill_workers", 0),
                 decode_workers=resources.get("decode_workers", 0),
-                mode="disaggregated" if resources.get("prefill_nodes", 0) > 0 else "aggregated",
-                job_name=json_data.get("job_name", ""),
-                partition=json_data.get("partition", ""),
-                model_dir=model.get("path", ""),
                 gpus_per_node=resources.get("gpus_per_node", 0),
                 gpu_type=resources.get("gpu_type", ""),
-                enable_multiple_frontends=json_data.get("enable_multiple_frontends", False),
-                num_additional_frontends=json_data.get("num_additional_frontends", 0),
                 agg_nodes=resources.get("agg_nodes", 0),
                 agg_workers=resources.get("agg_workers", 0),
+
+                frontend_type=json_data.get("frontend_type", "dynamo"),
+                enable_multiple_frontends=json_data.get("enable_multiple_frontends", False),
+                num_additional_frontends=json_data.get("num_additional_frontends", 0),
+                
+                path=Path(run_path),
+                partition=json_data.get("partition", ""),
             )
         else:
-            # v1.0 format: run_metadata section
-            run_meta = json_data.get("run_metadata", {})
-            mode = run_meta.get("mode", "disaggregated")
+            raise ValueError("Unsupported version of {jobid}.json file.")
+            # # v1.0 format: run_metadata section
+            # run_meta = json_data.get("run_metadata", {})
+            # mode = run_meta.get("mode", "disaggregated")
 
-            return cls(
-                job_id=run_meta.get("slurm_job_id", ""),
-                path=run_path,
-                run_date=run_meta.get("run_date", ""),
-                container=run_meta.get("container", ""),
-                prefill_nodes=run_meta.get("prefill_nodes", 0),
-                decode_nodes=run_meta.get("decode_nodes", 0),
-                prefill_workers=run_meta.get("prefill_workers", 0),
-                decode_workers=run_meta.get("decode_workers", 0),
-                mode=mode,
-                job_name=run_meta.get("job_name", ""),
-                partition=run_meta.get("partition", ""),
-                model_dir=run_meta.get("model_dir", ""),
-                gpus_per_node=run_meta.get("gpus_per_node", 0),
-                gpu_type=run_meta.get("gpu_type", ""),
-                enable_multiple_frontends=run_meta.get("enable_multiple_frontends", False),
-                num_additional_frontends=run_meta.get("num_additional_frontends", 0),
-                agg_nodes=run_meta.get("agg_nodes", 0),
-                agg_workers=run_meta.get("agg_workers", 0),
-            )
+            # return cls(
+            #     job_id=run_meta.get("slurm_job_id", ""),
+            #     path=run_path,
+            #     run_date=run_meta.get("run_date", ""),
+            #     container=run_meta.get("container", ""),
+            #     prefill_nodes=run_meta.get("prefill_nodes", 0),
+            #     decode_nodes=run_meta.get("decode_nodes", 0),
+            #     prefill_workers=run_meta.get("prefill_workers", 0),
+            #     decode_workers=run_meta.get("decode_workers", 0),
+            #     mode=mode,
+            #     job_name=run_meta.get("job_name", ""),
+            #     partition=run_meta.get("partition", ""),
+            #     model_dir=run_meta.get("model_dir", ""),
+            #     gpus_per_node=run_meta.get("gpus_per_node", 0),
+            #     gpu_type=run_meta.get("gpu_type", ""),
+            #     enable_multiple_frontends=run_meta.get("enable_multiple_frontends", False),
+            #     num_additional_frontends=run_meta.get("num_additional_frontends", 0),
+            #     agg_nodes=run_meta.get("agg_nodes", 0),
+            #     agg_workers=run_meta.get("agg_workers", 0),
+            # )
+
+    @property
+    def mode(self) -> str:
+        """Get the mode of the run."""
+        if self.prefill_nodes > 0 and self.decode_nodes > 0:
+            return "disaggregated"
+        return "aggregated"
 
     @property
     def is_aggregated(self) -> bool:
@@ -141,10 +187,10 @@ class RunMetadata:
         except (ValueError, TypeError):
             return self.run_date
 
-
-@dataclass
-class ProfilerMetadata:
-    """Metadata about the profiler configuration from {jobid}.json.
+class ProfilerMetadata(BaseModel):
+    """
+    
+    This provides a materialized view on disk for the srtctl.core.schema.ProfilingConfig class.
 
     Attributes:
         profiler_type: Type of profiler (e.g., 'sa-bench', 'vllm-bench')
@@ -154,28 +200,32 @@ class ProfilerMetadata:
         req_rate: Request rate (e.g., 'inf' or numeric)
     """
 
-    profiler_type: str
-    isl: str
-    osl: str
-    concurrencies: str = ""
-    req_rate: str = ""
+    profiler_type: Literal["sa-bench", "manual"]
+    isl: int
+    osl: int
+    concurrencies: list[int] | str
+    req_rate: str | int = "inf"
 
     @classmethod
-    def from_json(cls, json_data: dict) -> "ProfilerMetadata":
+    def from_job_id_json(cls, json_data: dict) -> "ProfilerMetadata":
         """Create from {jobid}.json profiler_metadata section."""
-        profiler_meta = json_data.get("profiler_metadata", json_data.get("benchmark", {}))
-        return cls(
-            profiler_type=profiler_meta.get("type", "unknown"),
-            isl=str(profiler_meta.get("isl", "")),
-            osl=str(profiler_meta.get("osl", "")),
-            concurrencies=profiler_meta.get("concurrencies", ""),
-            req_rate=profiler_meta.get("req-rate", ""),
-        )
+        if json_data.get("version") == "2.0":
+            benchmark = json_data.get("benchmark", {})
+            return cls(
+                profiler_type=benchmark.get("type"),
+                isl=benchmark.get("isl"),
+                osl=benchmark.get("osl"),
+                concurrencies=benchmark.get("concurrencies", []),
+                req_rate=benchmark.get("req-rate", "inf"),
+            )
+        else:
+            raise ValueError("Unsupported version of {jobid}.json file.")
 
 
 @dataclass
 class ProfilerResults:
     """Results from profiler benchmarks.
+    Only supports sa-bench for now.
 
     Parses 32 out of 39 fields from benchmark JSON output.
 
@@ -184,9 +234,6 @@ class ProfilerResults:
     - errors, generated_texts: Per-request data (not needed for aggregate analysis)
     - tokenizer_id, best_of, burstiness: Metadata not critical for dashboards
     """
-
-    metadata: ProfilerMetadata
-
     # Primary throughput metrics (per concurrency level)
     output_tps: list[float] = field(default_factory=list)
     total_tps: list[float] = field(default_factory=list)
@@ -231,40 +278,7 @@ class ProfilerResults:
     completed: list[int] = field(default_factory=list)
     num_prompts: list[int] = field(default_factory=list)
 
-    @classmethod
-    def from_json(cls, json_data: dict) -> "ProfilerResults":
-        """Create from {jobid}.json profiler_metadata section.
-
-        Args:
-            json_data: Parsed JSON from {jobid}.json file
-
-        Returns:
-            ProfilerResults instance (benchmark data added later from result files)
-        """
-        return cls(metadata=ProfilerMetadata.from_json(json_data))
-
-    # Backward-compatible properties delegating to metadata
-    @property
-    def profiler_type(self) -> str:
-        return self.metadata.profiler_type
-
-    @property
-    def isl(self) -> str:
-        return self.metadata.isl
-
-    @property
-    def osl(self) -> str:
-        return self.metadata.osl
-
-    @property
-    def concurrencies(self) -> str:
-        return self.metadata.concurrencies
-
-    @property
-    def req_rate(self) -> str:
-        return self.metadata.req_rate
-
-    def add_benchmark_results(self, results: dict) -> None:
+    def load_results_from_cached_json(self, results: dict) -> None:
         """Add actual benchmark results from profiler output files.
 
         Args:
@@ -320,14 +334,16 @@ class BenchmarkRun:
     """Complete benchmark run with metadata and profiler results."""
 
     metadata: RunMetadata
-    profiler: ProfilerResults
-    is_complete: bool = True
+    profiler_metadata: ProfilerMetadata
+
+    profiler_results: ProfilerResults = field(default_factory=ProfilerResults)
     missing_concurrencies: list[int] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
 
     @classmethod
     def from_json_file(cls, run_path: str, job_id: int | None = None) -> "BenchmarkRun | None":
-        """Create from {jobid}.json file in the run directory.
+        """
+        Each run directory contains a {jobid}.json file.
 
         Args:
             run_path: Path to the run directory containing {jobid}.json
@@ -353,10 +369,10 @@ class BenchmarkRun:
                 json_data = json.load(f)
 
             metadata = RunMetadata.from_json(json_data, run_path)
-            profiler = ProfilerResults.from_json(json_data)
+            profiler_metadata = ProfilerMetadata.from_job_id_json(json_data)
             tags = json_data.get("tags", [])
 
-            return cls(metadata=metadata, profiler=profiler, tags=tags)
+            return cls(metadata=metadata, profiler_metadata=profiler_metadata, tags=tags)
         except Exception:
             return None
 
@@ -377,27 +393,30 @@ class BenchmarkRun:
         Updates is_complete and missing_concurrencies fields.
         """
         # Parse expected concurrencies from metadata
-        if not self.profiler.concurrencies:
+        if not self.profiler_metadata.concurrencies:
             # No expected concurrencies specified, assume manual run
-            self.is_complete = True
             self.missing_concurrencies = []
             return
 
         expected = set()
-        for val in self.profiler.concurrencies.split("x"):
+        for val in self.profiler_metadata.concurrencies.split("x"):
             try:
                 expected.add(int(val.strip()))
             except ValueError:
                 continue
 
         # Get actual concurrencies from results
-        actual = set(self.profiler.concurrency_values)
+        actual = set(self.profiler_results.concurrency_values)
 
         # Find missing ones
         missing = expected - actual
 
-        self.is_complete = len(missing) == 0
         self.missing_concurrencies = sorted(missing)
+
+    @property
+    def is_complete(self) -> bool:
+        """Check if all expected benchmark results are present."""
+        return len(self.missing_concurrencies) == 0
 
 
 @dataclass

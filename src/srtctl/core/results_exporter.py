@@ -15,7 +15,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 import traceback
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 import json
 import pandas as pd
 import yaml
@@ -26,10 +26,9 @@ import sys
 from analysis.srtlog import BenchmarkRun, RunLoader
 from analysis.srtlog.cache_manager import CacheManager
 from analysis.srtlog.log_parser import NodeAnalyzer
-from analysis.srtlog.models import NodeMetrics
-if TYPE_CHECKING:
-    from srtctl.core.runtime import RuntimeContext
-    from srtctl.core.schema import SrtConfig
+from analysis.srtlog.models import NodeMetrics, RunMetadata
+from srtctl.core.runtime import RuntimeContext
+from srtctl.core.schema import SrtConfig
 
 logger = logging.getLogger(__name__)
 
@@ -126,9 +125,9 @@ class ResultsExporter:
         df = exporter.to_dataframe()
     """
 
-    config: "SrtConfig | None" = None
-    runtime: "RuntimeContext | None" = None
-    log_dir: str | None = None
+    config: Optional[SrtConfig] = None
+    runtime: Optional[RuntimeContext] = None
+    log_dir: Optional[str] = None
     datapoints: list[BenchmarkDatapoint] = field(default_factory=list)
 
     @classmethod
@@ -147,6 +146,7 @@ class ResultsExporter:
         """Get the log directory path."""
         if self.log_dir:
             return self.log_dir
+
         if self.runtime:
             return str(self.runtime.log_dir)
         raise ValueError("Either log_dir or runtime must be provided")
@@ -169,8 +169,8 @@ class ResultsExporter:
             logger.warning(f"No benchmark runs found in {log_dir}")
             if skipped:
                 logger.info(f"Skipped {len(skipped)} runs:")
-                for job_id, run_dir, reason in skipped[:5]:
-                    logger.info(f"  {job_id} ({run_dir}): {reason}")
+                for skipped_run in skipped[:5]:
+                    logger.info(f"  {skipped_run.run_id_path_pair.job_id} ({skipped_run.run_id_path_pair.run_dir}): {skipped_run.reason}")
             return []
 
         datapoints = []
@@ -195,27 +195,22 @@ class ResultsExporter:
             List of BenchmarkDatapoint objects
         """
         datapoints = []
-        meta = run.metadata
-        profiler = run.profiler
-
-        # Calculate total GPUs
-        if meta.mode == "disaggregated":
-            total_gpus = (meta.prefill_nodes * meta.gpus_per_node) + (meta.decode_nodes * meta.gpus_per_node)
-        else:
-            total_gpus = meta.agg_nodes * meta.gpus_per_node
+        meta: RunMetadata = run.metadata
+        profiler_results = run.profiler_results
+        profiler_metadata = run.profiler_metadata
 
         # Fetch node metrics for this run (shared across all datapoints)
         node_metrics = self._get_node_metrics_for_run(meta.path)
 
         # Create a datapoint for each concurrency level
-        num_results = len(profiler.output_tps)
+        num_results = len(profiler_results.concurrency_values)
         for i in range(num_results):
             datapoint = BenchmarkDatapoint(
                 # Run metadata
                 job_id=meta.job_id,
                 run_name=meta.job_name or (self.runtime.run_name if self.runtime else ""),
                 run_date=meta.run_date,
-                benchmark_type=profiler.profiler_type,
+                benchmark_type=profiler_metadata.profiler_type,
                 # Resource config
                 gpu_type=meta.gpu_type,
                 gpus_per_node=meta.gpus_per_node,
@@ -224,39 +219,39 @@ class ResultsExporter:
                 prefill_workers=meta.prefill_workers,
                 decode_workers=meta.decode_workers,
                 agg_workers=meta.agg_workers,
-                total_gpus=total_gpus,
+                total_gpus=meta.total_gpus,
                 # Benchmark params
-                isl=int(profiler.isl) if profiler.isl else 0,
-                osl=int(profiler.osl) if profiler.osl else 0,
-                concurrency=profiler.concurrency_values[i] if i < len(profiler.concurrency_values) else 0,
-                request_rate=profiler.request_rate[i] if i < len(profiler.request_rate) else None,
+                isl=int(profiler_metadata.isl) if profiler_metadata.isl else 0,
+                osl=int(profiler_metadata.osl) if profiler_metadata.osl else 0,
+                concurrency=profiler_results.concurrency_values[i] if i < len(profiler_results.concurrency_values) else 0,
+                request_rate=profiler_results.request_rate[i] if i < len(profiler_results.request_rate) else None,
                 # Throughput metrics
-                output_tps=profiler.output_tps[i],
-                total_tps=profiler.total_tps[i] if i < len(profiler.total_tps) else None,
-                request_throughput=profiler.request_throughput[i] if i < len(profiler.request_throughput) else None,
-                request_goodput=profiler.request_goodput[i] if i < len(profiler.request_goodput) else None,
+                output_tps=profiler_results.output_tps[i],
+                total_tps=profiler_results.total_tps[i] if i < len(profiler_results.total_tps) else None,
+                request_throughput=profiler_results.request_throughput[i] if i < len(profiler_results.request_throughput) else None,
+                request_goodput=profiler_results.request_goodput[i] if i < len(profiler_results.request_goodput) else None,
                 # Mean latencies
-                mean_ttft_ms=profiler.mean_ttft_ms[i] if i < len(profiler.mean_ttft_ms) else None,
-                mean_tpot_ms=profiler.mean_tpot_ms[i] if i < len(profiler.mean_tpot_ms) else None,
-                mean_itl_ms=profiler.mean_itl_ms[i] if i < len(profiler.mean_itl_ms) else None,
-                mean_e2el_ms=profiler.mean_e2el_ms[i] if i < len(profiler.mean_e2el_ms) else None,
+                mean_ttft_ms=profiler_results.mean_ttft_ms[i] if i < len(profiler_results.mean_ttft_ms) else None,
+                mean_tpot_ms=profiler_results.mean_tpot_ms[i] if i < len(profiler_results.mean_tpot_ms) else None,
+                mean_itl_ms=profiler_results.mean_itl_ms[i] if i < len(profiler_results.mean_itl_ms) else None,
+                mean_e2el_ms=profiler_results.mean_e2el_ms[i] if i < len(profiler_results.mean_e2el_ms) else None,
                 # Median latencies
-                median_ttft_ms=profiler.median_ttft_ms[i] if i < len(profiler.median_ttft_ms) else None,
-                median_tpot_ms=profiler.median_tpot_ms[i] if i < len(profiler.median_tpot_ms) else None,
-                median_itl_ms=profiler.median_itl_ms[i] if i < len(profiler.median_itl_ms) else None,
-                median_e2el_ms=profiler.median_e2el_ms[i] if i < len(profiler.median_e2el_ms) else None,
+                median_ttft_ms=profiler_results.median_ttft_ms[i] if i < len(profiler_results.median_ttft_ms) else None,
+                median_tpot_ms=profiler_results.median_tpot_ms[i] if i < len(profiler_results.median_tpot_ms) else None,
+                median_itl_ms=profiler_results.median_itl_ms[i] if i < len(profiler_results.median_itl_ms) else None,
+                median_e2el_ms=profiler_results.median_e2el_ms[i] if i < len(profiler_results.median_e2el_ms) else None,
                 # P99 latencies
-                p99_ttft_ms=profiler.p99_ttft_ms[i] if i < len(profiler.p99_ttft_ms) else None,
-                p99_tpot_ms=profiler.p99_tpot_ms[i] if i < len(profiler.p99_tpot_ms) else None,
-                p99_itl_ms=profiler.p99_itl_ms[i] if i < len(profiler.p99_itl_ms) else None,
-                p99_e2el_ms=profiler.p99_e2el_ms[i] if i < len(profiler.p99_e2el_ms) else None,
+                p99_ttft_ms=profiler_results.p99_ttft_ms[i] if i < len(profiler_results.p99_ttft_ms) else None,
+                p99_tpot_ms=profiler_results.p99_tpot_ms[i] if i < len(profiler_results.p99_tpot_ms) else None,
+                p99_itl_ms=profiler_results.p99_itl_ms[i] if i < len(profiler_results.p99_itl_ms) else None,
+                p99_e2el_ms=profiler_results.p99_e2el_ms[i] if i < len(profiler_results.p99_e2el_ms) else None,
                 # Token counts
-                total_input_tokens=profiler.total_input_tokens[i] if i < len(profiler.total_input_tokens) else None,
-                total_output_tokens=profiler.total_output_tokens[i] if i < len(profiler.total_output_tokens) else None,
+                total_input_tokens=profiler_results.total_input_tokens[i] if i < len(profiler_results.total_input_tokens) else None,
+                total_output_tokens=profiler_results.total_output_tokens[i] if i < len(profiler_results.total_output_tokens) else None,
                 # Run metadata
-                duration=profiler.duration[i] if i < len(profiler.duration) else None,
-                completed=profiler.completed[i] if i < len(profiler.completed) else None,
-                num_prompts=profiler.num_prompts[i] if i < len(profiler.num_prompts) else None,
+                duration=profiler_results.duration[i] if i < len(profiler_results.duration) else None,
+                completed=profiler_results.completed[i] if i < len(profiler_results.completed) else None,
+                num_prompts=profiler_results.num_prompts[i] if i < len(profiler_results.num_prompts) else None,
                 # Node metrics (shared across all concurrency levels in this run)
                 node_metrics=node_metrics,
             )
@@ -266,7 +261,7 @@ class ResultsExporter:
         datapoints.sort(key=lambda x: x.concurrency)
         return datapoints
 
-    def _get_node_metrics_for_run(self, run_path: str) -> list[NodeMetrics]:
+    def _get_node_metrics_for_run(self, run_path: Path) -> list[NodeMetrics]:
         """Get node metrics for a specific run directory.
 
         Args:
@@ -588,13 +583,8 @@ def clear_cache(log_dir: str) -> None:
     logger.info(f"Cleared {cleared_count} run caches")
 
 
-if __name__ == "__main__":
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(message)s",
-    )
-
+def create_args_parser() -> argparse.ArgumentParser:
+    """Create an argument parser for the results exporter."""
     parser = argparse.ArgumentParser(description="Results exporter utilities")
     parser.add_argument(
         "--log-dir",
@@ -607,25 +597,35 @@ if __name__ == "__main__":
         action="store_true",
         help="Clear all analysis caches",
     )
+    return parser
+
+if __name__ == "__main__":
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+    )
+
+    parser = create_args_parser()
 
     args = parser.parse_args()
 
     if args.clear_cache:
         clear_cache(args.log_dir)
-        print(f"✅ Cache cleared for {args.log_dir}")
+        logger.info(f"Cache cleared for {args.log_dir}")
 
     # Use ResultsExporter in standalone mode
     exporter = ResultsExporter.from_log_dir(args.log_dir)
     exporter.collect_results()
 
     if not exporter.datapoints:
-        print("No datapoints found")
+        logger.error("No datapoints found")
         sys.exit(1)
 
-    print(f"Found {len(exporter.datapoints)} datapoints")
+    logger.info(f"Found {len(exporter.datapoints)} datapoints")
 
     # Export to CSV and Parquet
     exported = exporter.export()
 
     for fmt, path in exported.items():
-        print(f"✅ Exported {fmt.upper()}: {path}")
+        logger.info(f"Exported {fmt.upper()}: {path}")

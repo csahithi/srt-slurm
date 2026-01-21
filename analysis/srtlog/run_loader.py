@@ -9,6 +9,8 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
+from typing import TypeVar
 
 import pandas as pd
 
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PairJobIdAndRunDir:
     job_id: int
-    run_dir: str
+    run_dir: Path
 
     @classmethod
     def from_path(cls, path: str) -> "PairJobIdAndRunDir | None":  # pyright: ignore[reportUndefinedVariable]
@@ -38,7 +40,22 @@ class PairJobIdAndRunDir:
             job_id = int(dirname.split("_")[0])
         except ValueError:
             return None
-        return cls(int(job_id), path)
+        return cls(int(job_id), Path(path))
+
+
+@dataclass
+class SkippedRun:
+    """Skipped run information.
+
+    Attributes:
+        run_id_path_pair: PairJobIdAndRunDir object
+        reason: Reason for skipping the run
+    """
+    run_id_path_pair: PairJobIdAndRunDir
+    reason: str
+
+
+
 
 class RunLoader:
     """Service for loading benchmark run data from directories.
@@ -65,22 +82,22 @@ class RunLoader:
         runs, _ = self.load_all_with_skipped()
         return runs
 
-    def load_all_with_skipped(self) -> tuple[list[BenchmarkRun], list[tuple[str, str, str]]]:
+    def load_all_with_skipped(self) -> tuple[list[BenchmarkRun], list[SkippedRun]]:
         """Load all benchmark runs and track which ones were skipped.
 
         Returns:
             Tuple of (runs_with_data, skipped_runs)
             - runs_with_data: List of BenchmarkRun objects with benchmark results
-            - skipped_runs: List of tuples (job_id, run_dir, reason)
+            - skipped_runs: List of SkippedRun objects
         """
-        runs = []
-        skipped = []
+        runs: list[BenchmarkRun] = []
+        skipped: list[SkippedRun] = []
 
         # Add runs without metadata to skipped list
         for run_id_path_pair in self.get_runs_without_metadata():
             reason = "No metadata JSON file"
             logger.warning(f"No metadata JSON found for {run_id_path_pair.run_dir}")
-            skipped.append((run_id_path_pair.job_id, run_id_path_pair.run_dir, reason))
+            skipped.append(SkippedRun(run_id_path_pair, reason))
 
         # Process only runs with metadata
         runs_with_metadata: list[PairJobIdAndRunDir] = self.get_runs_with_metadata()
@@ -90,18 +107,18 @@ class RunLoader:
                 job_id = run_id_path_pair.job_id
                 run_dir = run_id_path_pair.run_dir
                 
-                run = BenchmarkRun.from_json_file(run_dir, job_id=job_id)
+                run = BenchmarkRun.from_json_file(Path(run_dir), job_id=job_id)
                 
                 if run is None:
                     # Should not happen since we pre-filtered, but handle gracefully
-                    skipped.append((job_id, run_dir, "Failed to parse metadata JSON"))
+                    skipped.append(SkippedRun(run_id_path_pair, "Failed to parse metadata JSON"))
                     continue
 
                 # Skip profiling jobs (they don't have benchmark results)
-                if run.profiler.profiler_type == "torch-profiler":
+                if run.profiler_metadata.profiler_type == "torch-profiler":
                     reason = "Profiling job (no benchmark results)"
                     logger.debug(f"Skipping profiling job {job_id}")
-                    skipped.append((job_id, run_dir, reason))
+                    skipped.append(SkippedRun(run_id_path_pair, reason))
                     continue
 
                 # Load benchmark results from profiler output files
@@ -117,17 +134,17 @@ class RunLoader:
                     )
 
                 # Only include runs with benchmark data
-                if run.profiler.output_tps:
+                if run.profiler_results.output_tps:
                     runs.append(run)
                 else:
                     reason = "No benchmark results found"
                     logger.debug(f"Skipping run {job_id} - {reason}")
-                    skipped.append((job_id, run_dir, reason))
+                    skipped.append(SkippedRun(run_id_path_pair, reason))
 
             except Exception as e:
                 reason = f"Error loading: {str(e)}"
                 logger.error(f"Error loading run from {run_dir}: {e}")
-                skipped.append((job_id, run_dir, reason))
+                skipped.append(SkippedRun(run_id_path_pair, reason))
                 continue
 
         return runs, skipped
@@ -149,7 +166,7 @@ class RunLoader:
             return None
 
         try:
-            run = BenchmarkRun.from_json_file(run_path)
+            run = BenchmarkRun.from_json_file(Path(run_path))
             if run is not None:
                 self._load_benchmark_results(run)
                 run.check_completeness()
@@ -171,7 +188,7 @@ class RunLoader:
         Returns:
             True if metadata JSON file exists, False otherwise
         """
-        return os.path.exists(os.path.join(pair.run_dir, f"{pair.job_id}.json"))
+        return pair.run_dir.joinpath(f"{pair.job_id}.json").exists()
 
     def _find_run_directories(self) -> list[PairJobIdAndRunDir]:
         """Find all valid benchmark run directories in logs_dir.
@@ -241,13 +258,13 @@ class RunLoader:
         logs_subdir = os.path.join(run_path, "logs")
         if os.path.exists(logs_subdir):
             search_paths.append(logs_subdir)
-
+        
         # Initialize cache manager
         cache_mgr = CacheManager(run_path)
 
         # Use profiler_type from metadata to construct directory name
-        profiler_type = run.profiler.profiler_type
-        pattern_strs = [f"{profiler_type}_isl_{run.profiler.isl}_osl_{run.profiler.osl}"]
+        profiler_type = run.profiler_metadata.profiler_type
+        pattern_strs = [f"{profiler_type}_isl_{run.profiler_metadata.isl}_osl_{run.profiler_metadata.osl}"]
 
         # Define source patterns for cache validation (check all possible patterns)
         source_patterns = [f"{pattern}/*.json" for pattern in pattern_strs]
@@ -258,7 +275,7 @@ class RunLoader:
             if cached_df is not None and not cached_df.empty:
                 # Populate run.profiler from cached DataFrame - load all available columns
                 results = {
-                    "concurrencies": cached_df["concurrency"].tolist(),
+                    "concurrencies": cached_df["max_concurrency"].tolist(),
                     "output_tps": cached_df["output_tps"].tolist(),
                     "mean_itl_ms": cached_df["mean_itl_ms"].tolist(),
                     "mean_ttft_ms": cached_df["mean_ttft_ms"].tolist(),
@@ -293,7 +310,7 @@ class RunLoader:
                     else:
                         results[field] = []
 
-                run.profiler.add_benchmark_results(results)
+                run.profiler_results.load_results_from_cached_json(results)
                 return
 
         # Cache miss or invalid - parse from JSON files
@@ -305,7 +322,7 @@ class RunLoader:
                         result_dir = os.path.join(search_path, entry)
                         if os.path.isdir(result_dir):
                             results = self._parse_profiler_results(result_dir)
-                            run.profiler.add_benchmark_results(results)
+                            run.profiler_results.load_results_from_cached_json(results)
 
                             # Save to cache
                             if results["concurrencies"]:
@@ -559,17 +576,17 @@ class RunLoader:
             total_gpus = run.total_gpus
 
             # Create a row for each concurrency level
-            for i in range(len(run.profiler.output_tps)):
+            for i in range(len(run.profiler_results.output_tps)):
                 # Calculate derived metrics
-                tps = run.profiler.output_tps[i]
+                tps = run.profiler_results.output_tps[i]
                 tps_per_gpu = tps / total_gpus if total_gpus > 0 else 0
 
                 # Get total TPS (input + output tokens)
-                total_token_tps = run.profiler.total_tps[i] if i < len(run.profiler.total_tps) else None
+                total_token_tps = run.profiler_results.total_tps[i] if i < len(run.profiler_results.total_tps) else None
                 total_tps_per_gpu = total_token_tps / total_gpus if total_token_tps and total_gpus > 0 else None
 
                 # Output TPS/User = 1000 / TPOT(ms)
-                tpot = run.profiler.mean_tpot_ms[i] if i < len(run.profiler.mean_tpot_ms) else None
+                tpot = run.profiler_results.mean_tpot_ms[i] if i < len(run.profiler_results.mean_tpot_ms) else None
                 tps_per_user = 1000 / tpot if tpot and tpot > 0 else 0
 
                 row = {
@@ -585,18 +602,18 @@ class RunLoader:
                     "Frontends": run.metadata.num_additional_frontends,
                     "GPUs per Node": run.metadata.gpus_per_node,
                     "Total GPUs": total_gpus,
-                    "Request Rate": (run.profiler.request_rate[i] if i < len(run.profiler.request_rate) else "N/A"),
+                    "Request Rate": (run.profiler_results.request_rate[i] if i < len(run.profiler_results.request_rate) else "N/A"),
                     "Concurrency": (
-                        run.profiler.concurrency_values[i] if i < len(run.profiler.concurrency_values) else "N/A"
+                        run.profiler_results.concurrency_values[i] if i < len(run.profiler_results.concurrency_values) else "N/A"
                     ),
                     "Output TPS": tps,
                     "Total TPS": total_token_tps if total_token_tps else "N/A",
                     "Output TPS/GPU": tps_per_gpu,
                     "Total TPS/GPU": total_tps_per_gpu if total_tps_per_gpu else "N/A",
                     "Output TPS/User": tps_per_user,
-                    "Mean TTFT (ms)": (run.profiler.mean_ttft_ms[i] if i < len(run.profiler.mean_ttft_ms) else "N/A"),
+                    "Mean TTFT (ms)": (run.profiler_results.mean_ttft_ms[i] if i < len(run.profiler_results.mean_ttft_ms) else "N/A"),
                     "Mean TPOT (ms)": tpot if tpot else "N/A",
-                    "Mean ITL (ms)": (run.profiler.mean_itl_ms[i] if i < len(run.profiler.mean_itl_ms) else "N/A"),
+                    "Mean ITL (ms)": (run.profiler_results.mean_itl_ms[i] if i < len(run.profiler_results.mean_itl_ms) else "N/A"),
                 }
                 rows.append(row)
 
