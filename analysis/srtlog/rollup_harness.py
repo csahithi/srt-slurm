@@ -137,21 +137,22 @@ def _try_parse_launch_command(node_rollup: Any, node_parser: Any, log_file: Path
         content = log_file.read_text(errors="replace")
         cmd = node_parser.parse_launch_command(content, worker_type=worker_type)
         if cmd:
+            args = cmd.extra_args
             node_rollup.launch_command = LaunchCommandRollup(
                 raw_command=cmd.raw_command,
                 command_type="worker",
-                model_path=cmd.model_path,
-                served_model_name=cmd.served_model_name,
+                model_path=args.get("model_path"),
+                served_model_name=args.get("served_model_name"),
                 worker_type=worker_type,
                 backend_type=cmd.backend_type,
-                disaggregation_mode=cmd.disaggregation_mode,
-                tp_size=cmd.tp_size,
-                pp_size=cmd.pp_size,
-                dp_size=cmd.dp_size,
-                ep_size=cmd.ep_size,
-                port=cmd.port,
-                max_num_seqs=cmd.max_num_seqs,
-                max_model_len=cmd.max_model_len,
+                disaggregation_mode=args.get("disaggregation_mode"),
+                tp_size=args.get("tp_size"),
+                pp_size=args.get("pp_size"),
+                dp_size=args.get("dp_size"),
+                ep_size=args.get("ep_size"),
+                port=args.get("port"),
+                max_num_seqs=args.get("max_num_seqs"),
+                max_model_len=args.get("max_model_len"),
             )
             logger.debug("Parsed launch command for %s from %s", node_rollup.node_name, log_file.name)
             return True

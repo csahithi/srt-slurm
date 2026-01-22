@@ -54,37 +54,16 @@ class BenchmarkLaunchCommand:
 
 @dataclass
 class NodeLaunchCommand:
-    """Parsed node worker launch command information."""
+    """Parsed node worker launch command information.
+
+    Only contains essential fields. All parsed arguments go into extra_args.
+    """
 
     backend_type: str
     worker_type: str  # prefill, decode, agg
     raw_command: str
 
-    # Model configuration
-    model_path: str | None = None
-    served_model_name: str | None = None
-
-    # Parallelism
-    tp_size: int | None = None
-    pp_size: int | None = None
-    dp_size: int | None = None
-    ep_size: int | None = None
-
-    # Server configuration
-    host: str | None = None
-    port: int | None = None
-
-    # Memory/performance
-    max_num_seqs: int | None = None
-    max_model_len: int | None = None
-    kv_cache_dtype: str | None = None
-    gpu_memory_utilization: float | None = None
-
-    # Disaggregation (P/D)
-    disaggregation_mode: str | None = None  # prefill, decode, null
-    nccl_init_addr: str | None = None
-
-    # Additional parsed args as dict
+    # All parsed arguments as dict
     extra_args: dict[str, Any] = field(default_factory=dict)
 
 

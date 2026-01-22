@@ -15,7 +15,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from analysis.srtlog.models import BatchMetrics, MemoryMetrics, NodeMetrics
 from analysis.srtlog.parsers import register_node_parser
@@ -404,13 +404,9 @@ class TRTLLMNodeParser:
         if not raw_command:
             return None
 
-        cmd = NodeLaunchCommand(
-            backend_type=self.backend_type,
-            worker_type=worker_type,
-            raw_command=raw_command,
-        )
+        extra_args: dict[str, Any] = {}
 
-        # Parse dynamo.trtllm / tensorrt_llm server arguments
+        # Parse dynamo.trtllm / tensorrt_llm server arguments from command line
         arg_patterns = {
             "model_path": r"--model-path[=\s]+([^\s]+)",
             "served_model_name": r"--served-model-name[=\s]+([^\s]+)",
@@ -425,7 +421,7 @@ class TRTLLMNodeParser:
                 value = match.group(1)
                 if field == "port":
                     value = int(value)
-                setattr(cmd, field, value)
+                extra_args[field] = value
 
         # Also extract from TensorRT-LLM engine args if available (has actual parallelism values)
         engine_args_match = re.search(r"TensorRT-LLM engine args:\s*\{([^}]+)", clean_content)
@@ -440,13 +436,13 @@ class TRTLLMNodeParser:
             }
 
             for field, pattern in engine_patterns.items():
-                if getattr(cmd, field) is None:
+                if field not in extra_args:
                     match = re.search(pattern, engine_str)
                     if match:
-                        setattr(cmd, field, int(match.group(1)))
+                        extra_args[field] = int(match.group(1))
 
         # Fallback to Config() dump
-        if cmd.tp_size is None:
+        if "tp_size" not in extra_args:
             config_match = re.search(r"Config\((.*?)\)", clean_content)
             if config_match:
                 config_str = config_match.group(1)
@@ -459,10 +455,15 @@ class TRTLLMNodeParser:
                 }
 
                 for field, pattern in config_patterns.items():
-                    if getattr(cmd, field) is None:
+                    if field not in extra_args:
                         match = re.search(pattern, config_str)
                         if match:
-                            setattr(cmd, field, int(match.group(1)))
+                            extra_args[field] = int(match.group(1))
 
-        return cmd
+        return NodeLaunchCommand(
+            backend_type=self.backend_type,
+            worker_type=worker_type,
+            raw_command=raw_command,
+            extra_args=extra_args,
+        )
 

@@ -15,7 +15,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from analysis.srtlog.models import BatchMetrics, MemoryMetrics, NodeMetrics
 from analysis.srtlog.parsers import register_node_parser
@@ -367,11 +367,7 @@ class SGLangNodeParser:
         if not raw_command:
             return None
 
-        cmd = NodeLaunchCommand(
-            backend_type="sglang",
-            worker_type=worker_type,
-            raw_command=raw_command,
-        )
+        extra_args: dict[str, Any] = {}
 
         # Parse SGLang server arguments (from command line)
         arg_patterns = {
@@ -409,22 +405,27 @@ class SGLangNodeParser:
         for field, pattern in arg_patterns.items():
             match = re.search(pattern, raw_command)
             if match:
-                value = match.group(1)
+                value: Any = match.group(1)
                 if field in ("tp_size", "pp_size", "dp_size", "ep_size", "port", "max_num_seqs", "max_model_len"):
                     value = int(value)
                 elif field == "gpu_memory_utilization":
                     value = float(value)
-                setattr(cmd, field, value)
+                extra_args[field] = value
 
         # Try ServerArgs patterns for any missing fields
         for field, pattern in server_args_patterns.items():
-            if getattr(cmd, field) is None:
+            if field not in extra_args:
                 match = re.search(pattern, clean_content)
                 if match:
                     value = match.group(1)
                     if field in ("tp_size", "pp_size", "dp_size", "ep_size", "port", "max_num_seqs", "max_model_len"):
                         value = int(value)
-                    setattr(cmd, field, value)
+                    extra_args[field] = value
 
-        return cmd
+        return NodeLaunchCommand(
+            backend_type="sglang",
+            worker_type=worker_type,
+            raw_command=raw_command,
+            extra_args=extra_args,
+        )
 
