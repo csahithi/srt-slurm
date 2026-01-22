@@ -40,5 +40,5 @@ srtctl apply -f config.yaml --tags experiment,baseline
 srtctl dry-run -f config.yaml
 
 # Launch analysis dashboard
-make dashboard
+uv run streamlit run analysis/dashboard/app.py
 ```

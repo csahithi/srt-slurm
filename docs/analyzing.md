@@ -153,10 +153,6 @@ Example log line format:
 ### Launching the Dashboard
 
 ```bash
-# Recommended method
-make dashboard
-
-# Alternative
 uv run streamlit run analysis/dashboard/app.py
 ```
 
