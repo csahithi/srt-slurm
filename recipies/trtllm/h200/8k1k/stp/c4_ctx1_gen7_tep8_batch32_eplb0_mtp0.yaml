@@ -1,4 +1,4 @@
-name: "c32_ctx1_gen32_tep8_batch32_eplb0_mtp0"
+name: "c4_ctx1_gen7_tep8_batch32_eplb0_mtp0"
 
 model:
   path: "dsr1"
@@ -13,8 +13,8 @@ resources:
   prefill_nodes: 1
   prefill_workers: 1
 
-  decode_workers: 9
-  decode_nodes: 9
+  decode_workers: 7
+  decode_nodes: 7
 
   gpus_per_node: 8
 
@@ -44,18 +44,18 @@ backend:
       tensor_parallel_size: 8
       moe_expert_parallel_size: 8
       pipeline_parallel_size: 1
-      enable_attention_dp: true
+      enable_attention_dp: false
       enable_chunked_prefill: false
-      max_batch_size: 8
-      max_num_tokens: 8192
-      max_seq_len: 1064
+      max_batch_size: 2
+      max_num_tokens: 16640
+      max_seq_len: 8232
       kv_cache_config:
         enable_block_reuse: false
-        free_gpu_memory_fraction: 0.6
+        free_gpu_memory_fraction: 0.85
         dtype: fp8
       cache_transceiver_config:
         backend: UCX
-        max_tokens_in_buffer: 8192
+        max_tokens_in_buffer: 32768
       moe_config:
         backend: CUTLASS
       cuda_graph_config: null
@@ -65,7 +65,7 @@ backend:
       stream_interval: 100
       num_postprocess_workers: 4
     decode:
-      # Decode Worker Config for Dynamo DSR1 (TEP c=16)
+      # Decode Worker Config for Dynamo DSR1 (TEP c=4)
       # ISL/OSL: 8k/1k, TP=8 on H200
       backend: pytorch
       trust_remote_code: true
@@ -73,59 +73,23 @@ backend:
       moe_expert_parallel_size: 8
       pipeline_parallel_size: 1
       enable_attention_dp: false
-      enable_lm_head_tp_in_adp: false
       enable_chunked_prefill: false
-      max_batch_size: 256
-      max_num_tokens: 256
-      max_seq_len: 2088
+      max_batch_size: 32
+      max_num_tokens: 32
+      max_seq_len: 9256
       kv_cache_config:
         enable_block_reuse: false
-        free_gpu_memory_fraction: 0.9
+        free_gpu_memory_fraction: 0.85
         dtype: fp8
       cache_transceiver_config:
         backend: UCX
-        max_tokens_in_buffer: 8192
+        max_tokens_in_buffer: 16384
       moe_config:
         backend: CUTLASS
         use_low_precision_moe_combine: true
       cuda_graph_config:
         enable_padding: true
-        batch_sizes:
-        - 1
-        - 2
-        - 4
-        - 8
-        - 16
-        - 24
-        - 32
-        - 40
-        - 48
-        - 56
-        - 64
-        - 72
-        - 80
-        - 88
-        - 96
-        - 104
-        - 112
-        - 120
-        - 128
-        - 136
-        - 144
-        - 152
-        - 160
-        - 168
-        - 176
-        - 184
-        - 192
-        - 200
-        - 208
-        - 216
-        - 224
-        - 232
-        - 240
-        - 248
-        - 256
+        batch_sizes: [1, 2, 4, 8, 16, 32]
       disable_overlap_scheduler: false
       print_iter_log: true
       # Performance tuning
@@ -134,9 +98,9 @@ backend:
 
 benchmark:
   type: "sa-bench"
-  isl: 1024
+  isl: 8192
   osl: 1024
-  concurrencies: "288"
+  concurrencies: "28"
   req_rate: "inf"
 
 frontend:

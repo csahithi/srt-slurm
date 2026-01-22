@@ -1,4 +1,4 @@
-name: "ctx1_gen3_tep8_batch32_eplb0_mtp2"
+name: "c8_ctx1_gen6_tep8_batch32_eplb0_mtp3"
 
 model:
   path: "dsr1"
@@ -13,8 +13,8 @@ resources:
   prefill_nodes: 1
   prefill_workers: 1
 
-  decode_workers: 3
-  decode_nodes: 3
+  decode_workers: 6
+  decode_nodes: 6
 
   gpus_per_node: 8
 
@@ -66,9 +66,9 @@ backend:
       num_postprocess_workers: 4
       speculative_config:
         decoding_type: MTP
-        num_nextn_predict_layers: 2
+        num_nextn_predict_layers: 3
     decode:
-      # Decode Worker Config for Dynamo DSR1 (MTP c=16)
+      # Decode Worker Config for Dynamo DSR1 (MTP c=8)
       # ISL/OSL: 8k/1k, TP=8 on H200
       backend: pytorch
       trust_remote_code: true
@@ -100,7 +100,7 @@ backend:
       num_postprocess_workers: 4
       speculative_config:
         decoding_type: MTP
-        num_nextn_predict_layers: 2
+        num_nextn_predict_layers: 3
 
 benchmark:
   type: "sa-bench"

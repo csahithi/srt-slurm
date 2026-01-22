@@ -1,4 +1,4 @@
-name: "c256_ctx3_gen1_dep8_batch32_eplb0_mtp2_ratio3to1"
+name: "c64_ctx2_gen3_dep8_batch128_eplb0_mtp0"
 
 model:
   path: "dsr1"
@@ -10,11 +10,11 @@ sbatch_directives:
 
 resources:
   gpu_type: "h200"
-  prefill_nodes: 3
-  prefill_workers: 3
+  prefill_nodes: 2
+  prefill_workers: 2
 
-  decode_workers: 1
-  decode_nodes: 1
+  decode_workers: 3
+  decode_nodes: 3
 
   gpus_per_node: 8
 
@@ -37,7 +37,7 @@ backend:
 
   trtllm_config:
     prefill:
-      # Prefill Worker Config for Dynamo DSR1 (MTP mode)
+      # Prefill Worker Config for Dynamo DSR1 (DEP mode)
       # ISL/OSL: 8k/1k, TP=8 on H200
       backend: pytorch
       trust_remote_code: true
@@ -64,11 +64,8 @@ backend:
       # Performance tuning
       stream_interval: 100
       num_postprocess_workers: 4
-      speculative_config:
-        decoding_type: MTP
-        num_nextn_predict_layers: 2
     decode:
-      # Decode Worker Config for Dynamo DSR1 (MTP c=256)
+      # Decode Worker Config for Dynamo DSR1 (DEP c=64)
       # ISL/OSL: 8k/1k, TP=8 on H200
       backend: pytorch
       trust_remote_code: true
@@ -77,7 +74,7 @@ backend:
       pipeline_parallel_size: 1
       enable_attention_dp: true
       enable_chunked_prefill: false
-      max_batch_size: 32
+      max_batch_size: 128
       max_num_tokens: 128
       max_seq_len: 9256
       kv_cache_config:
@@ -92,21 +89,18 @@ backend:
         use_low_precision_moe_combine: true
       cuda_graph_config:
         enable_padding: true
-        batch_sizes: [1, 2, 4, 8, 16, 32]
+        batch_sizes: [1, 2, 4, 8, 16, 32, 64, 128]
       disable_overlap_scheduler: false
       print_iter_log: true
       # Performance tuning
       stream_interval: 100
       num_postprocess_workers: 4
-      speculative_config:
-        decoding_type: MTP
-        num_nextn_predict_layers: 2
 
 benchmark:
   type: "sa-bench"
   isl: 8192
   osl: 1024
-  concurrencies: "256"
+  concurrencies: "192"
   req_rate: "inf"
 
 frontend:

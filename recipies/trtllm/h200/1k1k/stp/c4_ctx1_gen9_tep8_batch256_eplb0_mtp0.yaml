@@ -1,4 +1,4 @@
-name: "c512_ctx1_gen512_dep8_batch64_eplb0_mtp1"
+name: "c4_ctx1_gen9_tep8_batch256_eplb0_mtp0"
 
 model:
   path: "dsr1"
@@ -13,8 +13,8 @@ resources:
   prefill_nodes: 1
   prefill_workers: 1
 
-  decode_workers: 2
-  decode_nodes: 2
+  decode_workers: 9
+  decode_nodes: 9
 
   gpus_per_node: 8
 
@@ -37,7 +37,7 @@ backend:
 
   trtllm_config:
     prefill:
-      # Prefill Worker Config for Dynamo DSR1 (MTP mode)
+      # Prefill Worker Config for Dynamo DSR1 (TEP mode)
       # ISL/OSL: 8k/1k, TP=8 on H200
       backend: pytorch
       trust_remote_code: true
@@ -64,26 +64,23 @@ backend:
       # Performance tuning
       stream_interval: 100
       num_postprocess_workers: 4
-      speculative_config:
-        decoding_type: MTP
-        num_nextn_predict_layers: 1
     decode:
-      # Decode Worker Config for Dynamo DSR1 (MTP c=512)
+      # Decode Worker Config for Dynamo DSR1 (TEP c=16)
       # ISL/OSL: 8k/1k, TP=8 on H200
       backend: pytorch
       trust_remote_code: true
       tensor_parallel_size: 8
       moe_expert_parallel_size: 8
       pipeline_parallel_size: 1
-      enable_attention_dp: true
-      enable_lm_head_tp_in_adp: true
+      enable_attention_dp: false
+      enable_lm_head_tp_in_adp: false
       enable_chunked_prefill: false
       max_batch_size: 256
-      max_num_tokens: 512
+      max_num_tokens: 256
       max_seq_len: 2088
       kv_cache_config:
         enable_block_reuse: false
-        free_gpu_memory_fraction: 0.85
+        free_gpu_memory_fraction: 0.9
         dtype: fp8
       cache_transceiver_config:
         backend: UCX
@@ -134,15 +131,12 @@ backend:
       # Performance tuning
       stream_interval: 100
       num_postprocess_workers: 4
-      speculative_config:
-        decoding_type: MTP
-        num_nextn_predict_layers: 1
 
 benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: "1024"
+  concurrencies: "36"
   req_rate: "inf"
 
 frontend:

@@ -1,4 +1,4 @@
-name: "ctx2_gen5_tep8_batch128_eplb0_mtp0"
+name: "c16_ctx1_gen3_tep8_batch32_eplb0_mtp0"
 
 model:
   path: "dsr1"
@@ -10,11 +10,11 @@ sbatch_directives:
 
 resources:
   gpu_type: "h200"
-  prefill_nodes: 2
-  prefill_workers: 2
+  prefill_nodes: 1
+  prefill_workers: 1
 
-  decode_workers: 5
-  decode_nodes: 5
+  decode_workers: 3
+  decode_nodes: 3
 
   gpus_per_node: 8
 
@@ -65,7 +65,7 @@ backend:
       stream_interval: 100
       num_postprocess_workers: 4
     decode:
-      # Decode Worker Config for Dynamo DSR1 (TEP c=32)
+      # Decode Worker Config for Dynamo DSR1 (TEP c=16)
       # ISL/OSL: 8k/1k, TP=8 on H200
       backend: pytorch
       trust_remote_code: true
@@ -74,8 +74,8 @@ backend:
       pipeline_parallel_size: 1
       enable_attention_dp: false
       enable_chunked_prefill: false
-      max_batch_size: 128
-      max_num_tokens: 128
+      max_batch_size: 32
+      max_num_tokens: 32
       max_seq_len: 9256
       kv_cache_config:
         enable_block_reuse: false
@@ -89,7 +89,7 @@ backend:
         use_low_precision_moe_combine: true
       cuda_graph_config:
         enable_padding: true
-        batch_sizes: [1, 2, 4, 8, 16, 32, 64, 128]
+        batch_sizes: [1, 2, 4, 8, 16, 32]
       disable_overlap_scheduler: false
       print_iter_log: true
       # Performance tuning
@@ -100,7 +100,7 @@ benchmark:
   type: "sa-bench"
   isl: 8192
   osl: 1024
-  concurrencies: "160"
+  concurrencies: "48"
   req_rate: "inf"
 
 frontend:
