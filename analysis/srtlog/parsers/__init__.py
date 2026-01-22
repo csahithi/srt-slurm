@@ -28,33 +28,25 @@ from analysis.srtlog.models import NodeMetrics
 
 @dataclass
 class BenchmarkLaunchCommand:
-    """Parsed benchmark launch command information."""
+    """Parsed benchmark launch command information.
+
+    Source: logs/benchmark.out
+
+    Only contains essential fields. All parsed arguments go into extra_args.
+    """
 
     benchmark_type: str
     raw_command: str
 
-    # Common benchmark parameters
-    model: str | None = None
-    base_url: str | None = None
-    num_prompts: int | None = None
-    request_rate: float | str | None = None
-    max_concurrency: int | None = None
-
-    # Token lengths
-    input_len: int | None = None
-    output_len: int | None = None
-
-    # Dataset/workload
-    dataset: str | None = None
-    dataset_path: str | None = None
-
-    # Additional parsed args as dict
+    # All parsed arguments as dict
     extra_args: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class NodeLaunchCommand:
     """Parsed node worker launch command information.
+
+    Source: logs/{node}_{worker_type}_{worker_id}.out or .err
 
     Only contains essential fields. All parsed arguments go into extra_args.
     """

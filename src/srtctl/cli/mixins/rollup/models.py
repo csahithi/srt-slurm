@@ -18,7 +18,11 @@ if TYPE_CHECKING:
 
 @dataclass
 class LaunchCommandRollup:
-    """Parsed launch command information for a worker or benchmark."""
+    """Parsed launch command information for a worker or benchmark.
+
+    Source (worker): logs/{node}_{worker_type}_{worker_id}.out or .err
+    Source (benchmark): logs/benchmark.out
+    """
 
     raw_command: str
     command_type: str  # "worker" or "benchmark"
@@ -51,6 +55,8 @@ class LaunchCommandRollup:
 @dataclass
 class NodeRollup:
     """Summary of metrics for a single worker node.
+
+    Source: logs/{node}_{worker_type}_{worker_id}.out and .err
 
     Derived from analysis.srtlog.models.NodeMetrics with aggregated statistics.
     """
@@ -313,7 +319,10 @@ class NodeRollup:
 
 @dataclass
 class NodesSummary:
-    """Summary of all worker nodes in the experiment."""
+    """Summary of all worker nodes in the experiment.
+
+    Source: Aggregated from logs/{node}_{worker_type}_{worker_id}.out and .err files
+    """
 
     # Counts
     total_prefill_nodes: int = 0
@@ -409,7 +418,10 @@ class NodesSummary:
 
 @dataclass
 class RollupResult:
-    """Consolidated benchmark result for a single concurrency level."""
+    """Consolidated benchmark result for a single concurrency level.
+
+    Source: logs/*_isl_*_osl_*/result.json or benchmark.out
+    """
 
     concurrency: int
     output_tps: float
@@ -448,7 +460,11 @@ class RollupResult:
 
 @dataclass
 class EnvironmentConfig:
-    """Environment variables and engine configuration for prefill/decode/agg workers."""
+    """Environment variables and engine configuration for prefill/decode/agg workers.
+
+    Source: config.yaml (backend.{prefill,decode,aggregated}_environment)
+    Source: logs/trtllm_config_{prefill,decode,agg}.yaml (engine config)
+    """
 
     # Environment variables from config.yaml
     prefill_environment: dict[str, str] = field(default_factory=dict)
@@ -463,7 +479,17 @@ class EnvironmentConfig:
 
 @dataclass
 class RollupSummary:
-    """Complete rollup summary for an experiment."""
+    """Complete rollup summary for an experiment.
+
+    Output: logs/rollup.json
+
+    Aggregates data from:
+    - config.yaml (experiment configuration)
+    - logs/benchmark.out (benchmark command and results)
+    - logs/*_isl_*_osl_*/result.json (benchmark results)
+    - logs/{node}_{worker_type}_{worker_id}.out/err (node metrics and commands)
+    - logs/trtllm_config_*.yaml (engine configuration)
+    """
 
     # Experiment identification
     job_id: str

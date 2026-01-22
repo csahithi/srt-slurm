@@ -236,10 +236,7 @@ class MooncakeRouterParser:
         if not raw_command:
             return None
 
-        cmd = BenchmarkLaunchCommand(
-            benchmark_type=self.benchmark_type,
-            raw_command=raw_command,
-        )
+        extra_args: dict[str, Any] = {}
 
         # Parse aiperf/genai-perf arguments from command line
         # Supports both --model and -m formats, quoted and unquoted values
@@ -256,7 +253,7 @@ class MooncakeRouterParser:
         for field, pattern in arg_patterns.items():
             match = re.search(pattern, raw_command)
             if match:
-                value = match.group(1)
+                value: Any = match.group(1)
                 if field in ("num_prompts", "max_concurrency", "input_len", "output_len"):
                     value = int(value)
                 elif field == "request_rate" and value != "inf":
@@ -264,7 +261,7 @@ class MooncakeRouterParser:
                         value = float(value)
                     except ValueError:
                         pass
-                setattr(cmd, field, value)
+                extra_args[field] = value
 
         # Also parse from header format (srtctl-style)
         header_patterns = {
@@ -274,10 +271,14 @@ class MooncakeRouterParser:
         }
 
         for field, pattern in header_patterns.items():
-            if getattr(cmd, field) is None:
+            if field not in extra_args:
                 match = re.search(pattern, log_content, re.MULTILINE)
                 if match:
-                    setattr(cmd, field, match.group(1).strip())
+                    extra_args[field] = match.group(1).strip()
 
-        return cmd
+        return BenchmarkLaunchCommand(
+            benchmark_type=self.benchmark_type,
+            raw_command=raw_command,
+            extra_args=extra_args,
+        )
 

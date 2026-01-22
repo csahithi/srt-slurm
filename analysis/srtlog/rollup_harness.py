@@ -259,15 +259,16 @@ def run_rollup_on_job(job_dir: Path, output_dir: Path | None = None) -> dict[str
             parser = get_benchmark_parser(benchmark_type)
             cmd = parser.parse_launch_command(benchmark_out.read_text(errors="replace"))
             if cmd:
+                args = cmd.extra_args
                 benchmark_command = LaunchCommandRollup(
                     raw_command=cmd.raw_command,
                     command_type="benchmark",
-                    model_path=cmd.model,
+                    model_path=args.get("model"),
                     benchmark_type=cmd.benchmark_type,
-                    base_url=cmd.base_url,
-                    max_concurrency=cmd.max_concurrency,
-                    input_len=cmd.input_len,
-                    output_len=cmd.output_len,
+                    base_url=args.get("base_url"),
+                    max_concurrency=args.get("max_concurrency"),
+                    input_len=args.get("input_len"),
+                    output_len=args.get("output_len"),
                 )
         except Exception as e:
             logger.debug("Failed to parse benchmark command: %s", e)

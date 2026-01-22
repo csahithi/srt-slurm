@@ -215,10 +215,7 @@ class SABenchParser:
         if not raw_command:
             return None
 
-        cmd = BenchmarkLaunchCommand(
-            benchmark_type=self.benchmark_type,
-            raw_command=raw_command,
-        )
+        extra_args: dict[str, Any] = {}
 
         # Parse common arguments from command line
         arg_patterns = {
@@ -236,7 +233,7 @@ class SABenchParser:
         for field, pattern in arg_patterns.items():
             match = re.search(pattern, raw_command)
             if match:
-                value = match.group(1)
+                value: Any = match.group(1)
                 # Convert to appropriate type
                 if field in ("num_prompts", "max_concurrency", "input_len", "output_len"):
                     value = int(value)
@@ -245,7 +242,7 @@ class SABenchParser:
                         value = float(value)
                     except ValueError:
                         pass
-                setattr(cmd, field, value)
+                extra_args[field] = value
 
         # Also parse from SA-Bench Config header format
         # Format: SA-Bench Config: endpoint=http://localhost:8000; isl=8192; osl=1024; concurrencies=28; req_rate=inf; model=dsr1-fp8
@@ -259,7 +256,7 @@ class SABenchParser:
         }
 
         for field, pattern in header_patterns.items():
-            if getattr(cmd, field) is None:
+            if field not in extra_args:
                 match = re.search(pattern, raw_command)
                 if match:
                     value = match.group(1)
@@ -270,7 +267,11 @@ class SABenchParser:
                             value = float(value)
                         except ValueError:
                             pass
-                    setattr(cmd, field, value)
+                    extra_args[field] = value
 
-        return cmd
+        return BenchmarkLaunchCommand(
+            benchmark_type=self.benchmark_type,
+            raw_command=raw_command,
+            extra_args=extra_args,
+        )
 

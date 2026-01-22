@@ -318,16 +318,17 @@ class RollupStageMixin:
             cmd = parser.parse_launch_command(content)
 
             if cmd:
+                args = cmd.extra_args
                 return LaunchCommandRollup(
                     raw_command=cmd.raw_command,
                     command_type="benchmark",
-                    model_path=cmd.model,
+                    model_path=args.get("model"),
                     benchmark_type=cmd.benchmark_type,
-                    base_url=cmd.base_url,
-                    max_concurrency=cmd.max_concurrency,
-                    num_prompts=cmd.num_prompts,
-                    input_len=cmd.input_len,
-                    output_len=cmd.output_len,
+                    base_url=args.get("base_url"),
+                    max_concurrency=args.get("max_concurrency"),
+                    num_prompts=args.get("num_prompts"),
+                    input_len=args.get("input_len"),
+                    output_len=args.get("output_len"),
                 )
 
         except ImportError:
