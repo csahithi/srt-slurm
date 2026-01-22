@@ -2,7 +2,7 @@ name: "ctx1_gen7_tep8_batch32_eplb0_mtp3"
 
 model:
   path: "dsr1"
-  container: "/home/nlevin/containers/jwillthomson_dynamo-0.8.0_trtllm-1.2.0rc6-post1-router-patch-x86.sqsh"
+  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.0"
   precision: "fp8"
 
 sbatch_directives:
