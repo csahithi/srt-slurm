@@ -32,6 +32,7 @@ class LaunchCommandRollup:
     backend_type: str | None = None
     disaggregation_mode: str | None = None
     tp_size: int | None = None
+    pp_size: int | None = None
     dp_size: int | None = None
     ep_size: int | None = None
     port: int | None = None
@@ -60,6 +61,7 @@ class NodeRollup:
 
     # Configuration (from NodeMetrics.config)
     tp_size: int | None = None
+    pp_size: int | None = None
     dp_size: int | None = None
     ep_size: int | None = None
 
@@ -117,6 +119,7 @@ class NodeRollup:
             worker_type=worker_type,
             worker_id=node.node_info.get("worker_id", ""),
             tp_size=node.config.get("tp_size"),
+            pp_size=node.config.get("pp_size"),
             dp_size=node.config.get("dp_size"),
             ep_size=node.config.get("ep_size"),
             total_batches=len(node.batches),

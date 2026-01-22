@@ -434,6 +434,7 @@ class TRTLLMNodeParser:
 
             engine_patterns = {
                 "tp_size": r"'tensor_parallel_size':\s*(\d+)",
+                "pp_size": r"'pipeline_parallel_size':\s*(\d+)",
                 "max_num_seqs": r"'max_batch_size':\s*(\d+)",
                 "max_model_len": r"'max_seq_len':\s*(\d+)",
             }
@@ -452,6 +453,7 @@ class TRTLLMNodeParser:
 
                 config_patterns = {
                     "tp_size": r"tensor_parallel_size=(\d+)",
+                    "pp_size": r"pipeline_parallel_size=(\d+)",
                     "max_num_seqs": r"max_batch_size=(\d+)",
                     "max_model_len": r"max_seq_len=(\d+)",
                 }

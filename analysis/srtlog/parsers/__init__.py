@@ -66,6 +66,7 @@ class NodeLaunchCommand:
 
     # Parallelism
     tp_size: int | None = None
+    pp_size: int | None = None
     dp_size: int | None = None
     ep_size: int | None = None
 

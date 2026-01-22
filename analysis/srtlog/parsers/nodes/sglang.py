@@ -378,6 +378,7 @@ class SGLangNodeParser:
             "model_path": r"--model(?:-path)?[=\s]+([^\s]+)",
             "served_model_name": r"--served-model-name[=\s]+([^\s]+)",
             "tp_size": r"--tp-size[=\s]+(\d+)",
+            "pp_size": r"--pp-size[=\s]+(\d+)",
             "dp_size": r"--dp-size[=\s]+(\d+)",
             "ep_size": r"--ep-size[=\s]+(\d+)",
             "host": r"--host[=\s]+([^\s]+)",
@@ -395,6 +396,7 @@ class SGLangNodeParser:
             "model_path": r"model_path=['\"]?([^'\"]+)['\"]?",
             "served_model_name": r"served_model_name=['\"]?([^'\"]+)['\"]?",
             "tp_size": r"tp_size=(\d+)",
+            "pp_size": r"pp_size=(\d+)",
             "dp_size": r"dp_size=(\d+)",
             "ep_size": r"ep_size=(\d+)",
             "host": r"host=['\"]?([^'\"]+)['\"]?",
@@ -408,7 +410,7 @@ class SGLangNodeParser:
             match = re.search(pattern, raw_command)
             if match:
                 value = match.group(1)
-                if field in ("tp_size", "dp_size", "ep_size", "port", "max_num_seqs", "max_model_len"):
+                if field in ("tp_size", "pp_size", "dp_size", "ep_size", "port", "max_num_seqs", "max_model_len"):
                     value = int(value)
                 elif field == "gpu_memory_utilization":
                     value = float(value)
@@ -420,7 +422,7 @@ class SGLangNodeParser:
                 match = re.search(pattern, clean_content)
                 if match:
                     value = match.group(1)
-                    if field in ("tp_size", "dp_size", "ep_size", "port", "max_num_seqs", "max_model_len"):
+                    if field in ("tp_size", "pp_size", "dp_size", "ep_size", "port", "max_num_seqs", "max_model_len"):
                         value = int(value)
                     setattr(cmd, field, value)
 

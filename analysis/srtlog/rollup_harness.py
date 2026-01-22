@@ -146,6 +146,7 @@ def _try_parse_launch_command(node_rollup: Any, node_parser: Any, log_file: Path
                 backend_type=cmd.backend_type,
                 disaggregation_mode=cmd.disaggregation_mode,
                 tp_size=cmd.tp_size,
+                pp_size=cmd.pp_size,
                 dp_size=cmd.dp_size,
                 ep_size=cmd.ep_size,
                 port=cmd.port,
