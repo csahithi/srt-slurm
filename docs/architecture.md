@@ -866,14 +866,25 @@ into a single `rollup.json` file for easy analysis and comparison.
 
 ### Key Dataclasses
 
-| Dataclass | Purpose |
-|-----------|---------|
-| `RollupResult` | Single benchmark result at one concurrency level (TPS, latencies) |
-| `NodeRollup` | Per-node metrics (batches, throughput, memory, KV cache) |
-| `NodesSummary` | Aggregated node statistics across all workers |
-| `EnvironmentConfig` | Environment variables and engine config for prefill/decode/agg |
-| `LaunchCommandRollup` | Parsed launch command parameters |
-| `RollupSummary` | Complete experiment summary combining all above |
+| Dataclass | Source File(s) | Purpose |
+|-----------|----------------|---------|
+| `RollupResult` | `logs/*_isl_*_osl_*/result.json` | Single benchmark result at one concurrency level (TPS, latencies) |
+| `NodeRollup` | `logs/{node}_{type}_{id}.out/err` | Per-node metrics (batches, throughput, memory, KV cache) |
+| `NodesSummary` | Aggregated from worker logs | Aggregated node statistics across all workers |
+| `EnvironmentConfig` | `config.yaml`, `trtllm_config_*.yaml` | Environment variables and engine config for prefill/decode/agg |
+| `LaunchCommandRollup` | Worker/benchmark log files | Parsed launch command parameters |
+| `RollupSummary` | **Output:** `logs/rollup.json` | Complete experiment summary combining all above |
+
+### Parser Dataclasses
+
+Parsers return lightweight dataclasses with essential fields and an `extra_args` dict for parsed values:
+
+| Dataclass | Source | Fields |
+|-----------|--------|--------|
+| `BenchmarkLaunchCommand` | `logs/benchmark.out` | `benchmark_type`, `raw_command`, `extra_args` |
+| `NodeLaunchCommand` | `logs/{node}_{type}_{id}.out/err` | `backend_type`, `worker_type`, `raw_command`, `extra_args` |
+
+The `extra_args` dict contains parsed parameters like `model`, `tp_size`, `max_concurrency`, etc.
 
 ### Entity Relationship Diagram
 
