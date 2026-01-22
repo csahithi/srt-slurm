@@ -1,22 +1,39 @@
-name: "c256_ctx3_gen1_dep8_batch32_eplb0_mtp2"
+name: "c64_ctx1_gen1_dep8_batch32_eplb0_mtp2_nsys"
 
 model:
   path: "/models/DeepSeek-R1-0528"
   container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.0"
   precision: "fp8"
 
+# Mount nsys from host (not in container by default)
+extra_mount:
+  - "/opt/nvidia/nsight-systems/2025.1.3:/opt/nvidia/nsight-systems"
+  - "/usr/local/bin/nsys:/usr/local/bin/nsys"
+
 sbatch_directives:
   cpus-per-gpu: "16"
 
 resources:
   gpu_type: "h200"
-  prefill_nodes: 3
-  prefill_workers: 3
-
+  prefill_nodes: 1
+  prefill_workers: 1
   decode_workers: 1
   decode_nodes: 1
-
   gpus_per_node: 8
+
+# Enable nsys profiling (1:1 ratio - single worker per role)
+profiling:
+  type: "nsys"
+  isl: 8192
+  osl: 1024
+  concurrency: 64   # Matches this config's target concurrency
+  num_prompts: 256  # Enough to stress c=64 (4x concurrency)
+  prefill:
+    start_step: 10   # Skip CUDA graph capture warmup
+    stop_step: 140   # Capture ~130 prefill ops (covers 256 prompts with batch=2)
+  decode:
+    start_step: 100  # Skip batch ramp-up, capture steady state
+    stop_step: 500   # 400 decode iterations with MTP2
 
 backend:
   type: trtllm
@@ -68,7 +85,7 @@ backend:
         decoding_type: MTP
         num_nextn_predict_layers: 2
     decode:
-      # Decode Worker Config for Dynamo DSR1 (MTP c=256)
+      # Decode Worker Config for Dynamo DSR1 (MTP c=64)
       # ISL/OSL: 8k/1k, TP=8 on H200
       backend: pytorch
       trust_remote_code: true
@@ -102,16 +119,13 @@ backend:
         decoding_type: MTP
         num_nextn_predict_layers: 2
 
+# Must be "manual" when profiling is enabled
 benchmark:
-  type: "sa-bench"
-  isl: 8192
-  osl: 1024
-  concurrencies: "256"
-  req_rate: "inf"
+  type: "manual"
 
 frontend:
   type: "dynamo"
-  enable_multiple_frontends: false # For some reason, the H200 cluster doesn't like nginx.
+  enable_multiple_frontends: false
 
 dynamo:
   install: false

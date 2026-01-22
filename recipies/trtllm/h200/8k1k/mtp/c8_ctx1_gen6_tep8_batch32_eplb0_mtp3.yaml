@@ -1,7 +1,7 @@
 name: "c8_ctx1_gen6_tep8_batch32_eplb0_mtp3"
 
 model:
-  path: "dsr1"
+  path: "/models/DeepSeek-R1-0528"
   container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.0"
   precision: "fp8"
 
