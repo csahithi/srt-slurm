@@ -11,7 +11,12 @@ srtctl/
 ├── cli/
 │   ├── submit.py            # srtctl apply - job submission
 │   ├── do_sweep.py          # srtctl-sweep - main orchestrator
-│   └── setup_head.py        # Head node infrastructure (NATS/etcd)
+│   ├── setup_head.py        # Head node infrastructure (NATS/etcd)
+│   └── mixins/
+│       ├── worker_stage.py  # Worker startup mixin
+│       ├── frontend_stage.py# Frontend/NGINX startup mixin
+│       ├── benchmark_stage.py# Benchmark execution mixin
+│       └── rollup_stage.py  # Experiment data consolidation
 ├── core/
 │   ├── config.py            # Config loading and srtslurm.yaml resolution
 │   ├── runtime.py           # RuntimeContext - single source of truth
@@ -26,7 +31,8 @@ srtctl/
 │       └── get_node_ip.sh   # IP detection bash functions
 ├── backends/
 │   ├── base.py              # BackendProtocol interface
-│   └── sglang.py            # SGLang implementation
+│   ├── sglang.py            # SGLang implementation
+│   └── trtllm.py            # TensorRT-LLM implementation
 ├── benchmarks/
 │   ├── base.py              # BenchmarkRunner ABC
 │   ├── sa_bench.py          # Serving benchmark
@@ -130,17 +136,120 @@ resources:
 
 `CUDA_VISIBLE_DEVICES` is automatically set per worker (e.g., `0,1,2,3` and `4,5,6,7`).
 
+### Rollup Stage
+
+After benchmark completion, the rollup stage consolidates all experiment data into
+a single `rollup.json` file for easy analysis:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           ROLLUP STAGE PIPELINE                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  INPUT FILES                          OUTPUT                                │
+│  ───────────                          ──────                                │
+│  • benchmark results (*.json)    ──┐                                        │
+│  • worker logs (*.out/*.err)     ──┼──►  rollup.json                        │
+│  • config.yaml                   ──┤     • benchmark results                │
+│  • engine configs (*.yaml)       ──┘     • node metrics                     │
+│                                          • environment config               │
+│                                          • summary statistics               │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Data collected:**
+
+| Component | Source | Output |
+|-----------|--------|--------|
+| Benchmark Results | `sa-bench_*/results_*.json` | `RollupResult[]` with TPS, latencies |
+| Node Metrics | `worker-*.out` logs | `NodesSummary` with batches, memory, throughput |
+| Environment Config | `config.yaml`, `trtllm_config_*.yaml` | `EnvironmentConfig` with env vars, engine settings |
+| Launch Commands | `benchmark.out`, worker logs | Parsed command parameters |
+
+**Modular Parser System:**
+
+The rollup uses pluggable parsers from `analysis.srtlog.parsers`:
+
+```python
+# Benchmark parsers (parse result JSON files)
+from analysis.srtlog.parsers import get_benchmark_parser
+parser = get_benchmark_parser("sa-bench")  # or "mooncake-router"
+results = parser.parse_result_directory(log_dir)
+
+# Node parsers (parse worker log files)  
+from analysis.srtlog.parsers import get_node_parser
+parser = get_node_parser("trtllm")  # or "sglang", "sglang-v2"
+nodes = parser.parse_logs(log_dir)
+```
+
+**Example rollup.json structure:**
+
+```json
+{
+  "job_id": "12345",
+  "job_name": "disagg-benchmark",
+  "model_path": "/model/llama-70b",
+  "backend_type": "trtllm",
+  
+  "results": [
+    {"concurrency": 16, "output_tps": 2500.0, "mean_ttft_ms": 45.2, ...},
+    {"concurrency": 32, "output_tps": 4000.0, "mean_ttft_ms": 52.1, ...}
+  ],
+  
+  "nodes_summary": {
+    "total_prefill_nodes": 1,
+    "total_decode_nodes": 7,
+    "avg_decode_gen_throughput": 533.1,
+    "total_kv_cache_gb": 325.0,
+    "nodes": [
+      {
+        "node_name": "worker-0",
+        "worker_type": "prefill",
+        "total_batches": 1523,
+        "avg_input_throughput": 21565.5,
+        "mem_usage_gb": 91.46,
+        "kv_cache_gb": 41.19
+      }
+    ]
+  },
+  
+  "environment_config": {
+    "prefill_environment": {"UCX_TLS": "rc,dc,ud,...", "TRTLLM_ENABLE_PDL": "1"},
+    "decode_environment": {"UCX_TLS": "rc,dc,ud,..."},
+    "prefill_engine_config": {"tensor_parallel_size": 8, "max_batch_size": 2},
+    "decode_engine_config": {"tensor_parallel_size": 8, "max_batch_size": 32}
+  },
+  
+  "max_output_tps": 4000.0,
+  "min_mean_ttft_ms": 45.2
+}
+```
+
 ## Files Overview
 
-| File                 | Purpose                                  |
-| -------------------- | ---------------------------------------- |
-| `core/config.py`     | YAML loading, srtslurm.yaml resolution   |
-| `core/runtime.py`    | Computed paths/values (RuntimeContext)   |
-| `core/topology.py`   | Worker topology and GPU allocation       |
-| `core/processes.py`  | Process lifecycle management             |
-| `core/slurm.py`      | SLURM srun launching, node IP resolution |
-| `core/health.py`     | Health checks, worker readiness polling  |
-| `core/ip_utils/`     | Bash-based IP detection utilities        |
-| `cli/do_sweep.py`    | Main orchestrator (runs on head node)    |
-| `backends/sglang.py` | SGLang backend implementation            |
-| `benchmarks/base.py` | BenchmarkRunner ABC                      |
+| File | Purpose |
+| ---- | ------- |
+| `core/config.py` | YAML loading, srtslurm.yaml resolution |
+| `core/runtime.py` | Computed paths/values (RuntimeContext) |
+| `core/topology.py` | Worker topology and GPU allocation |
+| `core/processes.py` | Process lifecycle management |
+| `core/slurm.py` | SLURM srun launching, node IP resolution |
+| `core/health.py` | Health checks, worker readiness polling |
+| `core/ip_utils/` | Bash-based IP detection utilities |
+| `cli/do_sweep.py` | Main orchestrator (runs on head node) |
+| `cli/mixins/rollup_stage.py` | Experiment data consolidation to rollup.json |
+| `backends/sglang.py` | SGLang backend implementation |
+| `backends/trtllm.py` | TensorRT-LLM backend implementation |
+| `benchmarks/base.py` | BenchmarkRunner ABC |
+
+### Related Analysis Modules
+
+| File | Purpose |
+| ---- | ------- |
+| `analysis/srtlog/parsers/__init__.py` | Parser registry and protocols |
+| `analysis/srtlog/parsers/benchmark/sa_bench.py` | SA-Bench result parser |
+| `analysis/srtlog/parsers/benchmark/mooncake_router.py` | Mooncake router result parser |
+| `analysis/srtlog/parsers/nodes/sglang.py` | SGLang worker log parser |
+| `analysis/srtlog/parsers/nodes/sglang_v2.py` | SGLang v2 log parser (newer format) |
+| `analysis/srtlog/parsers/nodes/trtllm.py` | TRTLLM worker log parser |
+| `analysis/srtlog/models.py` | Data models (NodeMetrics, BatchMetrics, etc.) |

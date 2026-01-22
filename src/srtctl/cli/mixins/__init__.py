@@ -8,14 +8,17 @@ Each mixin handles one stage of the sweep orchestration:
 - WorkerStageMixin: Backend worker process startup
 - FrontendStageMixin: Frontend/nginx orchestration
 - BenchmarkStageMixin: Benchmark execution
+- RollupStageMixin: Experiment data consolidation
 """
 
 from srtctl.cli.mixins.benchmark_stage import BenchmarkStageMixin
 from srtctl.cli.mixins.frontend_stage import FrontendStageMixin
+from srtctl.cli.mixins.rollup_stage import RollupStageMixin
 from srtctl.cli.mixins.worker_stage import WorkerStageMixin
 
 __all__ = [
     "WorkerStageMixin",
     "FrontendStageMixin",
     "BenchmarkStageMixin",
+    "RollupStageMixin",
 ]

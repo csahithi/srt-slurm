@@ -65,7 +65,7 @@ srtctl abstracts this complexity into a simple YAML interface while providing ex
                                 v
 +------------------------------------------------------------------+
 |                   ORCHESTRATION LAYER                             |
-|         SweepOrchestrator + Stage Mixins (Worker/Frontend/Bench)  |
+|   SweepOrchestrator + Stage Mixins (Worker/Frontend/Bench/Rollup) |
 +------------------------------------------------------------------+
                 |               |                |
                 v               v                v
@@ -208,7 +208,7 @@ The main orchestration class that runs inside the SLURM job:
 
 ```python
 @dataclass
-class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixin):
+class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixin, RollupStageMixin):
     config: SrtConfig
     runtime: RuntimeContext
 
@@ -396,6 +396,7 @@ src/srtctl/core/
 |   +-- WorkerStageMixin   (start_worker, start_all_workers)       |
 |   +-- FrontendStageMixin (start_nginx, start_frontend)           |
 |   +-- BenchmarkStageMixin (run_benchmark)                         |
+|   +-- RollupStageMixin   (run_rollup -> rollup.json)             |
 |                                                                   |
 | ProcessRegistry        | ManagedProcess     | Signal Handlers    |
 | - add_process()        | - name, popen      | - SIGTERM/SIGINT   |
@@ -811,6 +812,122 @@ class ManagedProcess:
 
 ---
 
+## Rollup Stage
+
+After benchmark completion, the **RollupStageMixin** consolidates all experiment data
+into a single `rollup.json` file for easy analysis and comparison.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              ROLLUP STAGE ARCHITECTURE                               │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+                                    ┌─────────────────┐
+                                    │ SweepOrchestrator│
+                                    │   run_rollup()   │
+                                    └────────┬────────┘
+                                             │
+                    ┌────────────────────────┼────────────────────────┐
+                    │                        │                        │
+                    ▼                        ▼                        ▼
+     ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+     │_collect_benchmark_   │  │ _collect_node_       │  │_collect_environment_ │
+     │      results()       │  │     metrics()        │  │      config()        │
+     └──────────┬───────────┘  └──────────┬───────────┘  └──────────┬───────────┘
+                │                         │                         │
+                ▼                         ▼                         ▼
+┌───────────────────────────┐ ┌───────────────────────────┐ ┌───────────────────────┐
+│   BENCHMARK PARSERS       │ │     NODE PARSERS          │ │    CONFIG FILES       │
+│   analysis.srtlog.parsers │ │   analysis.srtlog.parsers │ │                       │
+│   .benchmark              │ │   .nodes                  │ │  • config.yaml        │
+├───────────────────────────┤ ├───────────────────────────┤ │  • trtllm_config_*.yaml│
+│ • SABenchParser           │ │ • SGLangNodeParser        │ └───────────────────────┘
+│ • MooncakeRouterParser    │ │ • SGLangV2NodeParser      │
+└───────────────────────────┘ │ • TRTLLMNodeParser        │
+                              └───────────────────────────┘
+                                             │
+                                             ▼
+                              ┌──────────────────────────────────────────┐
+                              │             RollupSummary                │
+                              ├──────────────────────────────────────────┤
+                              │ • job_id, model_path, backend_type       │
+                              │ • results: RollupResult[] (TPS, latency) │
+                              │ • nodes_summary: NodesSummary            │
+                              │ • environment_config: EnvironmentConfig  │
+                              │ • max_output_tps, min_mean_ttft_ms       │
+                              └──────────────────────┬───────────────────┘
+                                                     │
+                                                     ▼
+                                          ┌──────────────────┐
+                                          │   rollup.json    │
+                                          └──────────────────┘
+```
+
+### Key Dataclasses
+
+| Dataclass | Purpose |
+|-----------|---------|
+| `RollupResult` | Single benchmark result at one concurrency level (TPS, latencies) |
+| `NodeRollup` | Per-node metrics (batches, throughput, memory, KV cache) |
+| `NodesSummary` | Aggregated node statistics across all workers |
+| `EnvironmentConfig` | Environment variables and engine config for prefill/decode/agg |
+| `LaunchCommandRollup` | Parsed launch command parameters |
+| `RollupSummary` | Complete experiment summary combining all above |
+
+### Modular Parser System
+
+Parsers are registered via decorators and accessed through a registry:
+
+```python
+# Register a new parser
+@register_benchmark_parser("my-bench")
+class MyBenchParser:
+    def parse_result_json(self, path: Path) -> dict: ...
+    def parse_launch_command(self, log: str) -> BenchmarkLaunchCommand: ...
+
+# Use the parser
+from analysis.srtlog.parsers import get_benchmark_parser, get_node_parser
+
+bench_parser = get_benchmark_parser("sa-bench")
+node_parser = get_node_parser("trtllm")
+```
+
+### Output Format
+
+The `rollup.json` file contains:
+
+```json
+{
+  "job_id": "12345",
+  "model_path": "/model/llama-70b",
+  "backend_type": "trtllm",
+  
+  "results": [
+    {"concurrency": 16, "output_tps": 2500.0, "mean_ttft_ms": 45.2},
+    {"concurrency": 32, "output_tps": 4000.0, "mean_ttft_ms": 52.1}
+  ],
+  
+  "nodes_summary": {
+    "total_prefill_nodes": 1,
+    "total_decode_nodes": 7,
+    "avg_decode_gen_throughput": 533.1,
+    "nodes": [{"node_name": "worker-0", "total_batches": 5531, ...}]
+  },
+  
+  "environment_config": {
+    "prefill_environment": {"UCX_TLS": "...", "TRTLLM_ENABLE_PDL": "1"},
+    "prefill_engine_config": {"tensor_parallel_size": 8, "max_batch_size": 2}
+  },
+  
+  "max_output_tps": 4000.0,
+  "min_mean_ttft_ms": 45.2
+}
+```
+
+---
+
 ## Extension Points
 
 ### How to Add a New Backend
@@ -1052,6 +1169,7 @@ src/srtctl/
 |       |-- worker_stage.py      # Backend worker startup
 |       |-- frontend_stage.py    # Frontend/nginx startup
 |       |-- benchmark_stage.py   # Benchmark execution
+|       |-- rollup_stage.py      # Experiment data consolidation
 |
 |-- benchmarks/              # Benchmark runners
 |   |-- __init__.py          # Registry and exports
@@ -1072,6 +1190,22 @@ src/srtctl/
 |-- templates/               # Jinja2 templates
     |-- job_script_minimal.j2    # sbatch script template
     |-- nginx.conf.j2            # nginx load balancer config
+
+analysis/srtlog/              # Log analysis and parsing
+|-- __init__.py
+|-- models.py                 # NodeMetrics, BatchMetrics, MemoryMetrics
+|-- log_parser.py             # Legacy NodeAnalyzer
+|-- parsers/                  # Modular parser system
+    |-- __init__.py           # Parser registry and protocols
+    |-- benchmark/            # Benchmark result parsers
+    |   |-- __init__.py
+    |   |-- sa_bench.py       # SA-Bench result parser
+    |   |-- mooncake_router.py# Mooncake router parser
+    |-- nodes/                # Worker log parsers
+        |-- __init__.py
+        |-- sglang.py         # SGLang log parser (DP/TP tags)
+        |-- sglang_v2.py      # SGLang v2 log parser (timestamps)
+        |-- trtllm.py         # TRTLLM log parser (iteration logs)
 ```
 
 ---
@@ -1082,9 +1216,11 @@ srtctl is a well-architected orchestration framework with:
 
 - **Clean separation of concerns**: Config, runtime, backend, frontend, benchmark layers
 - **Strong typing**: Frozen dataclasses with marshmallow validation
-- **Extensibility**: Protocol-based backends/frontends, decorator-based benchmark registration
+- **Extensibility**: Protocol-based backends/frontends, decorator-based benchmark/parser registration
 - **Robust process management**: Registry, monitoring, graceful cleanup
 - **SLURM integration**: Proper container mounts, srun launching, nodelist parsing
+- **Experiment consolidation**: Rollup stage aggregates results, node metrics, and configs into rollup.json
+- **Modular parsing**: Pluggable parsers for different benchmark types and backend log formats
 - **Modern Python**: 3.10+ syntax, comprehensive type hints, clear module structure
 
 The codebase follows Python best practices and provides a solid foundation for orchestrating complex LLM inference workloads on SLURM clusters.

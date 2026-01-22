@@ -383,3 +383,320 @@ class TestSetupScript:
             config = replace(config, setup_script=setup_script_override)
 
         assert config.setup_script == "install-sglang-main.sh"
+
+
+class TestOutputDirectoryStructure:
+    """Tests for output directory structure created during job submission."""
+
+    def test_output_directory_created_with_job_id(self, tmp_path, monkeypatch):
+        """Test that outputs/{job_id}/ directory is created on successful submission."""
+        import json
+        import subprocess
+        from unittest.mock import MagicMock, patch
+
+        from srtctl.cli.submit import submit_with_orchestrator
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        # Create a test config
+        config = SrtConfig(
+            name="test-output-dir",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        # Create a temp config file
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("name: test")
+
+        # Mock srtctl_root to use temp directory
+        monkeypatch.setattr(
+            "srtctl.cli.submit.get_srtslurm_setting",
+            lambda key, default=None: str(tmp_path) if key == "srtctl_root" else default,
+        )
+
+        # Mock sbatch to return a fake job ID
+        mock_result = MagicMock()
+        mock_result.stdout = "Submitted batch job 12345"
+        mock_result.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_result):
+            submit_with_orchestrator(
+                config_path=config_file,
+                config=config,
+                dry_run=False,
+            )
+
+        # Verify directory structure
+        output_dir = tmp_path / "outputs" / "12345"
+        assert output_dir.exists(), "outputs/{job_id}/ directory should be created"
+        assert output_dir.is_dir(), "outputs/{job_id}/ should be a directory"
+
+    def test_config_yaml_copied_to_output_dir(self, tmp_path, monkeypatch):
+        """Test that config.yaml is copied to outputs/{job_id}/."""
+        from unittest.mock import MagicMock, patch
+
+        from srtctl.cli.submit import submit_with_orchestrator
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test-config-copy",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        # Create config file with specific content
+        config_file = tmp_path / "my_config.yaml"
+        config_content = "name: test-config-copy\nmodel:\n  path: /model"
+        config_file.write_text(config_content)
+
+        monkeypatch.setattr(
+            "srtctl.cli.submit.get_srtslurm_setting",
+            lambda key, default=None: str(tmp_path) if key == "srtctl_root" else default,
+        )
+
+        mock_result = MagicMock()
+        mock_result.stdout = "Submitted batch job 99999"
+        mock_result.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_result):
+            submit_with_orchestrator(config_path=config_file, config=config, dry_run=False)
+
+        # Verify config.yaml was copied
+        copied_config = tmp_path / "outputs" / "99999" / "config.yaml"
+        assert copied_config.exists(), "config.yaml should be copied to output dir"
+        assert copied_config.read_text() == config_content, "config.yaml content should match original"
+
+    def test_sbatch_script_copied_to_output_dir(self, tmp_path, monkeypatch):
+        """Test that sbatch_script.sh is copied to outputs/{job_id}/."""
+        from unittest.mock import MagicMock, patch
+
+        from srtctl.cli.submit import submit_with_orchestrator
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test-sbatch-copy",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("name: test")
+
+        monkeypatch.setattr(
+            "srtctl.cli.submit.get_srtslurm_setting",
+            lambda key, default=None: str(tmp_path) if key == "srtctl_root" else default,
+        )
+
+        mock_result = MagicMock()
+        mock_result.stdout = "Submitted batch job 88888"
+        mock_result.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_result):
+            submit_with_orchestrator(config_path=config_file, config=config, dry_run=False)
+
+        # Verify sbatch_script.sh was copied
+        sbatch_script = tmp_path / "outputs" / "88888" / "sbatch_script.sh"
+        assert sbatch_script.exists(), "sbatch_script.sh should be copied to output dir"
+        # Verify it's a valid sbatch script
+        content = sbatch_script.read_text()
+        assert "#!/bin/bash" in content, "sbatch script should have bash shebang"
+        assert "#SBATCH" in content, "sbatch script should have SBATCH directives"
+
+    def test_metadata_json_created_in_output_dir(self, tmp_path, monkeypatch):
+        """Test that {job_id}.json metadata file is created in outputs/{job_id}/."""
+        import json
+        from unittest.mock import MagicMock, patch
+
+        from srtctl.cli.submit import submit_with_orchestrator
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test-metadata",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(
+                gpu_type="h100",
+                gpus_per_node=8,
+                prefill_nodes=1,
+                decode_nodes=2,
+                prefill_workers=1,
+                decode_workers=4,
+            ),
+        )
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("name: test")
+
+        monkeypatch.setattr(
+            "srtctl.cli.submit.get_srtslurm_setting",
+            lambda key, default=None: str(tmp_path) if key == "srtctl_root" else default,
+        )
+
+        mock_result = MagicMock()
+        mock_result.stdout = "Submitted batch job 77777"
+        mock_result.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_result):
+            submit_with_orchestrator(config_path=config_file, config=config, dry_run=False)
+
+        # Verify {job_id}.json was created
+        metadata_file = tmp_path / "outputs" / "77777" / "77777.json"
+        assert metadata_file.exists(), "{job_id}.json should be created in output dir"
+
+        # Verify metadata content
+        metadata = json.loads(metadata_file.read_text())
+        assert metadata["version"] == "2.0"
+        assert metadata["orchestrator"] is True
+        assert metadata["job_id"] == "77777"
+        assert metadata["job_name"] == "test-metadata"
+        assert metadata["model"]["path"] == "/model"
+        assert metadata["model"]["container"] == "/container.sqsh"
+        assert metadata["model"]["precision"] == "fp8"
+        assert metadata["resources"]["gpu_type"] == "h100"
+        assert metadata["resources"]["prefill_nodes"] == 1
+        assert metadata["resources"]["decode_nodes"] == 2
+        assert metadata["resources"]["prefill_workers"] == 1
+        assert metadata["resources"]["decode_workers"] == 4
+
+    def test_tags_included_in_metadata(self, tmp_path, monkeypatch):
+        """Test that tags are included in metadata when provided."""
+        import json
+        from unittest.mock import MagicMock, patch
+
+        from srtctl.cli.submit import submit_with_orchestrator
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test-tags",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("name: test")
+
+        monkeypatch.setattr(
+            "srtctl.cli.submit.get_srtslurm_setting",
+            lambda key, default=None: str(tmp_path) if key == "srtctl_root" else default,
+        )
+
+        mock_result = MagicMock()
+        mock_result.stdout = "Submitted batch job 66666"
+        mock_result.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_result):
+            submit_with_orchestrator(
+                config_path=config_file,
+                config=config,
+                dry_run=False,
+                tags=["experiment", "baseline", "v2"],
+            )
+
+        metadata_file = tmp_path / "outputs" / "66666" / "66666.json"
+        metadata = json.loads(metadata_file.read_text())
+        assert metadata["tags"] == ["experiment", "baseline", "v2"]
+
+    def test_complete_output_directory_structure(self, tmp_path, monkeypatch):
+        """Test that complete output directory structure is preserved."""
+        import json
+        from unittest.mock import MagicMock, patch
+
+        from srtctl.cli.submit import submit_with_orchestrator
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test-complete-structure",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp4"),
+            resources=ResourceConfig(gpu_type="gb200", gpus_per_node=4, agg_nodes=2, agg_workers=2),
+            setup_script="my-setup.sh",
+        )
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("name: test-complete-structure")
+
+        monkeypatch.setattr(
+            "srtctl.cli.submit.get_srtslurm_setting",
+            lambda key, default=None: str(tmp_path) if key == "srtctl_root" else default,
+        )
+
+        mock_result = MagicMock()
+        mock_result.stdout = "Submitted batch job 55555"
+        mock_result.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_result):
+            submit_with_orchestrator(
+                config_path=config_file,
+                config=config,
+                dry_run=False,
+                tags=["production"],
+            )
+
+        output_dir = tmp_path / "outputs" / "55555"
+
+        # Verify all expected files exist
+        expected_files = [
+            output_dir / "config.yaml",
+            output_dir / "sbatch_script.sh",
+            output_dir / "55555.json",
+        ]
+        for expected_file in expected_files:
+            assert expected_file.exists(), f"{expected_file.name} should exist in output dir"
+
+        # Verify metadata includes setup_script
+        metadata = json.loads((output_dir / "55555.json").read_text())
+        assert metadata["setup_script"] == "my-setup.sh"
+        assert metadata["tags"] == ["production"]
+        assert metadata["resources"]["agg_workers"] == 2
+
+    def test_dry_run_does_not_create_output_dir(self, tmp_path, monkeypatch):
+        """Test that dry-run mode does NOT create output directory."""
+        from srtctl.cli.submit import submit_with_orchestrator
+        from srtctl.core.schema import (
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        config = SrtConfig(
+            name="test-dry-run",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("name: test")
+
+        monkeypatch.setattr(
+            "srtctl.cli.submit.get_srtslurm_setting",
+            lambda key, default=None: str(tmp_path) if key == "srtctl_root" else default,
+        )
+
+        # Dry run should not call sbatch or create output dir
+        submit_with_orchestrator(config_path=config_file, config=config, dry_run=True)
+
+        # Verify no output directory was created
+        outputs_dir = tmp_path / "outputs"
+        assert not outputs_dir.exists(), "outputs/ should not be created in dry-run mode"

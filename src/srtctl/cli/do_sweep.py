@@ -21,7 +21,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-from srtctl.cli.mixins import BenchmarkStageMixin, FrontendStageMixin, WorkerStageMixin
+from srtctl.cli.mixins import BenchmarkStageMixin, FrontendStageMixin, RollupStageMixin, WorkerStageMixin
 from srtctl.core.config import load_config
 from srtctl.core.health import wait_for_port
 from srtctl.core.processes import (
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixin):
+class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixin, RollupStageMixin):
     """Main orchestrator for benchmark sweeps.
 
     Usage:
@@ -207,6 +207,11 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
             self._print_connection_info()
 
             exit_code = self.run_benchmark(registry, stop_event)
+
+            # Run rollup to consolidate experiment data
+            if exit_code == 0:
+                tags = self.config.tags if hasattr(self.config, "tags") else []
+                self.run_rollup(tags=tags)
 
         except Exception as e:
             logger.exception("Error during sweep: %s", e)
