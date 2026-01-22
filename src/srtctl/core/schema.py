@@ -33,6 +33,7 @@ from marshmallow_dataclass import dataclass
 from srtctl.backends import (
     BackendConfig,
     SGLangProtocol,
+    TRTLLMProtocol,
 )
 from srtctl.core.formatting import (
     FormattablePath,
@@ -61,10 +62,14 @@ class ClusterConfig:
     network_interface: str | None = None
     use_gpus_per_node_directive: bool = True
     use_segment_sbatch_directive: bool = True
+    use_exclusive_sbatch_directive: bool = False
     srtctl_root: str | None = None
     model_paths: dict[str, str] | None = None
     containers: dict[str, str] | None = None
     cloud: dict[str, str] | None = None
+    # Cluster-level container mounts (host_path -> container_path)
+    # Applied to all jobs on this cluster, useful for cluster-specific paths
+    default_mounts: dict[str, str] | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 
@@ -123,7 +128,7 @@ class BackendConfigField(fields.Field):
             # Default to SGLang
             return SGLangProtocol()
 
-        if isinstance(value, (SGLangProtocol)):
+        if isinstance(value, (SGLangProtocol, TRTLLMProtocol)):
             return value
 
         if not isinstance(value, dict):
@@ -135,8 +140,11 @@ class BackendConfigField(fields.Field):
         if backend_type == "sglang":
             schema = SGLangProtocol.Schema()
             return schema.load(value)
+        elif backend_type == "trtllm":
+            schema = TRTLLMProtocol.Schema()
+            return schema.load(value)
         else:
-            raise ValidationError(f"Unknown backend type: {backend_type!r}. Supported types: sglang")
+            raise ValidationError(f"Unknown backend type: {backend_type!r}. Supported types: sglang, trtllm")
 
     def _serialize(self, value: Any | None, attr: str | None, obj: Any, **kwargs) -> Any:
         """Serialize backend config to dict."""
@@ -144,6 +152,8 @@ class BackendConfigField(fields.Field):
             return None
         if isinstance(value, SGLangProtocol):
             return SGLangProtocol.Schema().dump(value)
+        if isinstance(value, TRTLLMProtocol):
+            return TRTLLMProtocol.Schema().dump(value)
         return value
 
 
@@ -255,6 +265,39 @@ class ResourceConfig:
     agg_nodes: int | None = None
     agg_workers: int | None = None
 
+    # Explicit GPUs per worker (override computed values)
+    # Use data_key to map from YAML field names to internal attribute names
+    _explicit_gpus_per_prefill: int | None = field(
+        default=None,
+        metadata={
+            "marshmallow_field": fields.Integer(
+                data_key="gpus_per_prefill",
+                load_default=None,
+                allow_none=True,
+            )
+        },
+    )
+    _explicit_gpus_per_decode: int | None = field(
+        default=None,
+        metadata={
+            "marshmallow_field": fields.Integer(
+                data_key="gpus_per_decode",
+                load_default=None,
+                allow_none=True,
+            )
+        },
+    )
+    _explicit_gpus_per_agg: int | None = field(
+        default=None,
+        metadata={
+            "marshmallow_field": fields.Integer(
+                data_key="gpus_per_agg",
+                load_default=None,
+                allow_none=True,
+            )
+        },
+    )
+
     @property
     def is_disaggregated(self) -> bool:
         return self.prefill_nodes is not None or self.decode_nodes is not None
@@ -279,12 +322,20 @@ class ResourceConfig:
 
     @property
     def gpus_per_prefill(self) -> int:
+        # Use explicit value if set
+        if self._explicit_gpus_per_prefill is not None:
+            return self._explicit_gpus_per_prefill
+        # Fall back to computed value
         if self.prefill_nodes and self.prefill_workers:
             return (self.prefill_nodes * self.gpus_per_node) // self.prefill_workers
         return self.gpus_per_node
 
     @property
     def gpus_per_decode(self) -> int:
+        # Use explicit value if set
+        if self._explicit_gpus_per_decode is not None:
+            return self._explicit_gpus_per_decode
+        # Fall back to computed value
         if self.decode_nodes and self.decode_workers:
             return (self.decode_nodes * self.gpus_per_node) // self.decode_workers
         # decode_nodes=0 with decode_workers means "share nodes with prefill"
@@ -295,6 +346,10 @@ class ResourceConfig:
 
     @property
     def gpus_per_agg(self) -> int:
+        # Use explicit value if set
+        if self._explicit_gpus_per_agg is not None:
+            return self._explicit_gpus_per_agg
+        # Fall back to computed value
         if self.agg_nodes and self.agg_workers:
             return (self.agg_nodes * self.gpus_per_node) // self.agg_workers
         return self.gpus_per_node
@@ -302,12 +357,12 @@ class ResourceConfig:
     @property
     def prefill_gpus(self) -> int:
         """Total GPUs used by all prefill workers."""
-        return (self.prefill_nodes or 0) * self.gpus_per_node
+        return self.num_prefill * self.gpus_per_prefill
 
     @property
     def decode_gpus(self) -> int:
         """Total GPUs used by all decode workers."""
-        return (self.decode_nodes or 0) * self.gpus_per_node
+        return self.num_decode * self.gpus_per_decode
 
     Schema: ClassVar[type[Schema]] = Schema
 
@@ -497,6 +552,8 @@ class DynamoConfig:
     Defaults to version="0.7.0" (pip install).
 
     Options:
+        install: Whether to install dynamo at all (default: True). Set to False
+                 if your container already has dynamo pre-installed.
         version: Install specific version from PyPI (e.g., "0.7.0")
         hash: Clone repo and checkout specific commit hash
         top_of_tree: Clone repo at HEAD (latest)
@@ -504,6 +561,7 @@ class DynamoConfig:
     If top_of_tree or hash is set, version is automatically cleared.
     """
 
+    install: bool = True
     version: str | None = "0.7.0"
     hash: str | None = None
     top_of_tree: bool = False
