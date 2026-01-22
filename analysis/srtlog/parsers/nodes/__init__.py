@@ -4,8 +4,7 @@
 """Node log parsers for different backends."""
 
 from analysis.srtlog.parsers.nodes.sglang import SGLangNodeParser
-from analysis.srtlog.parsers.nodes.sglang_v2 import SGLangV2NodeParser
 from analysis.srtlog.parsers.nodes.trtllm import TRTLLMNodeParser
 
-__all__ = ["SGLangNodeParser", "SGLangV2NodeParser", "TRTLLMNodeParser"]
+__all__ = ["SGLangNodeParser", "TRTLLMNodeParser"]
 

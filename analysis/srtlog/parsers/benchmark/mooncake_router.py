@@ -188,6 +188,7 @@ class MooncakeRouterParser:
         """Parse the mooncake-router launch command from log content.
 
         Looks for command lines like:
+            [CMD] aiperf profile --model ... --url ...
             genai-perf profile --model ... --endpoint ...
 
         Also parses header format:
@@ -203,22 +204,29 @@ class MooncakeRouterParser:
         """
         from analysis.srtlog.parsers import BenchmarkLaunchCommand
 
-        # Pattern to match genai-perf, aiperf or mooncake-router commands
-        # aiperf format: aiperf profile -m "Model" --url "http://..." --concurrency 10
-        command_patterns = [
-            r"(aiperf\s+profile\s+[^\n]+)",
-            r"(genai-perf\s+profile\s+[^\n]+)",
-            r"(python[3]?\s+.*genai_perf[^\n]+)",
-            r"(python[3]?\s+.*aiperf[^\n]+)",
-            r"(mooncake-router\s+[^\n]+)",
-        ]
-
         raw_command = None
-        for pattern in command_patterns:
-            match = re.search(pattern, log_content, re.IGNORECASE)
-            if match:
-                raw_command = match.group(1).strip()
-                break
+
+        # First, try to find [CMD] tagged command (preferred - from our scripts)
+        cmd_match = re.search(r"\[CMD\]\s*(.+)$", log_content, re.MULTILINE)
+        if cmd_match:
+            raw_command = cmd_match.group(1).strip()
+
+        # Fallback: pattern to match genai-perf, aiperf or mooncake-router commands
+        # aiperf format: aiperf profile -m "Model" --url "http://..." --concurrency 10
+        if not raw_command:
+            command_patterns = [
+                r"(aiperf\s+profile\s+[^\n]+)",
+                r"(genai-perf\s+profile\s+[^\n]+)",
+                r"(python[3]?\s+.*genai_perf[^\n]+)",
+                r"(python[3]?\s+.*aiperf[^\n]+)",
+                r"(mooncake-router\s+[^\n]+)",
+            ]
+
+            for pattern in command_patterns:
+                match = re.search(pattern, log_content, re.IGNORECASE)
+                if match:
+                    raw_command = match.group(1).strip()
+                    break
 
         # If no command found, try to build from header format
         if not raw_command:

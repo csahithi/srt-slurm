@@ -178,7 +178,7 @@ results = parser.parse_result_directory(log_dir)
 
 # Node parsers (parse worker log files)  
 from analysis.srtlog.parsers import get_node_parser
-parser = get_node_parser("trtllm")  # or "sglang", "sglang-v2"
+parser = get_node_parser("trtllm")  # or "sglang"
 nodes = parser.parse_logs(log_dir)
 ```
 
@@ -250,6 +250,5 @@ nodes = parser.parse_logs(log_dir)
 | `analysis/srtlog/parsers/benchmark/sa_bench.py` | SA-Bench result parser |
 | `analysis/srtlog/parsers/benchmark/mooncake_router.py` | Mooncake router result parser |
 | `analysis/srtlog/parsers/nodes/sglang.py` | SGLang worker log parser |
-| `analysis/srtlog/parsers/nodes/sglang_v2.py` | SGLang v2 log parser (newer format) |
 | `analysis/srtlog/parsers/nodes/trtllm.py` | TRTLLM worker log parser |
 | `analysis/srtlog/models.py` | Data models (NodeMetrics, BatchMetrics, etc.) |

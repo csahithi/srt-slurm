@@ -40,13 +40,8 @@ echo "Running prefix ratio benchmark..."
 echo "Results will be saved to: $result_dir"
 
 # shellcheck disable=SC2086
-python prefix_ratio_benchmark.py \
-    --prefix-ratios $PREFIX_RATIOS \
-    --isl "$ISL" \
-    --osl "$OSL" \
-    --requests "$REQUESTS" \
-    --concurrency "$CONCURRENCY" \
-    --output-dir "$result_dir"
+command="python prefix_ratio_benchmark.py --prefix-ratios $PREFIX_RATIOS --isl $ISL --osl $OSL --requests $REQUESTS --concurrency $CONCURRENCY --output-dir $result_dir"
+echo "[CMD] $command"
+eval $command
 
 echo "Router benchmark complete. Results in $result_dir"
-

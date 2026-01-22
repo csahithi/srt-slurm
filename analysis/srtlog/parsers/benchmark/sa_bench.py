@@ -171,6 +171,7 @@ class SABenchParser:
         """Parse the SA-Bench launch command from log content.
 
         Looks for command lines like:
+            [CMD] python -m sglang.bench_serving --model ... --base-url ...
             python -m sglang.bench_serving --model ... --base-url ...
 
         Also parses SA-Bench Config header format:
@@ -184,19 +185,26 @@ class SABenchParser:
         """
         from analysis.srtlog.parsers import BenchmarkLaunchCommand
 
-        # Pattern to match sa-bench / sglang.bench_serving command
-        command_patterns = [
-            r"(python[3]?\s+-m\s+sglang\.bench_serving\s+[^\n]+)",
-            r"(sa-bench\s+[^\n]+)",
-            r"(python[3]?\s+.*bench_serving\.py\s+[^\n]+)",
-        ]
-
         raw_command = None
-        for pattern in command_patterns:
-            match = re.search(pattern, log_content, re.IGNORECASE)
-            if match:
-                raw_command = match.group(1).strip()
-                break
+
+        # First, try to find [CMD] tagged command (preferred - from our scripts)
+        cmd_match = re.search(r"\[CMD\]\s*(.+)$", log_content, re.MULTILINE)
+        if cmd_match:
+            raw_command = cmd_match.group(1).strip()
+
+        # Fallback: pattern to match sa-bench / sglang.bench_serving command
+        if not raw_command:
+            command_patterns = [
+                r"(python[3]?\s+-m\s+sglang\.bench_serving\s+[^\n]+)",
+                r"(sa-bench\s+[^\n]+)",
+                r"(python[3]?\s+.*bench_serving\.py\s+[^\n]+)",
+            ]
+
+            for pattern in command_patterns:
+                match = re.search(pattern, log_content, re.IGNORECASE)
+                if match:
+                    raw_command = match.group(1).strip()
+                    break
 
         # Also try SA-Bench Config header format
         if not raw_command:

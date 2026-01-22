@@ -130,27 +130,19 @@ done
 if [[ "${PROFILING_MODE}" == "prefill" ]]; then
     echo ""
     echo "Generating profiling traffic..."
-    python3 -m sglang.bench_serving \
-        --backend sglang \
-        --model "${model_name}" \
-        --host "${head_node}" --port "${head_port}" \
-        --dataset-name random \
-        --max-concurrency "${PROFILE_CONCURRENCY}" \
-        --num-prompts 128 \
-        --random-input-len "${PROFILE_ISL}" \
-        --random-output-len "${PROFILE_OSL}" \
-        --random-range-ratio 1 \
-        --warmup-request 0
+    
+    command="python3 -m sglang.bench_serving --backend sglang --model ${model_name} --host ${head_node} --port ${head_port} --dataset-name random --max-concurrency ${PROFILE_CONCURRENCY} --num-prompts 128 --random-input-len ${PROFILE_ISL} --random-output-len ${PROFILE_OSL} --random-range-ratio 1 --warmup-request 0"
+    echo "[CMD] $command"
+    eval $command
 
     # Run lm-eval for additional profiling coverage
     echo ""
     echo "Running lm-eval..."
     pip install lm-eval tenacity > /dev/null 2>&1
-    python -m lm_eval \
-        --model local-completions \
-        --tasks gsm8k \
-        --model_args "base_url=http://${head_node}:${head_port}/v1/completions,model=${model_name},tokenized_requests=False,tokenizer_backend=None,num_concurrent=${PROFILE_CONCURRENCY},timeout=6000,max_retries=1" \
-        --limit 10
+    
+    command="python -m lm_eval --model local-completions --tasks gsm8k --model_args \"base_url=http://${head_node}:${head_port}/v1/completions,model=${model_name},tokenized_requests=False,tokenizer_backend=None,num_concurrent=${PROFILE_CONCURRENCY},timeout=6000,max_retries=1\" --limit 10"
+    echo "[CMD] $command"
+    eval $command
 fi
 
 exit_code=$?
@@ -164,4 +156,3 @@ if [[ -n "${SGLANG_TORCH_PROFILER_DIR}" ]]; then
 fi
 
 exit ${exit_code}
-

@@ -1204,7 +1204,6 @@ analysis/srtlog/              # Log analysis and parsing
     |-- nodes/                # Worker log parsers
         |-- __init__.py
         |-- sglang.py         # SGLang log parser (DP/TP tags)
-        |-- sglang_v2.py      # SGLang v2 log parser (timestamps)
         |-- trtllm.py         # TRTLLM log parser (iteration logs)
 ```
 

@@ -1,11 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""SGLang node log parser (v1 format with DP/TP/EP tags).
+"""SGLang node log parser.
 
 Parses logs with format:
-    [2025-11-04 05:31:43 DP0 TP0 EP0] Prefill batch, #new-seq: 18, #new-token: 16384, ...
-    [2025-11-04 05:32:32 DP31 TP31 EP31] Decode batch, #running-req: 7, #token: 7040, ...
+    [2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m ... Decode batch, #running-req: 5, ...
+
+This parser handles SGLang structured logging format with ISO 8601 timestamps.
 """
 
 from __future__ import annotations
@@ -25,12 +26,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# ANSI escape code pattern for stripping colors
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
 @register_node_parser("sglang")
 class SGLangNodeParser:
-    """Parser for SGLang node logs (v1 format with DP/TP/EP tags).
+    """Parser for SGLang node logs.
 
-    This format is used by older SGLang versions that include DP/TP/EP
-    indices in the log prefix.
+    Handles SGLang structured logging with ISO 8601 timestamps.
+    May contain ANSI color codes which are stripped during parsing.
     """
 
     @property
@@ -93,15 +98,18 @@ class SGLangNodeParser:
         try:
             with open(log_path) as f:
                 for line in f:
+                    # Strip ANSI escape codes
+                    clean_line = ANSI_ESCAPE.sub("", line)
+
                     # Parse prefill batch metrics
-                    batch_metrics = self._parse_prefill_batch_line(line)
+                    batch_metrics = self._parse_prefill_batch_line(clean_line)
                     if batch_metrics:
                         batches.append(
                             BatchMetrics(
                                 timestamp=batch_metrics["timestamp"],
-                                dp=batch_metrics["dp"],
-                                tp=batch_metrics["tp"],
-                                ep=batch_metrics["ep"],
+                                dp=0,  # Default since not in log
+                                tp=0,
+                                ep=0,
                                 batch_type=batch_metrics["type"],
                                 new_seq=batch_metrics.get("new_seq"),
                                 new_token=batch_metrics.get("new_token"),
@@ -116,14 +124,14 @@ class SGLangNodeParser:
                         )
 
                     # Parse decode batch metrics
-                    decode_metrics = self._parse_decode_batch_line(line)
+                    decode_metrics = self._parse_decode_batch_line(clean_line)
                     if decode_metrics:
                         batches.append(
                             BatchMetrics(
                                 timestamp=decode_metrics["timestamp"],
-                                dp=decode_metrics["dp"],
-                                tp=decode_metrics["tp"],
-                                ep=decode_metrics["ep"],
+                                dp=0,
+                                tp=0,
+                                ep=0,
                                 batch_type=decode_metrics["type"],
                                 running_req=decode_metrics.get("running_req"),
                                 queue_req=decode_metrics.get("queue_req"),
@@ -137,14 +145,14 @@ class SGLangNodeParser:
                         )
 
                     # Parse memory metrics
-                    mem_metrics = self._parse_memory_line(line)
+                    mem_metrics = self._parse_memory_line(clean_line)
                     if mem_metrics:
                         memory_snapshots.append(
                             MemoryMetrics(
                                 timestamp=mem_metrics["timestamp"],
-                                dp=mem_metrics["dp"],
-                                tp=mem_metrics["tp"],
-                                ep=mem_metrics["ep"],
+                                dp=0,
+                                tp=0,
+                                ep=0,
                                 metric_type=mem_metrics["type"],
                                 avail_mem_gb=mem_metrics.get("avail_mem_gb"),
                                 mem_usage_gb=mem_metrics.get("mem_usage_gb"),
@@ -153,11 +161,11 @@ class SGLangNodeParser:
                             )
                         )
 
-                    # Extract TP/DP/EP configuration from command line
-                    if "--tp-size" in line:
-                        tp_match = re.search(r"--tp-size\s+(\d+)", line)
-                        dp_match = re.search(r"--dp-size\s+(\d+)", line)
-                        ep_match = re.search(r"--ep-size\s+(\d+)", line)
+                    # Extract TP/DP/EP configuration from server_args
+                    if "tp_size=" in clean_line:
+                        tp_match = re.search(r"tp_size=(\d+)", clean_line)
+                        dp_match = re.search(r"dp_size=(\d+)", clean_line)
+                        ep_match = re.search(r"ep_size=(\d+)", clean_line)
 
                         if tp_match:
                             config["tp_size"] = int(tp_match.group(1))
@@ -172,12 +180,7 @@ class SGLangNodeParser:
 
         total_metrics = len(batches) + len(memory_snapshots)
         if total_metrics == 0:
-            logger.warning(
-                "Parsed %s but found no metrics. "
-                "Expected to find lines with DP/TP/EP tags. "
-                "Log format may have changed.",
-                log_path,
-            )
+            logger.debug("Parsed %s but found no batch/memory metrics", log_path)
 
         logger.debug("Parsed %s: %d batches, %d memory snapshots", log_path, len(batches), len(memory_snapshots))
 
@@ -188,41 +191,26 @@ class SGLangNodeParser:
             config=config,
         )
 
-    def _parse_dp_tp_ep_tag(self, line: str) -> tuple[int | None, int | None, int | None, str | None]:
-        """Extract DP, TP, EP indices and timestamp from log line.
+    def _parse_timestamp(self, line: str) -> str | None:
+        """Extract ISO 8601 timestamp from log line.
 
-        Supports three formats:
-        - Full: [2025-11-04 05:31:43 DP0 TP0 EP0]
-        - Simple TP: [2025-11-04 07:05:55 TP0] (defaults DP=0, EP=0)
-        - Pipeline: [2025-12-08 14:34:44 PP0] (defaults DP=0, EP=0, TP=PP value)
+        Example: 2025-12-30T15:52:38.206058Z
         """
-        # Try full format first: DP0 TP0 EP0
-        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) DP(\d+) TP(\d+) EP(\d+)\]", line)
+        match = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z?)", line)
         if match:
-            timestamp, dp, tp, ep = match.groups()
-            return int(dp), int(tp), int(ep), timestamp
-
-        # Try simple format: TP0 only (1P4D style)
-        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) TP(\d+)\]", line)
-        if match:
-            timestamp, tp = match.groups()
-            return 0, int(tp), 0, timestamp
-
-        # Try pipeline parallelism format: PP0 (prefill with PP)
-        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) PP(\d+)\]", line)
-        if match:
-            timestamp, pp = match.groups()
-            return 0, int(pp), 0, timestamp
-
-        return None, None, None, None
+            return match.group(1)
+        return None
 
     def _parse_prefill_batch_line(self, line: str) -> dict | None:
         """Parse prefill batch log line for metrics."""
-        dp, tp, ep, timestamp = self._parse_dp_tp_ep_tag(line)
-        if dp is None or "Prefill batch" not in line:
+        if "Prefill batch" not in line:
             return None
 
-        metrics = {"timestamp": timestamp, "dp": dp, "tp": tp, "ep": ep, "type": "prefill"}
+        timestamp = self._parse_timestamp(line)
+        if not timestamp:
+            return None
+
+        metrics = {"timestamp": timestamp, "type": "prefill"}
 
         patterns = {
             "new_seq": r"#new-seq:\s*(\d+)",
@@ -246,11 +234,14 @@ class SGLangNodeParser:
 
     def _parse_decode_batch_line(self, line: str) -> dict | None:
         """Parse decode batch log line for metrics."""
-        dp, tp, ep, timestamp = self._parse_dp_tp_ep_tag(line)
-        if dp is None or "Decode batch" not in line:
+        if "Decode batch" not in line:
             return None
 
-        metrics = {"timestamp": timestamp, "dp": dp, "tp": tp, "ep": ep, "type": "decode"}
+        timestamp = self._parse_timestamp(line)
+        if not timestamp:
+            return None
+
+        metrics = {"timestamp": timestamp, "type": "decode"}
 
         patterns = {
             "running_req": r"#running-req:\s*(\d+)",
@@ -273,44 +264,50 @@ class SGLangNodeParser:
 
     def _parse_memory_line(self, line: str) -> dict | None:
         """Parse memory-related log lines."""
-        dp, tp, ep, timestamp = self._parse_dp_tp_ep_tag(line)
-        if dp is None:
+        timestamp = self._parse_timestamp(line)
+        if not timestamp:
             return None
 
-        metrics = {"timestamp": timestamp, "dp": dp, "tp": tp, "ep": ep}
+        metrics = {"timestamp": timestamp}
 
-        # Parse available memory
+        # Parse available memory from "avail mem=75.11 GB"
         avail_match = re.search(r"avail mem=([\d.]+)\s*GB", line)
         if avail_match:
             metrics["avail_mem_gb"] = float(avail_match.group(1))
             metrics["type"] = "memory"
 
-        # Parse memory usage
+        # Parse memory usage from "mem usage=107.07 GB"
         usage_match = re.search(r"mem usage=([\d.]+)\s*GB", line)
         if usage_match:
             metrics["mem_usage_gb"] = float(usage_match.group(1))
             metrics["type"] = "memory"
 
-        # Parse KV cache size
+        # Parse KV cache size from "KV size: 17.16 GB"
         kv_match = re.search(r"KV size:\s*([\d.]+)\s*GB", line)
         if kv_match:
             metrics["kv_cache_gb"] = float(kv_match.group(1))
             metrics["type"] = "kv_cache"
 
-        # Parse token count for KV cache
+        # Parse token count from "#tokens: 524288"
         token_match = re.search(r"#tokens:\s*(\d+)", line)
         if token_match:
             metrics["kv_tokens"] = int(token_match.group(1))
+
+        # Parse from "Capturing batches" progress lines
+        # Example: "Capturing batches (bs=256 avail_mem=6.32 GB)"
+        capture_match = re.search(r"avail_mem=([\d.]+)\s*GB", line)
+        if capture_match and "type" not in metrics:
+            metrics["avail_mem_gb"] = float(capture_match.group(1))
+            metrics["type"] = "memory"
 
         return metrics if "type" in metrics else None
 
     def _extract_node_info_from_filename(self, filename: str) -> dict | None:
         """Extract node name and worker info from filename.
 
-        Example: watchtower-navy-cn01_prefill_w0.err or r02-p01-dgx-c11_prefill_w0.out
-        Returns: {'node': 'watchtower-navy-cn01', 'worker_type': 'prefill', 'worker_id': 'w0'}
+        Example: eos0219_prefill_w0.out
+        Returns: {'node': 'eos0219', 'worker_type': 'prefill', 'worker_id': 'w0'}
         """
-        # Use greedy match for node name up to _(prefill|decode|agg|frontend)_
         match = re.match(
             r"(.+)_(prefill|decode|agg|frontend)_([^.]+)\.(err|out)",
             os.path.basename(filename),
@@ -326,8 +323,7 @@ class SGLangNodeParser:
     def parse_launch_command(self, log_content: str, worker_type: str = "unknown") -> NodeLaunchCommand | None:
         """Parse the SGLang worker launch command from log content.
 
-        Looks for command lines like:
-            python -m sglang.launch_server --model ... --tp-size ...
+        Looks for command lines or ServerArgs in the log.
 
         Args:
             log_content: Content of the worker log file
@@ -338,30 +334,46 @@ class SGLangNodeParser:
         """
         from analysis.srtlog.parsers import NodeLaunchCommand
 
-        # Pattern to match sglang launch commands
-        patterns = [
-            r"(python[3]?\s+-m\s+sglang\.launch_server\s+[^\n]+)",
-            r"(python[3]?\s+.*launch_server\.py\s+[^\n]+)",
-            r"(sglang\.launch_server\s+[^\n]+)",
-        ]
+        # Strip ANSI codes for cleaner parsing
+        clean_content = ANSI_ESCAPE.sub("", log_content)
 
         raw_command = None
-        for pattern in patterns:
-            match = re.search(pattern, log_content, re.IGNORECASE)
-            if match:
-                raw_command = match.group(1).strip()
-                break
+
+        # First, try to find [CMD] tagged command (preferred - from our scripts)
+        cmd_match = re.search(r"\[CMD\]\s*(.+)$", clean_content, re.MULTILINE)
+        if cmd_match:
+            raw_command = cmd_match.group(1).strip()
+
+        # Fallback: pattern to match sglang launch commands
+        if not raw_command:
+            patterns = [
+                r"(python[3]?\s+-m\s+sglang\.launch_server\s+[^\n]+)",
+                r"(python[3]?\s+.*launch_server\.py\s+[^\n]+)",
+                r"(sglang\.launch_server\s+[^\n]+)",
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, clean_content, re.IGNORECASE)
+                if match:
+                    raw_command = match.group(1).strip()
+                    break
+
+        # Also try to parse from ServerArgs() log line
+        if not raw_command:
+            server_args_match = re.search(r"server_args=ServerArgs\((.*?)\)", clean_content, re.DOTALL)
+            if server_args_match:
+                raw_command = f"ServerArgs({server_args_match.group(1)[:200]}...)"
 
         if not raw_command:
             return None
 
         cmd = NodeLaunchCommand(
-            backend_type=self.backend_type,
+            backend_type="sglang",
             worker_type=worker_type,
             raw_command=raw_command,
         )
 
-        # Parse SGLang server arguments
+        # Parse SGLang server arguments (from command line)
         arg_patterns = {
             "model_path": r"--model(?:-path)?[=\s]+([^\s]+)",
             "served_model_name": r"--served-model-name[=\s]+([^\s]+)",
@@ -378,16 +390,39 @@ class SGLangNodeParser:
             "nccl_init_addr": r"--(?:dist-init-addr|nccl-init-addr)[=\s]+([^\s]+)",
         }
 
+        # Also parse from ServerArgs format
+        server_args_patterns = {
+            "model_path": r"model_path=['\"]?([^'\"]+)['\"]?",
+            "served_model_name": r"served_model_name=['\"]?([^'\"]+)['\"]?",
+            "tp_size": r"tp_size=(\d+)",
+            "dp_size": r"dp_size=(\d+)",
+            "ep_size": r"ep_size=(\d+)",
+            "host": r"host=['\"]?([^'\"]+)['\"]?",
+            "port": r"port=(\d+)",
+            "max_num_seqs": r"max_running_requests=(\d+)",
+            "max_model_len": r"context_length=(\d+)",
+            "disaggregation_mode": r"disaggregation_mode=['\"]?([^'\"]+)['\"]?",
+        }
+
         for field, pattern in arg_patterns.items():
             match = re.search(pattern, raw_command)
             if match:
                 value = match.group(1)
-                # Convert to appropriate type
                 if field in ("tp_size", "dp_size", "ep_size", "port", "max_num_seqs", "max_model_len"):
                     value = int(value)
                 elif field == "gpu_memory_utilization":
                     value = float(value)
                 setattr(cmd, field, value)
+
+        # Try ServerArgs patterns for any missing fields
+        for field, pattern in server_args_patterns.items():
+            if getattr(cmd, field) is None:
+                match = re.search(pattern, clean_content)
+                if match:
+                    value = match.group(1)
+                    if field in ("tp_size", "dp_size", "ep_size", "port", "max_num_seqs", "max_model_len"):
+                        value = int(value)
+                    setattr(cmd, field, value)
 
         return cmd
 

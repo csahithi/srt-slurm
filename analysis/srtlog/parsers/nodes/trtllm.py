@@ -362,6 +362,7 @@ class TRTLLMNodeParser:
         """Parse the TRTLLM worker launch command from log content.
 
         Looks for command lines like:
+            [CMD] python3 -m dynamo.trtllm --model-path /model --served-model-name dsr1-fp8 --disaggregation-mode prefill
             python3 -m dynamo.trtllm --model-path /model --served-model-name dsr1-fp8 --disaggregation-mode prefill
 
         Args:
@@ -376,22 +377,29 @@ class TRTLLMNodeParser:
         # Strip ANSI codes for cleaner parsing
         clean_content = ANSI_ESCAPE.sub("", log_content)
 
-        # Pattern to match TRTLLM launch commands (dynamo.trtllm or tensorrt_llm.serve)
-        patterns = [
-            r"(?:Rank\d+\s+run\s+)?(python[3]?\s+-m\s+dynamo\.trtllm\s+[^\n]+)",
-            r"(?:Rank\d+\s+run\s+)?(python[3]?\s+-m\s+tensorrt_llm\.serve\s+[^\n]+)",
-            r"(trtllm-serve\s+[^\n]+)",
-            r"(mpirun\s+.*trtllm[^\n]+)",
-        ]
-
         raw_command = None
-        for pattern in patterns:
-            match = re.search(pattern, clean_content)
-            if match:
-                raw_command = match.group(1).strip()
-                # Remove trailing "in background" if present
-                raw_command = re.sub(r"\s+in\s+background$", "", raw_command)
-                break
+
+        # First, try to find [CMD] tagged command (preferred - from our scripts)
+        cmd_match = re.search(r"\[CMD\]\s*(.+)$", clean_content, re.MULTILINE)
+        if cmd_match:
+            raw_command = cmd_match.group(1).strip()
+
+        # Fallback: pattern to match TRTLLM launch commands (dynamo.trtllm or tensorrt_llm.serve)
+        if not raw_command:
+            patterns = [
+                r"(?:Rank\d+\s+run\s+)?(python[3]?\s+-m\s+dynamo\.trtllm\s+[^\n]+)",
+                r"(?:Rank\d+\s+run\s+)?(python[3]?\s+-m\s+tensorrt_llm\.serve\s+[^\n]+)",
+                r"(trtllm-serve\s+[^\n]+)",
+                r"(mpirun\s+.*trtllm[^\n]+)",
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, clean_content)
+                if match:
+                    raw_command = match.group(1).strip()
+                    # Remove trailing "in background" if present
+                    raw_command = re.sub(r"\s+in\s+background$", "", raw_command)
+                    break
 
         if not raw_command:
             return None

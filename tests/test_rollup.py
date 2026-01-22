@@ -817,19 +817,19 @@ class TestRollupIntegration:
             )
         )
 
-        # Create mock prefill log file (matches NodeAnalyzer expected format)
+        # Create mock prefill log file (matches SGLang parser expected format)
         prefill_log = tmp_path / "node-01_prefill_w0.err"
         prefill_log.write_text(
-            """[2025-01-22 10:00:00 DP0 TP0 EP0] Prefill batch, #new-seq: 10, #new-token: 1024, #cached-token: 256, token usage: 0.50, #running-req: 5, #queue-req: 2, #prealloc-req: 0, #inflight-req: 3, input throughput (token/s): 5000.00,
-[2025-01-22 10:00:01 DP0 TP0 EP0] Load weight end. type=DeepseekV3ForCausalLM, dtype=torch.bfloat16, avail mem=75.11 GB, mem usage=107.07 GB.
-[2025-01-22 10:00:02 DP0 TP0 EP0] KV Cache is allocated. #tokens: 524288, KV size: 17.16 GB
+            """[2m2025-01-22T10:00:00.000000Z[0m [32m INFO[0m Prefill batch, #new-seq: 10, #new-token: 1024, #cached-token: 256, token usage: 0.50, #running-req: 5, #queue-req: 2, #prealloc-req: 0, #inflight-req: 3, input throughput (token/s): 5000.00,
+[2m2025-01-22T10:00:01.000000Z[0m [32m INFO[0m Load weight end. type=DeepseekV3ForCausalLM, dtype=torch.bfloat16, avail mem=75.11 GB, mem usage=107.07 GB.
+[2m2025-01-22T10:00:02.000000Z[0m [32m INFO[0m KV Cache is allocated. #tokens: 524288, KV size: 17.16 GB
 """
         )
 
         # Create mock decode log file
         decode_log = tmp_path / "node-02_decode_w0.err"
         decode_log.write_text(
-            """[2025-01-22 10:00:00 DP31 TP31 EP31] Decode batch, #running-req: 50, #token: 5000, token usage: 0.50, pre-allocated usage: 0.10, #prealloc-req: 2, #transfer-req: 1, #queue-req: 3, gen throughput (token/s): 150.00,
+            """[2m2025-01-22T10:00:00.000000Z[0m [32m INFO[0m Decode batch, #running-req: 50, #token: 5000, token usage: 0.50, pre-allocated usage: 0.10, #prealloc-req: 2, #transfer-req: 1, #queue-req: 3, gen throughput (token/s): 150.00,
 """
         )
 
