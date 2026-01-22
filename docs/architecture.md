@@ -844,9 +844,8 @@ into a single `rollup.json` file for easy analysis and comparison.
 │   .benchmark              │ │   .nodes                  │ │  • config.yaml        │
 ├───────────────────────────┤ ├───────────────────────────┤ │  • trtllm_config_*.yaml│
 │ • SABenchParser           │ │ • SGLangNodeParser        │ └───────────────────────┘
-│ • MooncakeRouterParser    │ │ • SGLangV2NodeParser      │
-└───────────────────────────┘ │ • TRTLLMNodeParser        │
-                              └───────────────────────────┘
+│ • MooncakeRouterParser    │ │ • TRTLLMNodeParser        │
+└───────────────────────────┘ └───────────────────────────┘
                                              │
                                              ▼
                               ┌──────────────────────────────────────────┐
@@ -875,6 +874,155 @@ into a single `rollup.json` file for easy analysis and comparison.
 | `EnvironmentConfig` | Environment variables and engine config for prefill/decode/agg |
 | `LaunchCommandRollup` | Parsed launch command parameters |
 | `RollupSummary` | Complete experiment summary combining all above |
+
+### Entity Relationship Diagram
+
+The following diagram shows how data flows from log files through parsers to the final rollup output:
+
+```
+                                    ┌─────────────────────────────────────────────────────────────┐
+                                    │                      LOG FILES                               │
+                                    └─────────────────────────────────────────────────────────────┘
+                                                              │
+                    ┌─────────────────────────────────────────┼─────────────────────────────────────────┐
+                    │                                         │                                         │
+                    ▼                                         ▼                                         ▼
+        ┌───────────────────┐                     ┌───────────────────┐                     ┌───────────────────┐
+        │  worker_*.out/err │                     │   benchmark.out   │                     │   config.yaml     │
+        └───────────────────┘                     └───────────────────┘                     └───────────────────┘
+                    │                                         │                                         │
+                    ▼                                         ▼                                         ▼
+    ┌───────────────────────────┐             ┌───────────────────────────┐             ┌───────────────────────────┐
+    │    NodeParserProtocol     │             │  BenchmarkParserProtocol  │             │      YAML Loader          │
+    │  (sglang.py / trtllm.py)  │             │  (sa_bench.py / etc.)     │             │                           │
+    └───────────────────────────┘             └───────────────────────────┘             └───────────────────────────┘
+                    │                                         │                                         │
+          ┌────────┴────────┐                       ┌────────┴────────┐                                 │
+          ▼                 ▼                       ▼                 ▼                                 ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐        ┌─────────────────────┐
+│  NodeMetrics    │  │NodeLaunchCommand│  │  dict (result)  │  │BenchmarkLaunch  │        │  EnvironmentConfig  │
+│  (models.py)    │  │ (__init__.py)   │  │                 │  │    Command      │        │  (rollup/models.py) │
+└─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘        └─────────────────────┘
+        │                    │                     │                    │                          │
+        └────────────────────┼─────────────────────┼────────────────────┼──────────────────────────┘
+                             │                     │                    │
+                             ▼                     ▼                    ▼
+                    ┌────────────────────────────────────────────────────────────┐
+                    │                    RollupStageMixin                         │
+                    │              (rollup_stage.py / rollup_harness.py)          │
+                    └────────────────────────────────────────────────────────────┘
+                                                   │
+                                                   │ transforms
+                                                   ▼
+                                          ┌───────────────┐
+                                          │ RollupSummary │
+                                          └───────┬───────┘
+                                                  │
+                                                  ▼
+                                          ┌───────────────┐
+                                          │  rollup.json  │
+                                          └───────────────┘
+```
+
+### Detailed Entity Relationships
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              PARSER LAYER (analysis/srtlog/parsers/)                     │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌────────────────────┐         ┌────────────────────┐         ┌────────────────────┐   │
+│  │  NodeLaunchCommand │         │ BenchmarkLaunch    │         │    NodeMetrics     │   │
+│  ├────────────────────┤         │      Command       │         ├────────────────────┤   │
+│  │ backend_type: str  │         ├────────────────────┤         │ node_info: dict    │   │
+│  │ worker_type: str   │         │ benchmark_type: str│         │ config: dict       │   │
+│  │ raw_command: str   │         │ raw_command: str   │         │ batches: list      │   │
+│  │ extra_args: dict   │         │ extra_args: dict   │         │ memory_snapshots   │   │
+│  └────────────────────┘         └────────────────────┘         └────────────────────┘   │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+                                              │
+                                              ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                           ROLLUP LAYER (srtctl/cli/mixins/rollup/)                       │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                            LaunchCommandRollup                                   │    │
+│  ├─────────────────────────────────────────────────────────────────────────────────┤    │
+│  │  raw_command: str          │  command_type: str ("worker" | "benchmark")        │    │
+│  │  model_path: str | None    │  served_model_name: str | None                     │    │
+│  │  worker_type: str | None   │  backend_type: str | None                          │    │
+│  │  tp_size: int | None       │  pp_size: int | None                               │    │
+│  │  dp_size: int | None       │  ep_size: int | None                               │    │
+│  │  max_num_seqs: int | None  │  max_model_len: int | None                         │    │
+│  └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                           │ 1:1                                          │
+│                                           ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                 NodeRollup                                       │    │
+│  ├─────────────────────────────────────────────────────────────────────────────────┤    │
+│  │  node_name: str              │  worker_type: str                                 │    │
+│  │  worker_id: str              │  tp_size, pp_size, dp_size, ep_size: int | None  │    │
+│  │  launch_command: LaunchCommandRollup | None                                      │    │
+│  │  avail_mem_gb: float | None  │  kv_cache_gb: float | None                       │    │
+│  │  total_batches: int          │  avg_gen_throughput: float | None                │    │
+│  └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                           │ 1:N                                          │
+│                                           ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                               NodesSummary                                       │    │
+│  ├─────────────────────────────────────────────────────────────────────────────────┤    │
+│  │  nodes: list[NodeRollup]                                                         │    │
+│  │  total_prefill_nodes: int    │  total_decode_nodes: int                         │    │
+│  │  total_agg_nodes: int        │  total_kv_cache_gb: float | None                 │    │
+│  └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                               RollupResult                                       │    │
+│  ├─────────────────────────────────────────────────────────────────────────────────┤    │
+│  │  max_concurrency: int        │  input_len: int        │  output_len: int        │    │
+│  │  output_tps: float           │  request_tps: float    │  total_tokens: int      │    │
+│  │  avg_ttft_ms: float          │  avg_tpot_ms: float    │  p50/p90/p99 metrics    │    │
+│  └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                            EnvironmentConfig                                     │    │
+│  ├─────────────────────────────────────────────────────────────────────────────────┤    │
+│  │  prefill_environment: dict   │  decode_environment: dict                        │    │
+│  │  aggregated_environment: dict│  prefill_engine_config: dict                     │    │
+│  │  decode_engine_config: dict  │  aggregated_engine_config: dict                  │    │
+│  └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                          │
+│                    ┌──────────────────────┬──────────────────────┐                      │
+│                    │                      │                      │                      │
+│                    ▼                      ▼                      ▼                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              RollupSummary                                       │    │
+│  ├─────────────────────────────────────────────────────────────────────────────────┤    │
+│  │  job_id: str                 │  model_name: str         │  backend_type: str    │    │
+│  │  benchmark_type: str         │  is_disaggregated: bool  │  total_nodes: int     │    │
+│  │  max_output_tps: float       │  max_request_tps: float                          │    │
+│  │  results: list[RollupResult]                                                     │    │
+│  │  nodes_summary: NodesSummary | None                                              │    │
+│  │  benchmark_command: LaunchCommandRollup | None                                   │    │
+│  │  environment_config: EnvironmentConfig | None                                    │    │
+│  │  tags: dict                  │  timestamp: str                                   │    │
+│  └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Cardinality Summary
+
+| Parent | Child | Relationship |
+|--------|-------|--------------|
+| `RollupSummary` | `RollupResult` | 1:N (one per concurrency level) |
+| `RollupSummary` | `NodesSummary` | 1:1 |
+| `RollupSummary` | `LaunchCommandRollup` | 1:1 (benchmark command) |
+| `RollupSummary` | `EnvironmentConfig` | 1:1 |
+| `NodesSummary` | `NodeRollup` | 1:N (one per worker) |
+| `NodeRollup` | `LaunchCommandRollup` | 1:1 (worker command) |
 
 ### Modular Parser System
 
