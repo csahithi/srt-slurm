@@ -1,8 +1,8 @@
 name: "gb200-fp4-1p2d"
 
 model:
-  path: "dsr1"
-  container: "lmsysorg/sglang:dev-cu13"
+  path: "dsfp4"
+  container: "lmsysorg/sglang:nightly-dev-cu13-20260121-1e309030"
   precision: "fp4"
 
 resources:
