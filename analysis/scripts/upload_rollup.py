@@ -374,6 +374,11 @@ def main():
             failed_count += 1
             continue
 
+        # Skip if no nodes_summary (job likely failed/cancelled)
+        if not data.get("nodes_summary"):
+            print("  ⚠ Skipping: no nodes_summary (job may have failed)")
+            continue
+
         # Read sbatch script for this job
         sbatch_script = read_sbatch_script(rollup_path)
 
