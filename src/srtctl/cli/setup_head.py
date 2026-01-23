@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import psutil
 
 # Network configurations
 ETCD_CLIENT_PORT = 2379
@@ -117,6 +118,19 @@ def setup_logging():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+def setup_priority():
+    try:
+        p = psutil.Process(os.getpid())
+        
+        # IOPRIO_CLASS_BE = 2 (Best Effort)
+        # Value 0 = Highest Priority
+        p.ionice(psutil.IOPRIO_CLASS_BE, value=0)
+        
+        print(f"Success: I/O priority set to Best Effort (Level 0) for PID {os.getpid()}")
+        
+    except Exception as e:
+        print(f"Warning: Could not set I/O priority. Reason: {e}")
+
 
 def start_nats(binary_path: str = "/configs/nats-server") -> subprocess.Popen:
     """Start NATS server.
@@ -165,6 +179,8 @@ def start_etcd(
 
     cmd = [
         binary_path,
+        "--data-dir",
+        "/etcd-data",
         "--listen-client-urls",
         f"{ETCD_LISTEN_ADDR}:{ETCD_CLIENT_PORT}",
         "--advertise-client-urls",
@@ -242,6 +258,7 @@ def main():
     args = parser.parse_args()
 
     setup_logging()
+    setup_priority()
     logger.info("Setting up head node infrastructure for: %s", args.name)
 
     log_dir = Path(args.log_dir)
