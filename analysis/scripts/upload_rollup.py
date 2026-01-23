@@ -19,214 +19,19 @@ Example:
 
 import argparse
 from collections import defaultdict
+import gzip
 import json
 import sys
 from pathlib import Path
 
-import pandas as pd
 import requests
 
 
 DEFAULT_WORKDIR = Path("/tmp/srt")
 
 
-def _is_numeric_list(obj: list) -> bool:
-    """Check if a list contains only ints or floats."""
-    return all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in obj)
-
-
-def _is_cuda_graph_key(key: str) -> bool:
-    """Check if a key is related to cuda graph config."""
-    key_lower = key.lower()
-    return "cuda_graph" in key_lower or "cudagraph" in key_lower
-
-
-def flatten_json(obj: dict | list, parent_key: str = "", sep: str = ".") -> dict:
-    """Flatten a nested JSON object using dot notation.
-
-    Args:
-        obj: The object to flatten (dict or list)
-        parent_key: The parent key prefix
-        sep: Separator to use between keys (default: ".")
-
-    Returns:
-        Flattened dictionary with dot-notation keys
-
-    Note:
-        Lists of ints/floats with "cuda_graph" or "cudagraph" in the key are kept as lists.
-    """
-    items = {}
-
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            new_key = f"{parent_key}{sep}{key}" if parent_key else key
-            if isinstance(value, list):
-                # Keep numeric lists for cuda_graph configs as-is
-                if _is_cuda_graph_key(new_key) and _is_numeric_list(value):
-                    items[new_key] = value
-                else:
-                    items.update(flatten_json(value, new_key, sep))
-            elif isinstance(value, dict):
-                items.update(flatten_json(value, new_key, sep))
-            else:
-                items[new_key] = value
-    elif isinstance(obj, list):
-        for idx, value in enumerate(obj):
-            new_key = f"{parent_key}{sep}{idx}" if parent_key else str(idx)
-            if isinstance(value, (dict, list)):
-                items.update(flatten_json(value, new_key, sep))
-            else:
-                items[new_key] = value
-
-    return items
-
-
-def parse_concurrencies(concurrencies_str: str) -> list[int]:
-    """Parse concurrencies string delimited by 'x'.
-
-    Args:
-        concurrencies_str: String like "32x64x128" or "48"
-
-    Returns:
-        List of integer concurrency values
-    """
-    if not concurrencies_str:
-        return []
-
-    parts = concurrencies_str.split("x")
-    result = []
-    for part in parts:
-        part = part.strip()
-        if part:
-            try:
-                result.append(int(part))
-            except ValueError:
-                pass
-    return result
-
-
-def extract_launch_commands(data: dict) -> dict:
-    """Extract launch commands from all workers, prefixed by node_name.
-
-    Args:
-        data: The rollup.json data
-
-    Returns:
-        Flattened dict with keys like "launch_commands.prefill"
-    """
-    nodes_summary = data.get("nodes_summary", {})
-    nodes = nodes_summary.get("nodes", [])
-
-    node_type_to_launch_command = defaultdict(list)
-
-    for node in nodes:
-        node_name = node.get("node_name", "unknown")
-        worker_type = node.get("worker_type", "unknown")
-        launch_command = node.get("launch_command", {})
-        raw_command = launch_command.get("raw_command", "")
-
-        worker_env_config = data.get("environment_config", {}).get(f"{worker_type}_environment", {})
-        engine_config = data.get("environment_config", {}).get(f"{worker_type}_engine_config", {})
-
-        raw_command_str = f"#{worker_type}:{node_name}"
-        if worker_env_config:
-            raw_command_str += f"\n#env_vars:{worker_env_config}"
-        if engine_config:
-            raw_command_str += f"\n#engine_config:{engine_config}"
-        raw_command_str += f"\n{raw_command}"
-
-        node_type_to_launch_command[worker_type].append(raw_command)
-
-    return node_type_to_launch_command
-
-
-def create_per_concurrency_rows(data: dict) -> list[dict]:
-    """Create one flattened row dict per concurrency level.
-
-    Args:
-        data: The rollup.json data
-
-    Returns:
-        List of flattened row dicts, one per concurrency
-    """
-    concurrencies_str = data.get("concurrencies", "")
-    concurrencies = parse_concurrencies(concurrencies_str)
-    results = data.get("results", [])
-
-    # Build a map of concurrency -> result
-    result_by_concurrency = {}
-    for result in results:
-        conc = result.get("concurrency")
-        if conc is not None:
-            result_by_concurrency[conc] = result
-
-    # If no concurrencies parsed, try to get from results
-    if not concurrencies:
-        concurrencies = list(result_by_concurrency.keys())
-
-    # Extract top-level metadata (exclude results, nodes_summary arrays)
-    top_level_keys = [
-        "job_id", "job_name", "generated_at", "model_path", "model_name",
-        "precision", "gpu_type", "gpus_per_node", "backend_type", "frontend_type",
-        "is_disaggregated", "total_nodes", "total_gpus", "prefill_nodes",
-        "decode_nodes", "prefill_workers", "decode_workers", "prefill_gpus",
-        "decode_gpus", "agg_nodes", "agg_workers", "benchmark_type", "isl", "osl",
-        "concurrencies"
-    ]
-
-    top_level = {k: data.get(k) for k in top_level_keys if k in data}
-
-    # Extract nodes_summary scalars (not the nodes array)
-    nodes_summary = data.get("nodes_summary", {})
-    for key, value in nodes_summary.items():
-        if key != "nodes" and not isinstance(value, (list, dict)):
-            top_level[f"nodes_summary.{key}"] = value
-
-    # Extract environment_config flattened
-    env_config = data.get("environment_config", {})
-    if env_config:
-        flattened_env = flatten_json(env_config, "environment_config")
-        top_level.update(flattened_env)
-
-    # Extract benchmark_command raw_command only
-    benchmark_cmd = data.get("benchmark_command", {})
-    if benchmark_cmd:
-        raw_cmd = benchmark_cmd.get("raw_command")
-        
-        if raw_cmd:
-            top_level["benchmark_command"] = raw_cmd
-    
-    sbatch_script = data.get("sbatch_script")
-    if sbatch_script:
-        top_level.update(
-            {
-                "benchmark_command": f"#sbatch_script\n\n{raw_cmd}",
-            }
-        )
-
-    # Extract launch commands from all workers
-    launch_commands = extract_launch_commands(data)
-    for worker_type, commands in launch_commands.items():
-        top_level[f"launch_commands.{worker_type}"] = "\n".join(commands)
-
-    rows = []
-
-    for concurrency in concurrencies:
-        row = dict(top_level)
-        row["concurrency"] = concurrency
-
-        # Add result for this concurrency with "result_" prefix
-        result = result_by_concurrency.get(concurrency, {})
-        for key, value in result.items():
-            row[f"result_{key}"] = value
-
-        rows.append(row)
-
-    return rows
-
-
-def upload_parquet(
-    parquet_path: Path,
+def upload_json(
+    json_path: Path,
     user_login: str,
     session_id: str,
     endpoint: str,
@@ -235,10 +40,10 @@ def upload_parquet(
     frontend: str,
     mode: str,
 ) -> tuple[bool, str]:
-    """Upload a Parquet file to the endpoint.
+    """Upload a gzipped JSON file to the endpoint.
 
     Args:
-        parquet_path: Path to the Parquet file
+        json_path: Path to the JSON file
         user_login: User login/email
         session_id: Session ID for the upload
         endpoint: API endpoint URL
@@ -250,12 +55,16 @@ def upload_parquet(
     Returns:
         Tuple of (success, message)
     """
-    parquet_content = parquet_path.read_bytes()
+    json_content = json_path.read_bytes()
+    compressed_content = gzip.compress(json_content)
+
+    # Use .json.gz extension to indicate gzipped JSON
+    filename = json_path.name + ".gz"
 
     try:
         response = requests.post(
             endpoint,
-            files={"file": (parquet_path.name, parquet_content, "application/octet-stream")},
+            files={"file": (filename, compressed_content, "application/gzip")},
             data={
                 "user_login": user_login,
                 "session_id": session_id,
@@ -360,8 +169,9 @@ def main():
     print(f"Study ID: {args.study_id}")
     print("---")
 
-    all_rows = []
     failed_count = 0
+
+    groups: defaultdict[tuple[str, str, str], list[dict]] = defaultdict(list)
 
     for rollup_path in sorted(rollup_files):
         print(f"Processing: {rollup_path}")
@@ -379,82 +189,41 @@ def main():
             print("  ⚠ Skipping: no nodes_summary (job may have failed)")
             continue
 
+        mode = "aggregated" if data.get("is_aggregated") else "disaggregated"
+        group = (data['benchmark_type'], data['frontend_type'], data['backend_type'], mode)
         # Read sbatch script for this job
         sbatch_script = read_sbatch_script(rollup_path)
 
-        # Create per-concurrency rows
-        rows = create_per_concurrency_rows(data)
-
-        if not rows:
-            print("  ⚠ No concurrency results found")
-            continue
-
         # Add sbatch script to each row
-        for row in rows:
-            if sbatch_script:
-                row["sbatch_script"] = sbatch_script
-            print(f"  Added: job_id={row.get('job_id')}, concurrency={row.get('concurrency')}")
-
-        all_rows.extend(rows)
+        if sbatch_script:
+            data["sbatch_script"] = sbatch_script
+        groups[group].append(data)
 
     print("---")
     print(f"Total rollups processed: {len(rollup_files)}")
-    print(f"Total rows: {len(all_rows)}")
+    print(f"Total groups: {len(groups)}")
+    for group, rows in groups.items():
+        print(f"  {group}: {len(rows)}")
     print(f"Failed to read: {failed_count}")
 
-    if not all_rows:
+    if not groups:
         print("No data to write")
-        sys.exit(0)
+        return
 
-    # Create full DataFrame
-    df = pd.DataFrame(all_rows)
-    # add metadata columns
-    df["experiment_id"] = 'STUDY'
-    df["study_id"] = args.study_id
-    df["user_login"] = args.user_login
-    
-    # Write combined Parquet
-    combined_parquet = workdir / "rollup_results_combined.parquet"
-    df.to_parquet(combined_parquet, index=False)
-    print(f"\n✓ Created combined Parquet: {combined_parquet}")
-    print(f"  Total rows: {len(df)}")
-    print(f"  Total columns: {len(df.columns)}")
-
-    # Group by backend_type, frontend_type, benchmark_type, is_disaggregated
-    group_cols = ["backend_type", "frontend_type", "benchmark_type", "is_disaggregated"]
-
-    # Fill NaN with 'unknown' for grouping (handle is_disaggregated specially)
-    for col in group_cols:
-        if col not in df.columns:
-            df[col] = "unknown" if col != "is_disaggregated" else False
-        elif col == "is_disaggregated":
-            df[col] = df[col].fillna(False)
-        else:
-            df[col] = df[col].fillna("unknown")
-
-    grouped = df.groupby(group_cols)
-    print(f"\nFound {len(grouped)} unique groups:")
-
-    generated_files = [combined_parquet]
     success_count = 0
     upload_failed_count = 0
 
-    for (backend, frontend, benchmarker, is_disagg), group_df in grouped:
-        mode = "disaggregated" if is_disagg else "aggregated"
-        print(f"\n--- Group: backend={backend}, frontend={frontend}, benchmarker={benchmarker}, mode={mode} ---")
-        print(f"  Rows: {len(group_df)}")
+    for group, rows in groups.items():
+        print(f"\n--- Group: {group} ---")
+        print(f"  Rows: {len(rows)}")
 
-        # Create group Parquet filename
-        safe_backend = str(backend).replace("/", "_")
-        safe_frontend = str(frontend).replace("/", "_")
-        safe_benchmarker = str(benchmarker).replace("/", "_")
-        group_filename = f"rollup_{safe_backend}_{safe_frontend}_{safe_benchmarker}_{mode}.parquet"
-        group_parquet = workdir / group_filename
+        group_str = "_".join(group)
 
-        # Write group Parquet
-        group_df.to_parquet(group_parquet, index=False)
-        generated_files.append(group_parquet)
-        print(f"  ✓ Created: {group_parquet}")
+        group_filename = f"rollup_{group_str}.json"
+        group_path = workdir / group_filename
+        with open(group_path, "w") as f:
+            json.dump(rows, f, indent=1)
+        print(f"  ✓ Created: {group_path}")
 
         if args.dry_run:
             print("  Dry run - skipping upload")
@@ -464,19 +233,19 @@ def main():
         if args.study_id:
             study_id = args.study_id
         else:
-            study_id = group_df["job_name"].iloc[0] if "job_name" in group_df.columns else "unknown"
+            study_id = rows[0]["job_name"]
 
         print(f"  Uploading with study_id: {study_id}")
 
-        success, message = upload_parquet(
-            group_parquet,
+        success, message = upload_json(
+            group_path,
             args.user_login,
             study_id,
             args.endpoint,
-            backend=str(backend),
-            benchmarker=str(benchmarker),
-            frontend=str(frontend),
-            mode=mode,
+            benchmarker=group[0],
+            frontend=group[1],
+            backend=group[2],
+            mode=group[3],
         )
 
         if success:
@@ -488,15 +257,15 @@ def main():
 
     # Cleanup unless --keep-files
     if not args.keep_files and not args.dry_run:
-        for fp in generated_files:
+        for fp in workdir.glob("*.json"):
             try:
                 fp.unlink()
             except Exception:
-                pass
-        print(f"\nCleaned up {len(generated_files)} generated files")
+                print(f"  ✗ Failed to delete: {fp}")
+        print(f"\nCleaned up {len(list(workdir.glob('*.json')))} generated files")
 
     print("\n" + "=" * 50)
-    print(f"Total groups: {len(grouped)}")
+    print(f"Total groups: {len(groups)}")
     if not args.dry_run:
         print(f"Successful uploads: {success_count}")
         print(f"Failed uploads: {upload_failed_count}")
