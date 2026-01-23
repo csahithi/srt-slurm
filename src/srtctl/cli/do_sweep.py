@@ -104,7 +104,9 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
 
         mounts = dict(self.runtime.container_mounts)
         mounts[setup_script] = setup_script_container
-        mounts[Path(f"/tmp/etcd-data-{self.runtime.job_id}")] = Path("/etcd-data")
+        etcd_data_dir = Path(f"/tmp/etcd-data-{self.runtime.job_id}")
+        etcd_data_dir.mkdir(parents=True, exist_ok=True)
+        mounts[etcd_data_dir] = Path("/etcd-data")
 
         proc = start_srun_process(
             command=cmd,
