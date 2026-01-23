@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Upload rollup.json files to SRT endpoint with flattened JSON structure.
+"""Upload rollup.json files to SRT endpoint as Parquet files grouped by backend/frontend/benchmarker.
 
-For each concurrency level in the rollup, creates a separate flattened JSON with:
-- Top-level metadata (duplicated for each concurrency)
-- Results for that concurrency prefixed with "result_"
-- Launch commands from all workers prefixed with node_name
+Process:
+1. Find all rollup.json files in the directory
+2. Create flattened JSON for each concurrency level
+3. Combine all into a single Parquet file
+4. Group by (backend_type, frontend_type, benchmark_type)
+5. Upload separate Parquet file for each group
 
 Usage:
-    python upload_rollups.py <directory> <user_login> [--session-id SESSION] [--endpoint URL]
+    python upload_rollup.py <directory> <user_login> [--study-id STUDY] [--endpoint URL]
 
 Example:
-    python upload_rollups.py ./outputs user@example.com
-    python upload_rollups.py ./outputs user@example.com --session-id my-session
-    python upload_rollups.py ./outputs user@example.com --workdir /tmp/srt/my-run
+    python upload_rollup.py ./outputs user@example.com
+    python upload_rollup.py ./outputs user@example.com --study-id my-study
+    python upload_rollup.py ./outputs user@example.com --endpoint that accepts the upload
 """
 
 import argparse
@@ -21,10 +23,22 @@ import json
 import sys
 from pathlib import Path
 
+import pandas as pd
 import requests
 
 
 DEFAULT_WORKDIR = Path("/tmp/srt")
+
+
+def _is_numeric_list(obj: list) -> bool:
+    """Check if a list contains only ints or floats."""
+    return all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in obj)
+
+
+def _is_cuda_graph_key(key: str) -> bool:
+    """Check if a key is related to cuda graph config."""
+    key_lower = key.lower()
+    return "cuda_graph" in key_lower or "cudagraph" in key_lower
 
 
 def flatten_json(obj: dict | list, parent_key: str = "", sep: str = ".") -> dict:
@@ -37,13 +51,22 @@ def flatten_json(obj: dict | list, parent_key: str = "", sep: str = ".") -> dict
 
     Returns:
         Flattened dictionary with dot-notation keys
+
+    Note:
+        Lists of ints/floats with "cuda_graph" or "cudagraph" in the key are kept as lists.
     """
     items = {}
 
     if isinstance(obj, dict):
         for key, value in obj.items():
             new_key = f"{parent_key}{sep}{key}" if parent_key else key
-            if isinstance(value, (dict, list)):
+            if isinstance(value, list):
+                # Keep numeric lists for cuda_graph configs as-is
+                if _is_cuda_graph_key(new_key) and _is_numeric_list(value):
+                    items[new_key] = value
+                else:
+                    items.update(flatten_json(value, new_key, sep))
+            elif isinstance(value, dict):
                 items.update(flatten_json(value, new_key, sep))
             else:
                 items[new_key] = value
@@ -89,11 +112,11 @@ def extract_launch_commands(data: dict) -> dict:
         data: The rollup.json data
 
     Returns:
-        Flattened dict with keys like "worker-0.launch_command.raw_command"
+        Flattened dict with keys like "launch_commands.prefill"
     """
     nodes_summary = data.get("nodes_summary", {})
     nodes = nodes_summary.get("nodes", [])
-    
+
     node_type_to_launch_command = defaultdict(list)
 
     for node in nodes:
@@ -102,25 +125,30 @@ def extract_launch_commands(data: dict) -> dict:
         launch_command = node.get("launch_command", {})
         raw_command = launch_command.get("raw_command", "")
 
-        raw_command = f"#{worker_type}:{node_name}\n{raw_command}"
+        worker_env_config = data.get("environment_config", {}).get(f"{worker_type}_environment", {})
+        engine_config = data.get("environment_config", {}).get(f"{worker_type}_engine_config", {})
+
+        raw_command_str = f"#{worker_type}:{node_name}"
+        if worker_env_config:
+            raw_command_str += f"\n#env_vars:{worker_env_config}"
+        if engine_config:
+            raw_command_str += f"\n#engine_config:{engine_config}"
+        raw_command_str += f"\n{raw_command}"
 
         node_type_to_launch_command[worker_type].append(raw_command)
-
 
     return node_type_to_launch_command
 
 
-def create_per_concurrency_jsons(data: dict, workdir: Path) -> list[tuple[int, Path]]:
-    """Create one JSON file per concurrency level.
+def create_per_concurrency_rows(data: dict) -> list[dict]:
+    """Create one flattened row dict per concurrency level.
 
     Args:
         data: The rollup.json data
-        workdir: Directory to write output files
 
     Returns:
-        List of (concurrency, file_path) tuples
+        List of flattened row dicts, one per concurrency
     """
-    job_id = data.get("job_id", "unknown")
     concurrencies_str = data.get("concurrencies", "")
     concurrencies = parse_concurrencies(concurrencies_str)
     results = data.get("results", [])
@@ -164,87 +192,79 @@ def create_per_concurrency_jsons(data: dict, workdir: Path) -> list[tuple[int, P
     benchmark_cmd = data.get("benchmark_command", {})
     if benchmark_cmd:
         raw_cmd = benchmark_cmd.get("raw_command")
+        
         if raw_cmd:
             top_level["benchmark_command"] = raw_cmd
+    
+    sbatch_script = data.get("sbatch_script")
+    if sbatch_script:
+        top_level.update(
+            {
+                "benchmark_command": f"#sbatch_script\n\n{raw_cmd}",
+            }
+        )
 
     # Extract launch commands from all workers
     launch_commands = extract_launch_commands(data)
     for worker_type, commands in launch_commands.items():
         top_level[f"launch_commands.{worker_type}"] = "\n".join(commands)
 
-    output_files = []
+    rows = []
 
     for concurrency in concurrencies:
-        output = dict(top_level)
-        output["concurrency"] = concurrency
-
-        # Add launch commands
-        output.update(launch_commands)
+        row = dict(top_level)
+        row["concurrency"] = concurrency
 
         # Add result for this concurrency with "result_" prefix
         result = result_by_concurrency.get(concurrency, {})
         for key, value in result.items():
-            output[f"result_{key}"] = value
+            row[f"result_{key}"] = value
 
-        # Write to file
-        filename = f"{job_id}_concurrency_{concurrency}.json"
-        filepath = workdir / filename
+        rows.append(row)
 
-        with open(filepath, "w") as f:
-            json.dump(output, f, indent=2)
-
-        output_files.append((concurrency, filepath))
-
-    return output_files
+    return rows
 
 
-def upload_json(
-    json_path: Path,
+def upload_parquet(
+    parquet_path: Path,
     user_login: str,
-    session_id: str | None,
+    session_id: str,
     endpoint: str,
+    backend: str,
+    benchmarker: str,
+    frontend: str,
+    mode: str,
 ) -> tuple[bool, str]:
-    """Upload a single JSON file to the endpoint.
+    """Upload a Parquet file to the endpoint.
 
     Args:
-        json_path: Path to the JSON file
+        parquet_path: Path to the Parquet file
         user_login: User login/email
-        session_id: Optional session ID (uses job_name if not provided)
+        session_id: Session ID for the upload
         endpoint: API endpoint URL
+        backend: Backend type
+        benchmarker: Benchmark type
+        frontend: Frontend type
+        mode: Mode (disaggregated or aggregated)
 
     Returns:
         Tuple of (success, message)
     """
-    try:
-        with open(json_path) as f:
-            data = json.load(f)
-    except Exception as e:
-        return False, f"Failed to read JSON: {e}"
-
-    # Extract metadata
-    benchmark_type = data.get("benchmark_type", "unknown")
-    frontend_type = data.get("frontend_type", "unknown")
-    backend_type = data.get("backend_type", "unknown")
-    job_name = data.get("job_name", "unknown")
-
-    # Use provided session_id or fall back to job_name
-    effective_session_id = session_id if session_id else job_name
-
-    # Read the file content for upload
-    json_content = json_path.read_text()
+    parquet_content = parquet_path.read_bytes()
 
     try:
         response = requests.post(
-            f"{endpoint}/upload/srt",
-            files={"file": (json_path.name, json_content, "application/json")},
+            endpoint,
+            files={"file": (parquet_path.name, parquet_content, "application/octet-stream")},
             data={
                 "user_login": user_login,
-                "session_id": effective_session_id,
-                "backend": backend_type,
-                "benchmarker": benchmark_type,
-                "frontend": frontend_type,
+                "session_id": session_id,
+                "backend": backend,
+                "benchmarker": benchmarker,
+                "frontend": frontend,
+                "mode": mode,
             },
-            timeout=30,
+            timeout=60,
         )
 
         if response.ok:
@@ -261,15 +281,40 @@ def find_rollup_files(directory: Path) -> list[Path]:
     return list(directory.rglob("rollup.json"))
 
 
+def read_sbatch_script(rollup_path: Path) -> str | None:
+    """Read the sbatch_script.sh associated with a rollup.json.
+
+    The sbatch script is expected to be at <job_dir>/sbatch_script.sh
+    where rollup.json is at <job_dir>/logs/rollup.json.
+
+    Args:
+        rollup_path: Path to the rollup.json file
+
+    Returns:
+        Content of sbatch_script.sh or None if not found
+    """
+    # rollup.json is at <job_dir>/logs/rollup.json
+    # sbatch_script.sh is at <job_dir>/sbatch_script.sh
+    job_dir = rollup_path.parent.parent
+    sbatch_path = job_dir / "sbatch_script.sh"
+
+    if sbatch_path.exists():
+        try:
+            return sbatch_path.read_text()
+        except Exception:
+            return None
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Upload rollup.json files to SRT endpoint with flattened JSON"
+        description="Upload rollup.json files to SRT endpoint as Parquet (grouped by backend/frontend/benchmarker)"
     )
     parser.add_argument("directory", type=Path, help="Directory to search for rollup.json files")
     parser.add_argument("user_login", help="User login/email for the upload")
     parser.add_argument(
-        "--session-id",
-        help="Session ID (default: extracted from job_name in each JSON)",
+        "--study-id",
+        help="Study ID (default: extracted from first job_name per group)",
     )
     parser.add_argument(
         "--endpoint",
@@ -284,12 +329,12 @@ def main():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Generate files but don't upload",
+        help="Generate Parquet files but don't upload",
     )
     parser.add_argument(
         "--keep-files",
         action="store_true",
-        help="Keep generated files after upload (default: delete)",
+        help="Keep generated Parquet files after upload (default: delete)",
     )
 
     args = parser.parse_args()
@@ -312,15 +357,11 @@ def main():
     print(f"Found {len(rollup_files)} rollup.json files")
     print(f"User: {args.user_login}")
     print(f"Endpoint: {args.endpoint}")
-    if args.session_id:
-        print(f"Session ID: {args.session_id}")
-    else:
-        print("Session ID: (from job_name)")
+    print(f"Study ID: {args.study_id}")
     print("---")
 
-    success_count = 0
+    all_rows = []
     failed_count = 0
-    generated_files = []
 
     for rollup_path in sorted(rollup_files):
         print(f"Processing: {rollup_path}")
@@ -333,53 +374,129 @@ def main():
             failed_count += 1
             continue
 
-        # Create per-concurrency JSON files
-        output_files = create_per_concurrency_jsons(data, workdir)
-        generated_files.extend([fp for _, fp in output_files])
+        # Read sbatch script for this job
+        sbatch_script = read_sbatch_script(rollup_path)
 
-        if not output_files:
+        # Create per-concurrency rows
+        rows = create_per_concurrency_rows(data)
+
+        if not rows:
             print("  ⚠ No concurrency results found")
             continue
 
-        for concurrency, json_path in output_files:
-            print(f"  Generated: {json_path.name} (concurrency={concurrency})")
+        # Add sbatch script to each row
+        for row in rows:
+            if sbatch_script:
+                row["sbatch_script"] = sbatch_script
+            print(f"  Added: job_id={row.get('job_id')}, concurrency={row.get('concurrency')}")
 
-            if args.dry_run:
-                continue
+        all_rows.extend(rows)
 
-            success, message = upload_json(
-                json_path,
-                args.user_login,
-                args.session_id,
-                args.endpoint,
-            )
+    print("---")
+    print(f"Total rollups processed: {len(rollup_files)}")
+    print(f"Total rows: {len(all_rows)}")
+    print(f"Failed to read: {failed_count}")
 
-            if success:
-                print(f"    ✓ Uploaded ({message})")
-                success_count += 1
-            else:
-                print(f"    ✗ Upload failed: {message}")
-                failed_count += 1
+    if not all_rows:
+        print("No data to write")
+        sys.exit(0)
 
-        print()
+    # Create full DataFrame
+    df = pd.DataFrame(all_rows)
+    # add metadata columns
+    df["experiment_id"] = 'STUDY'
+    df["study_id"] = args.study_id
+    df["user_login"] = args.user_login
+    
+    # Write combined Parquet
+    combined_parquet = workdir / "rollup_results_combined.parquet"
+    df.to_parquet(combined_parquet, index=False)
+    print(f"\n✓ Created combined Parquet: {combined_parquet}")
+    print(f"  Total rows: {len(df)}")
+    print(f"  Total columns: {len(df.columns)}")
 
-    # Cleanup generated files unless --keep-files
+    # Group by backend_type, frontend_type, benchmark_type, is_disaggregated
+    group_cols = ["backend_type", "frontend_type", "benchmark_type", "is_disaggregated"]
+
+    # Fill NaN with 'unknown' for grouping (handle is_disaggregated specially)
+    for col in group_cols:
+        if col not in df.columns:
+            df[col] = "unknown" if col != "is_disaggregated" else False
+        elif col == "is_disaggregated":
+            df[col] = df[col].fillna(False)
+        else:
+            df[col] = df[col].fillna("unknown")
+
+    grouped = df.groupby(group_cols)
+    print(f"\nFound {len(grouped)} unique groups:")
+
+    generated_files = [combined_parquet]
+    success_count = 0
+    upload_failed_count = 0
+
+    for (backend, frontend, benchmarker, is_disagg), group_df in grouped:
+        mode = "disaggregated" if is_disagg else "aggregated"
+        print(f"\n--- Group: backend={backend}, frontend={frontend}, benchmarker={benchmarker}, mode={mode} ---")
+        print(f"  Rows: {len(group_df)}")
+
+        # Create group Parquet filename
+        safe_backend = str(backend).replace("/", "_")
+        safe_frontend = str(frontend).replace("/", "_")
+        safe_benchmarker = str(benchmarker).replace("/", "_")
+        group_filename = f"rollup_{safe_backend}_{safe_frontend}_{safe_benchmarker}_{mode}.parquet"
+        group_parquet = workdir / group_filename
+
+        # Write group Parquet
+        group_df.to_parquet(group_parquet, index=False)
+        generated_files.append(group_parquet)
+        print(f"  ✓ Created: {group_parquet}")
+
+        if args.dry_run:
+            print("  Dry run - skipping upload")
+            continue
+
+        # Determine study_id - use provided or first job_name in group
+        if args.study_id:
+            study_id = args.study_id
+        else:
+            study_id = group_df["job_name"].iloc[0] if "job_name" in group_df.columns else "unknown"
+
+        print(f"  Uploading with study_id: {study_id}")
+
+        success, message = upload_parquet(
+            group_parquet,
+            args.user_login,
+            study_id,
+            args.endpoint,
+            backend=str(backend),
+            benchmarker=str(benchmarker),
+            frontend=str(frontend),
+            mode=mode,
+        )
+
+        if success:
+            print(f"  ✓ Uploaded ({message})")
+            success_count += 1
+        else:
+            print(f"  ✗ Upload failed: {message}")
+            upload_failed_count += 1
+
+    # Cleanup unless --keep-files
     if not args.keep_files and not args.dry_run:
         for fp in generated_files:
             try:
                 fp.unlink()
             except Exception:
                 pass
-        print(f"Cleaned up {len(generated_files)} generated files")
+        print(f"\nCleaned up {len(generated_files)} generated files")
 
-    print("---")
-    print(f"Total rollups: {len(rollup_files)}")
-    print(f"Generated files: {len(generated_files)}")
+    print("\n" + "=" * 50)
+    print(f"Total groups: {len(grouped)}")
     if not args.dry_run:
         print(f"Successful uploads: {success_count}")
-        print(f"Failed uploads: {failed_count}")
+        print(f"Failed uploads: {upload_failed_count}")
 
-    if failed_count > 0:
+    if upload_failed_count > 0:
         sys.exit(1)
 
 
