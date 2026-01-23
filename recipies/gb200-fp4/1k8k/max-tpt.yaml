@@ -3,7 +3,7 @@
 name: "gb200-fp4-max-tpt"
 
 model:
-  path: "dsfp4"
+  path: "dsr1"
   container: "lmsysorg/sglang:nightly-dev-cu13-20260121-1e309030"
   precision: "fp4"
 
