@@ -1,4 +1,4 @@
-name: ctx7_gen1_dep16_batch64_eplb0_mtp0
+name: ctx2_gen1_dep32_batch16_eplb0_mtp3_564
 
 model:
   path: "dsr1-fp8"
@@ -7,13 +7,13 @@ model:
 
 resources:
   gpu_type: "gb300"
-  prefill_nodes: 7
-  prefill_workers: 7
+  prefill_nodes: 2
+  prefill_workers: 2
   gpus_per_prefill: 4
 
   decode_workers: 1
-  decode_nodes: 4
-  gpus_per_decode: 16
+  decode_nodes: 8
+  gpus_per_decode: 32
 
   gpus_per_node: 4
 
@@ -50,14 +50,17 @@ backend:
         dtype: fp8
         enable_block_reuse: false
         free_gpu_memory_fraction: 0.4
-      max_batch_size: 2
+      max_batch_size: 16
       max_num_tokens: 16384
-      max_seq_len: 8232
+      max_seq_len: 1064
       moe_config:
         backend: DEEPGEMM
       moe_expert_parallel_size: 4
       pipeline_parallel_size: 1
       print_iter_log: true
+      speculative_config:
+        decoding_type: MTP
+        num_nextn_predict_layers: 3
       tensor_parallel_size: 4
 
 
@@ -72,38 +75,35 @@ backend:
         - 4
         - 8
         - 16
-        - 24
-        - 32
-        - 40
-        - 48
-        - 56
-        - 64
         enable_padding: true
       enable_attention_dp: true
-      enable_lm_head_tp_in_adp: false
+      enable_lm_head_tp_in_adp: true
       kv_cache_config:
         dtype: fp8
         enable_block_reuse: false
-        free_gpu_memory_fraction: 0.8
-      max_batch_size: 64
+        free_gpu_memory_fraction: 0.7
+      max_batch_size: 16
       max_num_tokens: 64
-      max_seq_len: 9256
+      max_seq_len: 2088
       moe_config:
         backend: DEEPGEMM
         use_low_precision_moe_combine: true
-      moe_expert_parallel_size: 16
+      moe_expert_parallel_size: 32
       num_postprocess_workers: 4
       pipeline_parallel_size: 1
       print_iter_log: true
+      speculative_config:
+        decoding_type: MTP
+        num_nextn_predict_layers: 3
       stream_interval: 100
-      tensor_parallel_size: 16
+      tensor_parallel_size: 32
 
 
 benchmark:
   type: "sa-bench"
-  isl: 8192
+  isl: 1024
   osl: 1024
-  concurrencies: ['1229']
+  concurrencies: ['564']
   req_rate: "inf"
 
 frontend:
