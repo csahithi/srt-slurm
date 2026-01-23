@@ -186,11 +186,13 @@ def start_etcd(
         "--advertise-client-urls",
         f"http://{host_ip}:{ETCD_CLIENT_PORT}",  # Must be reachable IP, not 0.0.0.0
         "--listen-peer-urls",
-        f"{ETCD_LISTEN_ADDR}:{ETCD_PEER_PORT}",
+        f"http://127.0.0.1:{ETCD_PEER_PORT}",
         "--initial-advertise-peer-urls",
-        f"http://{host_ip}:{ETCD_PEER_PORT}",  # Must be reachable IP
+        f"http://127.0.0.1:{ETCD_PEER_PORT}",
         "--initial-cluster",
-        f"default=http://{host_ip}:{ETCD_PEER_PORT}",
+        f"default=http://127.0.0.1:{ETCD_PEER_PORT}",
+        "--heartbeat-interval", "500",
+        "--election-timeout", "5000",
     ]
 
     # Set up output handling
