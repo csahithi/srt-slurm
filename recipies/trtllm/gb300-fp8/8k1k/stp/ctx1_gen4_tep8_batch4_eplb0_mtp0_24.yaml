@@ -1,4 +1,4 @@
-name: ctx1_gen4_tep8_batch1_eplb0_mtp0
+name: ctx1_gen4_tep8_batch4_eplb0_mtp0_24
 
 model:
   path: "dsr1-fp8"
@@ -78,8 +78,8 @@ backend:
         dtype: fp8
         enable_block_reuse: false
         free_gpu_memory_fraction: 0.9
-      max_batch_size: 1
-      max_num_tokens: 1
+      max_batch_size: 4
+      max_num_tokens: 4
       max_seq_len: 9256
       moe_config:
         backend: TRTLLM
@@ -96,7 +96,7 @@ benchmark:
   type: "sa-bench"
   isl: 8192
   osl: 1024
-  concurrencies: ['4']
+  concurrencies: ['24']
   req_rate: "inf"
 
 frontend:
