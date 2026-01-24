@@ -79,6 +79,9 @@ def generate_minimal_sbatch_script(
     template = env.get_template("job_script_minimal.j2")
 
     total_nodes = config.resources.total_nodes
+    # Add extra node for dedicated etcd/nats infrastructure
+    if config.infra.etcd_nats_dedicated_node:
+        total_nodes += 1
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Resolve container image path (expand aliases from srtslurm.yaml)

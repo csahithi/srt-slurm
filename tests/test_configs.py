@@ -471,3 +471,61 @@ class TestNodesInfraAllocation:
         with patch("srtctl.core.runtime.get_slurm_nodelist", return_value=["node0"]):
             with pytest.raises(ValueError, match="at least 2 nodes"):
                 Nodes.from_slurm(etcd_nats_dedicated_node=True)
+
+
+class TestSbatchNodeCount:
+    """Tests for sbatch node count calculation with infra config."""
+
+    def test_sbatch_adds_node_for_dedicated_infra(self):
+        """Test that sbatch script requests extra node when etcd_nats_dedicated_node is enabled."""
+        from pathlib import Path
+
+        from srtctl.cli.submit import generate_minimal_sbatch_script
+        from srtctl.core.schema import InfraConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        # Config with 2 worker nodes
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(
+                gpu_type="h100",
+                gpus_per_node=8,
+                prefill_nodes=1,
+                decode_nodes=1,
+                prefill_workers=1,
+                decode_workers=1,
+            ),
+            infra=InfraConfig(etcd_nats_dedicated_node=True),
+        )
+
+        script = generate_minimal_sbatch_script(config, Path("/tmp/test.yaml"))
+
+        # Should request 3 nodes: 2 workers + 1 infra
+        assert "#SBATCH --nodes=3" in script
+
+    def test_sbatch_normal_node_count_without_dedicated_infra(self):
+        """Test that sbatch script uses normal node count when etcd_nats_dedicated_node is disabled."""
+        from pathlib import Path
+
+        from srtctl.cli.submit import generate_minimal_sbatch_script
+        from srtctl.core.schema import InfraConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        # Config with 2 worker nodes, no dedicated infra
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(
+                gpu_type="h100",
+                gpus_per_node=8,
+                prefill_nodes=1,
+                decode_nodes=1,
+                prefill_workers=1,
+                decode_workers=1,
+            ),
+            infra=InfraConfig(etcd_nats_dedicated_node=False),
+        )
+
+        script = generate_minimal_sbatch_script(config, Path("/tmp/test.yaml"))
+
+        # Should request 2 nodes: just the workers
+        assert "#SBATCH --nodes=2" in script
