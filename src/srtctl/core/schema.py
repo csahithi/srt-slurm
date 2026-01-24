@@ -683,6 +683,21 @@ class HealthCheckConfig:
     Schema: ClassVar[type[Schema]] = Schema
 
 
+@dataclass(frozen=True)
+class InfraConfig:
+    """Infrastructure configuration for etcd/nats placement.
+
+    Attributes:
+        etcd_nats_dedicated_node: If True, run etcd and nats on a dedicated node
+            instead of the head node. This reserves the first node exclusively
+            for infrastructure services. Default: False.
+    """
+
+    etcd_nats_dedicated_node: bool = False
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
 # ============================================================================
 # Main Configuration Dataclass
 # ============================================================================
@@ -710,6 +725,7 @@ class SrtConfig:
     profiling: ProfilingConfig = field(default_factory=ProfilingConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     health_check: HealthCheckConfig = field(default_factory=HealthCheckConfig)
+    infra: InfraConfig = field(default_factory=InfraConfig)
 
     environment: dict[str, str] = field(default_factory=dict)
     container_mounts: dict[

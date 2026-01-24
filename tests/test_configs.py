@@ -649,3 +649,75 @@ class TestWorkerEnvironmentTemplating:
 
                             # Mixed case: supported replaced, unsupported kept
                             assert env_vars["MIXED"] == "gpu-01-{unsupported_var}-cache"
+
+class TestInfraConfig:
+    """Tests for InfraConfig dataclass."""
+
+    def test_infra_config_defaults(self):
+        """Test that InfraConfig has correct defaults."""
+        from srtctl.core.schema import InfraConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        # infra config should exist with default values
+        assert config.infra is not None
+        assert config.infra.etcd_nats_dedicated_node is False
+
+    def test_infra_config_enabled(self):
+        """Test InfraConfig with dedicated node enabled."""
+        from srtctl.core.schema import InfraConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+            infra=InfraConfig(etcd_nats_dedicated_node=True),
+        )
+
+        assert config.infra.etcd_nats_dedicated_node is True
+
+
+class TestNodesInfraAllocation:
+    """Tests for Nodes infra node allocation."""
+
+    def test_nodes_default_infra_equals_head(self):
+        """Test that infra node equals head node by default."""
+        from unittest.mock import patch
+
+        from srtctl.core.runtime import Nodes
+
+        with patch("srtctl.core.runtime.get_slurm_nodelist", return_value=["node0", "node1", "node2"]):
+            nodes = Nodes.from_slurm(etcd_nats_dedicated_node=False)
+
+        assert nodes.head == "node0"
+        assert nodes.infra == "node0"  # Same as head
+        assert nodes.worker == ("node0", "node1", "node2")
+
+    def test_nodes_dedicated_infra_node(self):
+        """Test that infra node is separate when dedicated node is enabled."""
+        from unittest.mock import patch
+
+        from srtctl.core.runtime import Nodes
+
+        with patch("srtctl.core.runtime.get_slurm_nodelist", return_value=["node0", "node1", "node2"]):
+            nodes = Nodes.from_slurm(etcd_nats_dedicated_node=True)
+
+        assert nodes.infra == "node0"  # First node is infra-only
+        assert nodes.head == "node1"  # Second node is head
+        assert nodes.worker == ("node1", "node2")  # Infra node not in workers
+
+    def test_nodes_dedicated_infra_requires_two_nodes(self):
+        """Test that dedicated infra node requires at least 2 nodes."""
+        from unittest.mock import patch
+
+        import pytest
+
+        from srtctl.core.runtime import Nodes
+
+        with patch("srtctl.core.runtime.get_slurm_nodelist", return_value=["node0"]):
+            with pytest.raises(ValueError, match="at least 2 nodes"):
+                Nodes.from_slurm(etcd_nats_dedicated_node=True)
