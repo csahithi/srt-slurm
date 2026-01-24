@@ -1,4 +1,4 @@
-name: "gb200-fp4-mid-curve"
+name: "gb200-fp4-max-tpt-conc8192"
 
 model:
   path: "dsr1"
@@ -8,7 +8,7 @@ model:
 resources:
   gpu_type: "gb200"
   prefill_nodes: 4
-  decode_nodes: 8
+  decode_nodes: 12
   prefill_workers: 4
   decode_workers: 1
   gpus_per_node: 4
@@ -61,11 +61,11 @@ backend:
       served-model-name: "deepseek-ai/DeepSeek-R1"
       model-path: "/model/"
       trust-remote-code: true
+      disaggregation-transfer-backend: nixl
 
       # KV cache and attention
       kv-cache-dtype: "fp8_e4m3"
       attention-backend: "trtllm_mla"
-      disaggregation-transfer-backend: nixl
 
       # Quantization
       quantization: "modelopt_fp4"
@@ -112,11 +112,11 @@ backend:
       served-model-name: "deepseek-ai/DeepSeek-R1"
       model-path: "/model/"
       trust-remote-code: true
+      disaggregation-transfer-backend: nixl
 
       # KV cache and attention
       kv-cache-dtype: "fp8_e4m3"
       attention-backend: "trtllm_mla"
-      disaggregation-transfer-backend: nixl
 
       # Quantization
       quantization: "modelopt_fp4"
@@ -145,6 +145,7 @@ backend:
 
       # Request handling
       max-running-requests: 67584
+      enable-single-batch-overlap: true
 
       # DeepEP configuration
       moe-a2a-backend: "deepep"
@@ -230,13 +231,13 @@ backend:
       fp4-gemm-backend: "flashinfer_cutlass"
 
       # Parallelism
-      tp-size: 32
-      dp-size: 32
-      ep-size: 32
+      tp-size: 48
+      dp-size: 48
+      ep-size: 48
 
 benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 8192
-  concurrencies: "2048x4096"
+  concurrencies: "8192"
   req_rate: "inf"

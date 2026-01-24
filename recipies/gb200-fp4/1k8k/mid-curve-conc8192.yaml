@@ -1,4 +1,4 @@
-name: "gb200-fp4-mid-curve"
+name: "gb200-fp4-mid-curve-conc8192"
 
 model:
   path: "dsr1"
@@ -238,5 +238,5 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 8192
-  concurrencies: "2048x4096"
+  concurrencies: "8192"
   req_rate: "inf"
