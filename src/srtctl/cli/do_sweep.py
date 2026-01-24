@@ -82,16 +82,21 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
         return self.backend.endpoints_to_processes(self.endpoints)
 
     def start_head_infrastructure(self, registry: ProcessRegistry) -> ManagedProcess:
-        """Start NATS and etcd on the head node."""
-        logger.info("Starting head node infrastructure")
-        logger.info("Head node: %s", self.runtime.nodes.head)
+        """Start NATS and etcd on the infra node.
+
+        When etcd_nats_dedicated_node is enabled, services run on a dedicated node.
+        Otherwise, they run on the head node (default behavior).
+        """
+        infra_node = self.runtime.nodes.infra
+        logger.info("Starting infrastructure services (NATS, etcd)")
+        logger.info("Infra node: %s", infra_node)
 
         setup_script = Path(__file__).parent / "setup_head.py"
         if not setup_script.exists():
             raise RuntimeError(f"setup_head.py not found at {setup_script}")
 
         setup_script_container = Path("/tmp/setup_head.py")
-        infra_log = self.runtime.log_dir / "log.out"
+        infra_log = self.runtime.log_dir / "infra.out"
 
         cmd = [
             "python3",
@@ -107,27 +112,27 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
 
         proc = start_srun_process(
             command=cmd,
-            nodelist=[self.runtime.nodes.head],
+            nodelist=[infra_node],
             output=str(infra_log),
             container_image=str(self.runtime.container_image),
             container_mounts=mounts,
         )
 
         managed = ManagedProcess(
-            name="head_infrastructure",
+            name="infra_services",
             popen=proc,
             log_file=infra_log,
-            node=self.runtime.nodes.head,
+            node=infra_node,
             critical=True,
         )
 
-        logger.info("Waiting for NATS (port 4222)...")
-        if not wait_for_port(self.runtime.nodes.head, 4222, timeout=60):
+        logger.info("Waiting for NATS (port 4222) on %s...", infra_node)
+        if not wait_for_port(infra_node, 4222, timeout=60):
             raise RuntimeError("NATS failed to start")
         logger.info("NATS is ready")
 
-        logger.info("Waiting for etcd (port 2379)...")
-        if not wait_for_port(self.runtime.nodes.head, 2379, timeout=60):
+        logger.info("Waiting for etcd (port 2379) on %s...", infra_node)
+        if not wait_for_port(infra_node, 2379, timeout=60):
             raise RuntimeError("etcd failed to start")
         logger.info("etcd is ready")
 
@@ -175,6 +180,7 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
         logger.info("Job ID: %s", self.runtime.job_id)
         logger.info("Run name: %s", self.runtime.run_name)
         logger.info("Config: %s", self.config.name)
+        logger.info("Infra node: %s", self.runtime.nodes.infra)
         logger.info("Head node: %s", self.runtime.nodes.head)
         logger.info("Worker nodes: %s", ", ".join(self.runtime.nodes.worker))
         if self.config.profiling.enabled:

@@ -22,42 +22,60 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class Nodes:
-    """Node allocation for head, benchmark, and worker nodes.
+    """Node allocation for head, benchmark, infra, and worker nodes.
 
     Attributes:
-        head: Head node hostname (runs NATS, etcd, nginx)
+        head: Head node hostname (runs nginx, frontends)
         bench: Benchmark node hostname (runs the benchmark client)
+        infra: Infrastructure node hostname (runs NATS, etcd). Same as head unless
+               etcd_nats_dedicated_node is enabled.
         worker: Tuple of all worker node hostnames (prefill + decode)
     """
 
     head: str
     bench: str
+    infra: str
     worker: tuple[str, ...]
 
     @classmethod
-    def from_slurm(cls, benchmark_on_separate_node: bool = False) -> "Nodes":
+    def from_slurm(
+        cls,
+        benchmark_on_separate_node: bool = False,
+        etcd_nats_dedicated_node: bool = False,
+    ) -> "Nodes":
         """Create Nodes from SLURM environment.
 
         Args:
             benchmark_on_separate_node: If True, first node is benchmark-only,
                                         second is head, rest are workers.
+            etcd_nats_dedicated_node: If True, dedicate first node for etcd/nats,
+                                      second node is head, rest are workers.
         """
         nodelist = get_slurm_nodelist()
         if not nodelist:
             raise RuntimeError("SLURM_NODELIST not set - are we running in SLURM?")
 
-        if benchmark_on_separate_node:
+        if etcd_nats_dedicated_node:
+            if len(nodelist) < 2:
+                raise ValueError("etcd_nats_dedicated_node requires at least 2 nodes")
+            infra = nodelist[0]
+            head = nodelist[1]
+            bench = head
+            worker = tuple(nodelist[1:])
+        elif benchmark_on_separate_node:
             if len(nodelist) < 2:
                 raise ValueError("benchmark_on_separate_node requires at least 2 nodes")
             bench = nodelist[0]
             head = nodelist[1]
+            infra = head
             worker = tuple(nodelist[1:])
         else:
             head = nodelist[0]
             bench = head
+            infra = head
             worker = tuple(nodelist[:])
 
-        return cls(head=head, bench=bench, worker=worker)
+        return cls(head=head, bench=bench, infra=infra, worker=worker)
 
 
 @dataclass(frozen=True)
@@ -75,6 +93,7 @@ class RuntimeContext:
     # Node topology
     nodes: Nodes
     head_node_ip: str
+    infra_node_ip: str
 
     # Computed paths (all absolute)
     log_dir: Path
@@ -114,13 +133,17 @@ class RuntimeContext:
             log_dir_base: Base directory for logs (default: ./outputs)
         """
         # Get nodes from SLURM
-        nodes = Nodes.from_slurm(benchmark_on_separate_node=False)
+        nodes = Nodes.from_slurm(
+            benchmark_on_separate_node=False,
+            etcd_nats_dedicated_node=config.infra.etcd_nats_dedicated_node,
+        )
 
         # Compute run_name
         run_name = f"{config.name}_{job_id}"
 
-        # Resolve head node IP
+        # Resolve node IPs
         head_node_ip = get_hostname_ip(nodes.head)
+        infra_node_ip = get_hostname_ip(nodes.infra)
 
         # Compute log directory using FormattablePath or default logic
         # Check for SRTCTL_OUTPUT_DIR from sbatch script first (ensures consistency)
@@ -200,6 +223,7 @@ class RuntimeContext:
             run_name=run_name,
             nodes=nodes,
             head_node_ip=head_node_ip,
+            infra_node_ip=infra_node_ip,
             log_dir=log_dir,
             model_path=model_path,
             container_image=container_image,
@@ -221,6 +245,7 @@ class RuntimeContext:
             run_name=run_name,
             nodes=nodes,
             head_node_ip=head_node_ip,
+            infra_node_ip=infra_node_ip,
             log_dir=log_dir,
             model_path=model_path,
             container_image=container_image,

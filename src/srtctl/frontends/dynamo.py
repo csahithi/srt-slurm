@@ -78,8 +78,8 @@ class DynamoFrontend:
             cmd.extend(self.get_frontend_args_list(config.frontend.args))
 
             env_to_set = {
-                "ETCD_ENDPOINTS": f"http://{runtime.nodes.head}:2379",
-                "NATS_SERVER": f"nats://{runtime.nodes.head}:4222",
+                "ETCD_ENDPOINTS": f"http://{runtime.nodes.infra}:2379",
+                "NATS_SERVER": f"nats://{runtime.nodes.infra}:4222",
                 "DYN_REQUEST_PLANE": "nats",
             }
 
