@@ -143,7 +143,7 @@ class SGLangProtocol:
                 mode_cfg = self.kv_events_config.get("aggregated")
             else:
                 mode_cfg = self.kv_events_config.get(mode)
-            
+
             if mode_cfg is None:
                 return None
             if mode_cfg is True:
