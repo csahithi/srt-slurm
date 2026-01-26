@@ -45,18 +45,20 @@ echo ""
 
 ulimit -n 65536
 
-# Warmup
+# Benchmark
+result_dir="/logs/sa-bench_isl_${ISL}_osl_${OSL}"
+mkdir -p "$result_dir"
+
 for concurrency in "${CONCURRENCY_LIST[@]}"; do
-    echo "Warming up with concurrency $concurrency"
-    echo "$(date '+%Y-%m-%d %H:%M:%S')"
-    num_prompts=$((concurrency * 2))
+
+    num_warmup_prompts=$((concurrency * 2))
     python3 -u "${WORK_DIR}/benchmark_serving.py" \
         --model "${MODEL_NAME}" --tokenizer "${MODEL_PATH}" \
         --host "$HOST" --port "$PORT" \
         --backend "dynamo" --endpoint /v1/completions \
         --disable-tqdm \
         --dataset-name random \
-        --num-prompts "$num_prompts" \
+        --num-prompts "$num_warmup_prompts" \
         --random-input-len "$ISL" \
         --random-output-len "$OSL" \
         --random-range-ratio 0.8 \
@@ -64,14 +66,8 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
         --request-rate 250 \
         --percentile-metrics ttft,tpot,itl,e2el \
         --max-concurrency "$concurrency"
-done
 
-# Benchmark
-result_dir="/logs/sa-bench_isl_${ISL}_osl_${OSL}"
-mkdir -p "$result_dir"
-
-for concurrency in "${CONCURRENCY_LIST[@]}"; do
-    num_prompts=$((concurrency * 8))
+    num_prompts=$((concurrency * 10))
     
     # Generate result filename based on mode
     if [ "$IS_DISAGGREGATED" = "true" ]; then
