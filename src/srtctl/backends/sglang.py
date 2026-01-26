@@ -139,8 +139,11 @@ class SGLangProtocol:
         # Per-mode config dict
         if isinstance(self.kv_events_config, dict):
             # Normalize mode key: use "aggregated" for aggregated mode
-            mode_cfg = self.kv_events_config.get("aggregated") if mode == "agg" else self.kv_events_config.get(mode)
-
+            if mode == "agg":
+                mode_cfg = self.kv_events_config.get("aggregated")
+            else:
+                mode_cfg = self.kv_events_config.get(mode)
+            
             if mode_cfg is None:
                 return None
             if mode_cfg is True:
@@ -238,17 +241,13 @@ class SGLangProtocol:
         # Start with nsys prefix if provided
         cmd: list[str] = list(nsys_prefix) if nsys_prefix else []
 
-        # Use container path /model since model is mounted there (see runtime.py)
-        # Note: runtime.model_path is the HOST path, not usable inside container
-        container_model_path = "/model"
-
         cmd.extend(
             [
                 "python3",
                 "-m",
                 python_module,
                 "--model-path",
-                container_model_path,
+                str(runtime.model_path),
                 "--served-model-name",
                 served_model_name,
                 "--host",

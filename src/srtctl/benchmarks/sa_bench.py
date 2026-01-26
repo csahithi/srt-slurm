@@ -79,10 +79,6 @@ class SABenchRunner(BenchmarkRunner):
             prefill_gpus = 0
             decode_gpus = 0
 
-        # Use container path /model since benchmark runs inside container
-        # (model is mounted at /model, see runtime.py)
-        container_model_path = "/model"
-
         return [
             "bash",
             self.script_path,
@@ -91,7 +87,7 @@ class SABenchRunner(BenchmarkRunner):
             str(b.osl),
             str(concurrencies) if concurrencies else "",
             str(b.req_rate) if b.req_rate else "inf",
-            container_model_path,
+            config.model.path,
             config.served_model_name,
             str(is_disaggregated).lower(),
             str(total_gpus),

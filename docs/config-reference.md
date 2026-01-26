@@ -5,7 +5,7 @@ Complete reference for job configuration YAML files.
 ## Table of Contents
 
 - [Overview](#overview)
-- [Path Resolution and Container Mounts](#path-resolution-and-container-mounts)
+- [Cluster Config Discovery](#cluster-config-discovery)
 - [name](#name)
 - [model](#model)
 - [resources](#resources)
@@ -80,114 +80,23 @@ setup_script: "my-setup.sh"    # Optional: custom setup script
 
 ---
 
-## Path Resolution and Container Mounts
+## Cluster Config Discovery
 
-Understanding how paths are resolved and what's available inside containers.
+srtctl looks for `srtslurm.yaml` (cluster-wide settings) in this order:
 
-### srtslurm.yaml Discovery
+1. **`SRTSLURM_CONFIG` environment variable** (if set) - explicit path to config file
+2. Current working directory
+3. Parent directory (1 level up)
+4. Grandparent directory (2 levels up)
 
-When you run `srtctl apply -f config.yaml`, it searches for `srtslurm.yaml` in:
+For users working in deep directory structures (e.g., study directories), set `SRTSLURM_CONFIG` in your shell profile:
 
-1. Current working directory
-2. Parent directory (1 level up)
-3. Grandparent directory (2 levels up)
-4. Great-grandparent directory (3 levels up)
-
-This allows you to run `srtctl` from subdirectories (e.g., a study directory) and still use the cluster config from the repo root.
-
-### Key Settings in srtslurm.yaml
-
-| Setting | Purpose |
-|---------|---------|
-| `srtctl_root` | Where the srtslurm repo is located. Used to find `configs/` directory and compute default output location. |
-| `output_dir` | Custom output directory. Default: `{srtctl_root}/outputs`. Set this to put outputs in a shared NFS location. |
-| `default_mounts` | Cluster-wide mounts added to all containers. |
-
-### Automatic Container Mounts
-
-These paths are automatically mounted into every container:
-
-| Host Path | Container Path | Description |
-|-----------|---------------|-------------|
-| `model.path` (from config) | `/model/` | Your model directory |
-| `{output_dir}/{job_id}/logs` | `/logs/` | Job log directory |
-| `{srtctl_root}/configs` | `/configs/` | Config files (deepep_config.json, etc.) |
-| `srtctl/benchmarks/scripts` | `/srtctl-benchmarks/` | Benchmark scripts |
-
-### Using Paths in sglang_config
-
-**Important:** Do NOT set `model-path` in `sglang_config`. The system automatically:
-1. Mounts your `model.path` to `/model/` in the container
-2. Passes `--model-path /model/` to sglang workers
-
-```yaml
-# CORRECT - let srtctl handle model-path
-backend:
-  sglang_config:
-    prefill:
-      served-model-name: "deepseek-ai/DeepSeek-R1"
-      # model-path is automatic, don't set it!
-      trust-remote-code: true
-
-# WRONG - don't set model-path manually
-backend:
-  sglang_config:
-    prefill:
-      model-path: "/model/"  # Don't do this, it's automatic
-```
-
-### Using /configs Directory
-
-Files in `{srtctl_root}/configs/` are available at `/configs/` in containers:
-
-```yaml
-backend:
-  prefill_environment:
-    SGLANG_DG_CACHE_DIR: "/configs/dg-10212025"  # -> {srtctl_root}/configs/dg-10212025
-  sglang_config:
-    prefill:
-      deepep-config: "/configs/deepep_config.json"  # -> {srtctl_root}/configs/deepep_config.json
-```
-
-### Using HuggingFace Cache
-
-If you want to use your HF cache directory directly instead of copying models, add a mount in `srtslurm.yaml`:
-
-```yaml
-# Option 1: Mount entire NFS (paths work unchanged inside container)
-default_mounts:
-  "/lustre": "/lustre"
-
-# Option 2: Mount specific HF cache
-default_mounts:
-  "$HF_HOME": "$HF_HOME"
-```
-
-Then in your job config:
-```yaml
-model:
-  path: "/lustre/user/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-R1/snapshots/abc123"
-```
-
-### Custom Output Directory
-
-By default, outputs go to `{srtctl_root}/outputs/{job_id}/`. To change this:
-
-**Option 1: CLI flag (highest priority)**
 ```bash
-srtctl apply -f config.yaml -o /lustre/my-team/outputs
-# Jobs output to: /lustre/my-team/outputs/outputs/{job_id}/
+# Add to ~/.bashrc or ~/.zshrc
+export SRTSLURM_CONFIG="/path/to/srt-slurm/srtslurm.yaml"
 ```
 
-**Option 2: srtslurm.yaml setting**
-```yaml
-# In srtslurm.yaml
-output_dir: "/lustre/my-team/srtctl-outputs"
-
-# Jobs will output to: /lustre/my-team/srtctl-outputs/outputs/{job_id}/
-```
-
-Priority order: CLI `-o/--output-dir` > `srtslurm.yaml output_dir` > `{srtctl_root}/outputs`
+This allows you to run `srtctl apply -f config.yaml` from anywhere without needing `srtslurm.yaml` nearby.
 
 ---
 

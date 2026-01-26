@@ -70,9 +70,6 @@ class ClusterConfig:
     # Cluster-level container mounts (host_path -> container_path)
     # Applied to all jobs on this cluster, useful for cluster-specific paths
     default_mounts: dict[str, str] | None = None
-    # Custom output directory (default: {srtctl_root}/outputs)
-    # Useful for teams who want outputs in a shared location
-    output_dir: str | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 
@@ -131,7 +128,7 @@ class BackendConfigField(fields.Field):
             # Default to SGLang
             return SGLangProtocol()
 
-        if isinstance(value, SGLangProtocol | TRTLLMProtocol):
+        if isinstance(value, (SGLangProtocol, TRTLLMProtocol)):
             return value
 
         if not isinstance(value, dict):
