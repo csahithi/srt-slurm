@@ -139,3 +139,6 @@ frontend:
 
 dynamo:
   install: false
+
+infra:
+  etcd_nats_dedicated_node: true
