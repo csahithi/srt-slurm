@@ -4,13 +4,17 @@ Node analysis service for parsing .err/.out log files
 All parsing logic encapsulated in the NodeAnalyzer class.
 """
 
+import json
 import logging
-import os
-import re
+import time
+from pathlib import Path
 
 import pandas as pd
+import yaml
 
 from .cache_manager import CacheManager
+from .models import NodeInfo
+from .parsers import get_node_parser
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -19,21 +23,21 @@ logger = logging.getLogger(__name__)
 class NodeAnalyzer:
     """Service for analyzing node-level metrics from log files.
 
-    Parses .err/.out files to extract batch metrics, memory usage, and configuration.
-    All parsing logic is encapsulated as methods.
+    Uses the new parser infrastructure to parse node logs based on detected backend type.
     """
 
     def parse_run_logs(self, run_path: str, return_dicts: bool = False) -> list:
         """Parse all node log files in a run directory.
 
         Uses parquet caching to avoid re-parsing on subsequent loads.
+        Automatically detects backend type and uses appropriate parser.
 
         Args:
             run_path: Path to the run directory containing .err/.out files
-            return_dicts: If True, return dicts directly (faster). If False, return NodeMetrics objects.
+            return_dicts: If True, return dicts directly (faster). If False, return NodeInfo objects.
 
         Returns:
-            List of NodeMetrics objects or dicts, one per node
+            List of NodeInfo objects (or dicts), one per node
         """
         # Initialize cache manager
         cache_mgr = CacheManager(run_path)
@@ -50,164 +54,289 @@ class NodeAnalyzer:
                     nodes = self._dataframe_to_dicts(cached_df)
                     logger.info(f"Loaded {len(nodes)} nodes from cache (as dicts)")
                 else:
-                    # Reconstruct NodeMetrics objects from DataFrame
-                    nodes = self._deserialize_node_metrics(cached_df)
+                    # Reconstruct NodeInfo objects from DataFrame
+                    nodes = self._deserialize_node_metrics(cached_df, run_path=run_path)
                     logger.info(f"Loaded {len(nodes)} nodes from cache")
                 return nodes
 
-        # Cache miss or invalid - parse from .err/.out files
-        nodes = []
+        # Cache miss or invalid - parse using new parser infrastructure
+        backend_type = self._detect_backend_type(run_path)
+        if not backend_type:
+            logger.warning(f"Could not detect backend type for {run_path}")
+            return []
 
-        if not os.path.exists(run_path):
-            logger.error(f"Run path does not exist: {run_path}")
-            return nodes
+        # Get appropriate parser
+        parser = get_node_parser(backend_type)
+        if not parser:
+            logger.warning(f"No parser registered for backend '{backend_type}'")
+            return []
 
-        total_err_files = 0
-        parsed_successfully = 0
+        # Use parser to parse logs directory
+        logs_dir = Path(run_path) / "logs"
+        if not logs_dir.exists():
+            # For backwards compatibility, try parsing files in run_path directly
+            logs_dir = Path(run_path)
 
-        for file in os.listdir(run_path):
-            if (file.endswith(".err") or file.endswith(".out")) and ("prefill" in file or "decode" in file):
-                total_err_files += 1
-                filepath = os.path.join(run_path, file)
-                node = self.parse_single_log(filepath)
-                if node:
-                    nodes.append(node)
-                    parsed_successfully += 1
+        logger.info(f"Using {backend_type} parser to parse logs in {logs_dir}")
+        node_infos = parser.parse_logs(logs_dir)
 
-        logger.info(f"Parsed {parsed_successfully}/{total_err_files} prefill/decode log files from {run_path}")
-
-        if total_err_files == 0:
-            logger.warning(f"No prefill/decode log files found in {run_path}")
+        # Populate additional config from config files if available
+        if node_infos:
+            self._populate_config_from_files(run_path, node_infos)
 
         # Save to cache if we have data
-        if nodes:
-            cache_df = self._serialize_node_metrics(nodes)
+        if node_infos:
+            # Extract metrics for caching
+            metrics_list = [ni.metrics for ni in node_infos]
+            cache_df = self._serialize_node_metrics(metrics_list)
             cache_mgr.save_to_cache("node_metrics", cache_df, source_patterns)
+            logger.info(f"Parsed and cached {len(node_infos)} nodes from {logs_dir}")
 
-        return nodes
+        if return_dicts:
+            return [self._node_info_to_dict(node) for node in node_infos]
+        return node_infos
 
-    def parse_single_log(self, filepath: str):
-        """Parse a single node log file.
+    def _detect_backend_type(self, run_path: str) -> str | None:
+        """Detect backend type from run metadata.
+
+        Looks for *.json files with container information in run_path
+        and its parent directory (for cases where run_path is logs/).
+        Also looks at log file content as fallback.
 
         Args:
-            filepath: Path to the .err/.out log file
+            run_path: Path to the run directory (or logs subdirectory)
 
         Returns:
-            NodeMetrics object or None if parsing failed
+            Backend type string (e.g., 'sglang', 'trtllm') or None
         """
-        from .models import BatchMetrics, MemoryMetrics, NodeMetrics
+        run_path = Path(run_path)
+        
+        # Try current directory and parent directory
+        search_dirs = [run_path]
+        if run_path.name == "logs" and run_path.parent.exists():
+            search_dirs.insert(0, run_path.parent)  # Check parent first
+        
+        # Try JSON files first
+        for search_dir in search_dirs:
+            json_files = list(search_dir.glob("*.json"))
+            for json_file in json_files:
+                try:
+                    with open(json_file) as f:
+                        metadata = json.load(f)
+                        # Try different possible locations for container info
+                        container = metadata.get("container", "")
+                        if not container:
+                            container = metadata.get("model", {}).get("container", "")
+                        
+                        container_lower = container.lower()
+                        if "sglang" in container_lower:
+                            logger.debug(f"Detected sglang from {json_file}")
+                            return "sglang"
+                        if "trtllm" in container_lower or "dynamo" in container_lower:
+                            logger.debug(f"Detected trtllm from {json_file}")
+                            return "trtllm"
+                except Exception as e:
+                    logger.debug(f"Could not read {json_file}: {e}")
+                    continue
 
-        node_info = self._extract_node_info_from_filename(filepath)
-        if not node_info:
-            logger.warning(
-                f"Could not extract node info from filename: {filepath}. "
-                f"Expected format: <node>_<service>_<id>.err or .out"
-            )
-            return None
+        # Try config.yaml as fallback
+        for search_dir in search_dirs:
+            yaml_path = search_dir / "config.yaml"
+            if yaml_path.exists():
+                try:
+                    with open(yaml_path) as f:
+                        config = yaml.safe_load(f)
+                        backend_type = config.get("backend", {}).get("type", "").lower()
+                        if backend_type in ["sglang", "trtllm"]:
+                            logger.debug(f"Detected {backend_type} from config.yaml")
+                            return backend_type
+                except Exception as e:
+                    logger.debug(f"Could not read {yaml_path}: {e}")
 
-        batches = []
-        memory_snapshots = []
-        config = {}
+        # Last resort: look at log files
+        logs_dir = run_path if run_path.name == "logs" else run_path / "logs"
+        if logs_dir.exists():
+            log_files = list(logs_dir.glob("*.out")) + list(logs_dir.glob("*.err"))
+            for log_file in log_files[:3]:  # Check first few files
+                try:
+                    with open(log_file) as f:
+                        content = f.read(2000)  # Read first 2KB
+                        if "sglang.launch_server" in content or "sglang.srt" in content:
+                            logger.debug(f"Detected sglang from log content in {log_file.name}")
+                            return "sglang"
+                        if "dynamo.trtllm" in content or "tensorrt_llm" in content:
+                            logger.debug(f"Detected trtllm from log content in {log_file.name}")
+                            return "trtllm"
+                except Exception as e:
+                    logger.debug(f"Could not read {log_file}: {e}")
+
+        return None
+
+    def _populate_config_from_files(self, run_path: str, node_infos: list) -> None:
+        """Populate node configuration from config files.
+
+        Reads both:
+        1. Per-node *_config.json files (gpu_info, server_args)
+        2. Global config.yaml file (environment variables by worker type)
+
+        Merges with existing config that already has launch_command from log parsing.
+
+        Args:
+            run_path: Path to the run directory (or logs subdirectory)
+            node_infos: List of NodeInfo objects to enhance with config file data
+        """
+        import os
+
+        run_path = Path(run_path)
+        
+        # If run_path is the logs directory, look in parent for config files
+        if run_path.name == "logs" and run_path.parent.exists():
+            config_dir = run_path.parent
+        else:
+            config_dir = run_path
+
+        # Parse global config.yaml for environment variables
+        yaml_env = self._parse_yaml_environment(config_dir)
+
+        # Find all per-node config files
+        config_files = {}
+        for file in os.listdir(config_dir):
+            if file.endswith("_config.json"):
+                # Extract node identifier from filename (e.g., "worker-3_prefill_w0_config.json" -> "worker-3_prefill_w0")
+                node_id = file.replace("_config.json", "")
+                config_files[node_id] = config_dir / file
+
+        # Build or enhance node_config for each NodeInfo
+        for node_info in node_infos:
+            metrics = node_info.metrics
+            node_name = metrics.node_name
+            worker_type = metrics.worker_type
+            worker_id = metrics.worker_id
+
+            # Try to find matching config file
+            # Format: <node>_<worker_type>_<worker_id>_config.json
+            potential_keys = [
+                f"{node_name}_{worker_type}_{worker_id}",  # Exact match
+                f"{node_name}_{worker_type}",  # Without worker_id
+                node_name,  # Just node name
+            ]
+
+            config_path = None
+            for key in potential_keys:
+                if key in config_files:
+                    config_path = config_files[key]
+                    break
+
+            # Load config file if it exists and merge with existing config
+            if config_path and config_path.exists():
+                try:
+                    with open(config_path) as f:
+                        file_config = json.load(f)
+                        # Merge file config with existing config (which has launch_command)
+                        if node_info.node_config:
+                            # Keep launch_command from log parsing
+                            launch_cmd = node_info.node_config.get("launch_command")
+                            node_info.node_config.update(file_config)
+                            if launch_cmd:
+                                node_info.node_config["launch_command"] = launch_cmd
+                        else:
+                            node_info.node_config = file_config
+                        logger.debug(f"Loaded config for {node_name} with {len(file_config.get('environment', {}))} env vars")
+                except Exception as e:
+                    logger.warning(f"Could not load config from {config_path}: {e}")
+                    # Keep existing minimal config with launch_command
+            else:
+                # No config file found
+                if not node_info.node_config:
+                    node_info.node_config = {"environment": {}}
+                elif "environment" not in node_info.node_config:
+                    node_info.node_config["environment"] = {}
+                logger.debug(f"No config file found for node {node_name}, using minimal config")
+
+            # Merge environment variables from config.yaml
+            if yaml_env and worker_type in yaml_env:
+                if not node_info.node_config:
+                    node_info.node_config = {}
+                if "environment" not in node_info.node_config:
+                    node_info.node_config["environment"] = {}
+                
+                # Merge YAML env vars (they take precedence over JSON)
+                yaml_worker_env = yaml_env[worker_type]
+                node_info.node_config["environment"].update(yaml_worker_env)
+                logger.debug(f"Merged {len(yaml_worker_env)} env vars from config.yaml for {node_name} ({worker_type})")
+
+    def _parse_yaml_environment(self, run_path: Path) -> dict[str, dict[str, str]]:
+        """Parse environment variables from config.yaml.
+
+        Args:
+            run_path: Path to the run directory
+
+        Returns:
+            Dict mapping worker_type to environment variables
+            Example: {"prefill": {"VAR1": "val1"}, "decode": {"VAR2": "val2"}}
+        """
+        yaml_path = run_path / "config.yaml"
+        if not yaml_path.exists():
+            logger.debug(f"No config.yaml found in {run_path}")
+            return {}
 
         try:
-            with open(filepath) as f:
-                for line in f:
-                    # Parse prefill batch metrics
-                    batch_metrics = self._parse_prefill_batch_line(line)
-                    if batch_metrics:
-                        batches.append(
-                            BatchMetrics(
-                                timestamp=batch_metrics["timestamp"],
-                                dp=batch_metrics["dp"],
-                                tp=batch_metrics["tp"],
-                                ep=batch_metrics["ep"],
-                                batch_type=batch_metrics["type"],
-                                new_seq=batch_metrics.get("new_seq"),
-                                new_token=batch_metrics.get("new_token"),
-                                cached_token=batch_metrics.get("cached_token"),
-                                token_usage=batch_metrics.get("token_usage"),
-                                running_req=batch_metrics.get("running_req"),
-                                queue_req=batch_metrics.get("queue_req"),
-                                prealloc_req=batch_metrics.get("prealloc_req"),
-                                inflight_req=batch_metrics.get("inflight_req"),
-                                input_throughput=batch_metrics.get("input_throughput"),
-                            )
-                        )
+            with open(yaml_path) as f:
+                config = yaml.safe_load(f)
+            
+            if not config or "backend" not in config:
+                logger.debug("config.yaml has no backend section")
+                return {}
 
-                    # Parse decode batch metrics
-                    decode_metrics = self._parse_decode_batch_line(line)
-                    if decode_metrics:
-                        batches.append(
-                            BatchMetrics(
-                                timestamp=decode_metrics["timestamp"],
-                                dp=decode_metrics["dp"],
-                                tp=decode_metrics["tp"],
-                                ep=decode_metrics["ep"],
-                                batch_type=decode_metrics["type"],
-                                running_req=decode_metrics.get("running_req"),
-                                queue_req=decode_metrics.get("queue_req"),
-                                prealloc_req=decode_metrics.get("prealloc_req"),
-                                transfer_req=decode_metrics.get("transfer_req"),
-                                token_usage=decode_metrics.get("token_usage"),
-                                preallocated_usage=decode_metrics.get("preallocated_usage"),
-                                num_tokens=decode_metrics.get("num_tokens"),
-                                gen_throughput=decode_metrics.get("gen_throughput"),
-                            )
-                        )
+            backend = config["backend"]
+            env_vars = {}
 
-                    # Parse memory metrics
-                    mem_metrics = self._parse_memory_line(line)
-                    if mem_metrics:
-                        memory_snapshots.append(
-                            MemoryMetrics(
-                                timestamp=mem_metrics["timestamp"],
-                                dp=mem_metrics["dp"],
-                                tp=mem_metrics["tp"],
-                                ep=mem_metrics["ep"],
-                                metric_type=mem_metrics["type"],
-                                avail_mem_gb=mem_metrics.get("avail_mem_gb"),
-                                mem_usage_gb=mem_metrics.get("mem_usage_gb"),
-                                kv_cache_gb=mem_metrics.get("kv_cache_gb"),
-                                kv_tokens=mem_metrics.get("kv_tokens"),
-                            )
-                        )
+            # Extract prefill_environment
+            if "prefill_environment" in backend:
+                env_vars["prefill"] = backend["prefill_environment"]
+                logger.info(f"Loaded {len(env_vars['prefill'])} prefill env vars from config.yaml")
 
-                    # Extract TP/DP/EP configuration from command line
-                    if "--tp-size" in line:
-                        tp_match = re.search(r"--tp-size\s+(\d+)", line)
-                        dp_match = re.search(r"--dp-size\s+(\d+)", line)
-                        ep_match = re.search(r"--ep-size\s+(\d+)", line)
+            # Extract decode_environment
+            if "decode_environment" in backend:
+                env_vars["decode"] = backend["decode_environment"]
+                logger.info(f"Loaded {len(env_vars['decode'])} decode env vars from config.yaml")
 
-                        if tp_match:
-                            config["tp_size"] = int(tp_match.group(1))
-                        if dp_match:
-                            config["dp_size"] = int(dp_match.group(1))
-                        if ep_match:
-                            config["ep_size"] = int(ep_match.group(1))
+            # Extract agg_environment if present
+            if "agg_environment" in backend:
+                env_vars["agg"] = backend["agg_environment"]
+                logger.info(f"Loaded {len(env_vars['agg'])} agg env vars from config.yaml")
+
+            return env_vars
 
         except Exception as e:
-            logger.error(f"Error parsing {filepath}: {e}")
-            return None
+            logger.warning(f"Could not parse config.yaml in {run_path}: {e}")
+            return {}
 
-        # Validation: Log if we found no metrics
-        total_metrics = len(batches) + len(memory_snapshots)
+    def _node_info_to_dict(self, node_info: "NodeInfo") -> dict:
+        """Convert NodeInfo object to dict for compatibility.
 
-        if total_metrics == 0:
-            logger.warning(
-                f"Parsed {filepath} but found no metrics. "
-                f"Expected to find lines with DP/TP/EP tags. "
-                f"Log format may have changed."
-            )
+        Args:
+            node_info: NodeInfo object
 
-        logger.debug(f"Parsed {filepath}: {len(batches)} batches, " f"{len(memory_snapshots)} memory snapshots")
-
-        return NodeMetrics(
-            node_info=node_info,
-            batches=batches,
-            memory_snapshots=memory_snapshots,
-            config=config,
-        )
-
+        Returns:
+            Dict representation compatible with old structure
+        """
+        metrics = node_info.metrics
+        return {
+            "node_info": {
+                "node": metrics.node_name,
+                "worker_type": metrics.worker_type,
+                "worker_id": metrics.worker_id,
+            },
+            "prefill_batches": metrics.batches,  # Keep as list of BatchMetrics objects
+            "memory_snapshots": metrics.memory_snapshots,  # Keep as list of MemoryMetrics objects
+            "config": metrics.config,  # Runtime config (TP/PP/EP, batch sizes)
+            "node_config": node_info.node_config,  # Full config (environment, launch_command, gpu_info)
+            "launch_command": node_info.launch_command,  # Property accessor for backward compatibility
+            "environment": node_info.environment,  # Property accessor for backward compatibility
+            "run_id": metrics.run_id,
+        }
+        
     def get_prefill_nodes(self, nodes: list):
         """Filter for prefill nodes only.
 
@@ -271,16 +400,16 @@ class NodeAnalyzer:
         rows = []
 
         for node in nodes:
-            node_info = node.node_info
+            metadata = node.metadata
             config = node.config
 
             # Serialize batch metrics
             for batch in node.batches:
                 row = {
                     # Node identification
-                    "node": node_info.get("node", ""),
-                    "worker_type": node_info.get("worker_type", ""),
-                    "worker_id": node_info.get("worker_id", ""),
+                    "node": metadata.node_name,
+                    "worker_type": metadata.worker_type,
+                    "worker_id": metadata.worker_id,
                     # Config
                     "tp_size": config.get("tp_size"),
                     "dp_size": config.get("dp_size"),
@@ -313,9 +442,9 @@ class NodeAnalyzer:
             for mem in node.memory_snapshots:
                 row = {
                     # Node identification
-                    "node": node_info.get("node", ""),
-                    "worker_type": node_info.get("worker_type", ""),
-                    "worker_id": node_info.get("worker_id", ""),
+                    "node": metadata.node_name,
+                    "worker_type": metadata.worker_type,
+                    "worker_id": metadata.worker_id,
                     # Config
                     "tp_size": config.get("tp_size"),
                     "dp_size": config.get("dp_size"),
@@ -336,17 +465,18 @@ class NodeAnalyzer:
 
         return pd.DataFrame(rows)
 
-    def _deserialize_node_metrics(self, df: pd.DataFrame) -> list:
-        """Deserialize NodeMetrics objects from a cached DataFrame.
+    def _deserialize_node_metrics(self, df: pd.DataFrame, run_path: str = None) -> list:
+        """Deserialize NodeInfo objects from a cached DataFrame.
 
         Args:
             df: DataFrame with cached node metrics
+            run_path: Path to the run directory (for loading config files)
 
         Returns:
-            List of NodeMetrics objects
+            List of NodeInfo objects
         """
         import time
-        from .models import BatchMetrics, MemoryMetrics, NodeMetrics
+        from .models import BatchMetrics, MemoryMetrics, NodeInfo, NodeMetadata, NodeMetrics
 
         start_time = time.time()
         nodes = []
@@ -355,12 +485,6 @@ class NodeAnalyzer:
         for (node_name, worker_type, worker_id), group_df in df.groupby(
             ["node", "worker_type", "worker_id"], dropna=False
         ):
-            node_info = {
-                "node": node_name,
-                "worker_type": worker_type,
-                "worker_id": worker_id,
-            }
-
             # Extract config (same for all rows in this node)
             config = {}
             if not group_df.empty:
@@ -427,184 +551,33 @@ class NodeAnalyzer:
                     )
                     memory_snapshots.append(mem)
 
-            # Create NodeMetrics object
-            node = NodeMetrics(
-                node_info=node_info,
+            # Create NodeMetadata
+            node_metadata = NodeMetadata(
+                node_name=node_name,
+                worker_type=worker_type,
+                worker_id=worker_id,
+            )
+            
+            # Create NodeMetrics (NEW structure)
+            metrics = NodeMetrics(
+                metadata=node_metadata,
                 batches=batches,
                 memory_snapshots=memory_snapshots,
                 config=config,
             )
-            nodes.append(node)
+            
+            # Create NodeInfo with empty config (will be populated below)
+            node_info = NodeInfo(metrics=metrics, node_config={})
+            nodes.append(node_info)
 
         elapsed = time.time() - start_time
         logger.info(f"Deserialized {len(nodes)} nodes in {elapsed:.2f}s")
+        
+        # Populate config from files (environment, launch_command)
+        if run_path and nodes:
+            self._populate_config_from_files(run_path, nodes)
+        
         return nodes
-
-    # Private helper methods
-
-    def _parse_dp_tp_ep_tag(self, line: str) -> tuple[int | None, int | None, int | None, str | None]:
-        """Extract DP, TP, EP indices and timestamp from log line.
-
-        Supports three formats:
-        - Full: [2025-11-04 05:31:43 DP0 TP0 EP0]
-        - Simple TP: [2025-11-04 07:05:55 TP0] (defaults DP=0, EP=0)
-        - Pipeline: [2025-12-08 14:34:44 PP0] (defaults DP=0, EP=0, TP=PP value)
-
-        Args:
-            line: Log line to parse
-
-        Returns:
-            (dp, tp, ep, timestamp) or (None, None, None, None) if pattern not found
-        """
-        # Try full format first: DP0 TP0 EP0
-        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) DP(\d+) TP(\d+) EP(\d+)\]", line)
-        if match:
-            timestamp, dp, tp, ep = match.groups()
-            return int(dp), int(tp), int(ep), timestamp
-
-        # Try simple format: TP0 only (1P4D style)
-        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) TP(\d+)\]", line)
-        if match:
-            timestamp, tp = match.groups()
-            return 0, int(tp), 0, timestamp  # Default DP=0, EP=0
-
-        # Try pipeline parallelism format: PP0 (prefill with PP)
-        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) PP(\d+)\]", line)
-        if match:
-            timestamp, pp = match.groups()
-            return 0, int(pp), 0, timestamp  # Map PP to TP slot, default DP=0, EP=0
-
-        return None, None, None, None
-
-    def _parse_prefill_batch_line(self, line: str) -> dict | None:
-        """Parse prefill batch log line for metrics.
-
-        Example line:
-        [2025-11-04 05:31:43 DP0 TP0 EP0] Prefill batch, #new-seq: 18, #new-token: 16384,
-        #cached-token: 0, token usage: 0.00, #running-req: 0, #queue-req: 0,
-        #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 0.00,
-        """
-        dp, tp, ep, timestamp = self._parse_dp_tp_ep_tag(line)
-        if dp is None or "Prefill batch" not in line:
-            return None
-
-        metrics = {"timestamp": timestamp, "dp": dp, "tp": tp, "ep": ep, "type": "prefill"}
-
-        # Extract metrics using regex
-        patterns = {
-            "new_seq": r"#new-seq:\s*(\d+)",
-            "new_token": r"#new-token:\s*(\d+)",
-            "cached_token": r"#cached-token:\s*(\d+)",
-            "token_usage": r"token usage:\s*([\d.]+)",
-            "running_req": r"#running-req:\s*(\d+)",
-            "queue_req": r"#queue-req:\s*(\d+)",
-            "prealloc_req": r"#prealloc-req:\s*(\d+)",
-            "inflight_req": r"#inflight-req:\s*(\d+)",
-            "input_throughput": r"input throughput \(token/s\):\s*([\d.]+)",
-        }
-
-        for key, pattern in patterns.items():
-            match = re.search(pattern, line)
-            if match:
-                value = match.group(1)
-                metrics[key] = float(value) if "." in value else int(value)
-
-        return metrics
-
-    def _parse_decode_batch_line(self, line: str) -> dict | None:
-        """Parse decode batch log line for metrics.
-
-        Example line:
-        [2025-11-04 05:32:32 DP31 TP31 EP31] Decode batch, #running-req: 7, #token: 7040,
-        token usage: 0.00, pre-allocated usage: 0.00, #prealloc-req: 0, #transfer-req: 0,
-        #retracted-req: 0, cuda graph: True, gen throughput (token/s): 6.73, #queue-req: 0,
-        """
-        dp, tp, ep, timestamp = self._parse_dp_tp_ep_tag(line)
-        if dp is None or "Decode batch" not in line:
-            return None
-
-        metrics = {"timestamp": timestamp, "dp": dp, "tp": tp, "ep": ep, "type": "decode"}
-
-        # Extract metrics using regex
-        patterns = {
-            "running_req": r"#running-req:\s*(\d+)",
-            "num_tokens": r"#token:\s*(\d+)",
-            "token_usage": r"token usage:\s*([\d.]+)",
-            "preallocated_usage": r"pre-allocated usage:\s*([\d.]+)",
-            "prealloc_req": r"#prealloc-req:\s*(\d+)",
-            "transfer_req": r"#transfer-req:\s*(\d+)",
-            "queue_req": r"#queue-req:\s*(\d+)",
-            "gen_throughput": r"gen throughput \(token/s\):\s*([\d.]+)",
-        }
-
-        for key, pattern in patterns.items():
-            match = re.search(pattern, line)
-            if match:
-                value = match.group(1)
-                metrics[key] = float(value) if "." in value else int(value)
-
-        return metrics
-
-    def _parse_memory_line(self, line: str) -> dict | None:
-        """Parse memory-related log lines.
-
-        Examples:
-        [2025-11-04 05:27:13 DP0 TP0 EP0] Load weight end. type=DeepseekV3ForCausalLM,
-        dtype=torch.bfloat16, avail mem=75.11 GB, mem usage=107.07 GB.
-
-        [2025-11-04 05:27:13 DP0 TP0 EP0] KV Cache is allocated. #tokens: 524288, KV size: 17.16 GB
-        """
-        dp, tp, ep, timestamp = self._parse_dp_tp_ep_tag(line)
-        if dp is None:
-            return None
-
-        metrics = {
-            "timestamp": timestamp,
-            "dp": dp,
-            "tp": tp,
-            "ep": ep,
-        }
-
-        # Parse available memory
-        avail_match = re.search(r"avail mem=([\d.]+)\s*GB", line)
-        if avail_match:
-            metrics["avail_mem_gb"] = float(avail_match.group(1))
-            metrics["type"] = "memory"
-
-        # Parse memory usage
-        usage_match = re.search(r"mem usage=([\d.]+)\s*GB", line)
-        if usage_match:
-            metrics["mem_usage_gb"] = float(usage_match.group(1))
-            metrics["type"] = "memory"
-
-        # Parse KV cache size
-        kv_match = re.search(r"KV size:\s*([\d.]+)\s*GB", line)
-        if kv_match:
-            metrics["kv_cache_gb"] = float(kv_match.group(1))
-            metrics["type"] = "kv_cache"
-
-        # Parse token count for KV cache
-        token_match = re.search(r"#tokens:\s*(\d+)", line)
-        if token_match:
-            metrics["kv_tokens"] = int(token_match.group(1))
-
-        return metrics if "type" in metrics else None
-
-    def _extract_node_info_from_filename(self, filename: str) -> dict | None:
-        """Extract node name and worker info from filename.
-
-        Example: watchtower-navy-cn01_prefill_w0.err or r02-p01-dgx-c11_prefill_w0.out
-        Returns: {'node': 'watchtower-navy-cn01', 'worker_type': 'prefill', 'worker_id': 'w0'}
-        """
-        # Use greedy match for node name up to _(prefill|decode|frontend)_
-        match = re.match(r"(.+)_(prefill|decode|frontend)_([^.]+)\.(err|out)", os.path.basename(filename))
-        if match:
-            return {
-                "node": match.group(1),
-                "worker_type": match.group(2),
-                "worker_id": match.group(3),
-            }
-        return None
 
 
 # Standalone helper function for visualizations

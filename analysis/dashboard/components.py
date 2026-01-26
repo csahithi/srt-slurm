@@ -101,7 +101,11 @@ def _node_to_dict(node) -> dict:
     Temporary converter for compatibility with existing visualization code.
     """
     return {
-        "node_info": node.node_info,
+        "node_info": {
+            "node": node.node_name,
+            "worker_type": node.worker_type,
+            "worker_id": node.worker_id,
+        },
         "prefill_batches": [_batch_to_dict(b) for b in node.batches],
         "memory_snapshots": [_memory_to_dict(m) for m in node.memory_snapshots],
         "config": node.config,

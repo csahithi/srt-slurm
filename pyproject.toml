@@ -38,6 +38,13 @@ dev = [
     "ty",  # Astral's fast type checker (replaces mypy)
 ]
 
+analysis = [
+    "streamlit>=1.30.0",
+    "plotly>=5.18.0",
+    "pandas>=2.1.0",
+    "pyarrow>=14.0.0",  # For parquet caching
+]
+
 # =============================================================================
 # Ruff - Fast Python linter and formatter
 # =============================================================================

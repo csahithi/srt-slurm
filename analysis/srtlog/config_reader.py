@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 
 from .cache_manager import CacheManager
-from .models import NodeConfig, ParsedCommandInfo
+from .models import NodeConfig, TopologyInfo
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -285,7 +285,7 @@ def parse_command_line_to_dict(cmd_args: list[str]) -> dict[str, str]:
     return parsed
 
 
-def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
+def parse_command_line_from_err(run_path: str) -> TopologyInfo:
     """Parse .err/.out files to find explicitly set flags and service topology.
 
     Uses parquet caching to avoid re-parsing on subsequent loads.
@@ -298,10 +298,9 @@ def parse_command_line_from_err(run_path: str) -> ParsedCommandInfo:
         run_path: Path to the run directory containing .err/.out files
 
     Returns:
-        {
+        TopologyInfo with:
             'explicit_flags': set of flag names that were explicitly set,
             'services': {node_name: [service_types]}
-        }
     """
     import os
     import re

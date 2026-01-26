@@ -64,10 +64,10 @@ def render(filtered_runs: list):
             with col2:
                 st.metric("GPU", config_data["summary"]["gpu_type"])
             with col3:
-                st.metric("ISL/OSL", f"{run.profiler.isl}/{run.profiler.osl}")
+                st.metric("ISL/OSL", f"{run.profiler_metadata.isl}/{run.profiler_metadata.osl}")
             with col4:
                 gpu_type_suffix = f" ({run.metadata.gpu_type})" if run.metadata.gpu_type else ""
-                st.metric("Profiler", f"{run.profiler.profiler_type}{gpu_type_suffix}")
+                st.metric("Profiler", f"{run.profiler_metadata.profiler_type}{gpu_type_suffix}")
 
             st.caption(f"Model: {config_data['summary']['model']}")
             st.divider()

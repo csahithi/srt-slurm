@@ -143,15 +143,11 @@ class RunMetadata:
 
 
 @dataclass
-class ProfilerResults:
-    """Results from profiler benchmarks.
-
-    Parses 32 out of 39 fields from benchmark JSON output.
-
-    NOT PARSED (7 fields):
-    - input_lens, output_lens, ttfts, itls: Per-request arrays (too large for in-memory storage)
-    - errors, generated_texts: Per-request data (not needed for aggregate analysis)
-    - tokenizer_id, best_of, burstiness: Metadata not critical for dashboards
+class ProfilerMetadata:
+    """Metadata about the benchmark/profiler configuration.
+    
+    This describes what the benchmark was configured to do,
+    not the actual results.
     """
 
     profiler_type: str
@@ -159,6 +155,40 @@ class ProfilerResults:
     osl: str
     concurrencies: str = ""
     req_rate: str = ""
+
+    @classmethod
+    def from_json(cls, json_data: dict) -> "ProfilerMetadata":
+        """Create from {jobid}.json benchmark section.
+
+        Args:
+            json_data: Parsed JSON from {jobid}.json file
+
+        Returns:
+            ProfilerMetadata instance
+        """
+        profiler_meta = json_data.get("benchmark", {})
+
+        return cls(
+            profiler_type=profiler_meta.get("type", "unknown"),
+            isl=str(profiler_meta.get("isl", "")),
+            osl=str(profiler_meta.get("osl", "")),
+            concurrencies=profiler_meta.get("concurrencies", ""),
+            req_rate=profiler_meta.get("req-rate", ""),
+        )
+
+
+@dataclass
+class ProfilerResults:
+    """Results from profiler benchmarks.
+
+    Contains only the actual metrics, not configuration metadata.
+    Parses 32 out of 39 fields from benchmark JSON output.
+
+    NOT PARSED (7 fields):
+    - input_lens, output_lens, ttfts, itls: Per-request arrays (too large for in-memory storage)
+    - errors, generated_texts: Per-request data (not needed for aggregate analysis)
+    - tokenizer_id, best_of, burstiness: Metadata not critical for dashboards
+    """
 
     # Primary throughput metrics (per concurrency level)
     output_tps: list[float] = field(default_factory=list)
@@ -203,26 +233,6 @@ class ProfilerResults:
     duration: list[float] = field(default_factory=list)
     completed: list[int] = field(default_factory=list)
     num_prompts: list[int] = field(default_factory=list)
-
-    @classmethod
-    def from_json(cls, json_data: dict) -> "ProfilerResults":
-        """Create from {jobid}.json profiler_metadata section.
-
-        Args:
-            json_data: Parsed JSON from {jobid}.json file
-
-        Returns:
-            ProfilerResults instance (benchmark data added later from result files)
-        """
-        profiler_meta = json_data.get("benchmark", {})
-
-        return cls(
-            profiler_type=profiler_meta.get("type", "unknown"),
-            isl=str(profiler_meta.get("isl", "")),
-            osl=str(profiler_meta.get("osl", "")),
-            concurrencies=profiler_meta.get("concurrencies", ""),
-            req_rate=profiler_meta.get("req-rate", ""),
-        )
 
     def add_benchmark_results(self, results: dict) -> None:
         """Add actual benchmark results from profiler output files.
@@ -276,10 +286,25 @@ class ProfilerResults:
 
 
 @dataclass
+class BenchmarkLaunchCommand:
+    """Parsed benchmark launch command information.
+    
+    Source: logs/benchmark.out
+    Only contains essential fields. All parsed arguments go into extra_args.
+    """
+
+    benchmark_type: str
+    raw_command: str
+
+    # All parsed arguments as dict
+    extra_args: dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class BenchmarkRun:
     """Complete benchmark run with metadata and profiler results."""
 
     metadata: RunMetadata
+    profiler_metadata: ProfilerMetadata
     profiler: ProfilerResults
     is_complete: bool = True
     missing_concurrencies: list[int] = field(default_factory=list)
@@ -311,10 +336,16 @@ class BenchmarkRun:
                 json_data = json.load(f)
 
             metadata = RunMetadata.from_json(json_data, run_path)
-            profiler = ProfilerResults.from_json(json_data)
+            profiler_metadata = ProfilerMetadata.from_json(json_data)
+            profiler = ProfilerResults()
             tags = json_data.get("tags", [])
 
-            return cls(metadata=metadata, profiler=profiler, tags=tags)
+            return cls(
+                metadata=metadata,
+                profiler_metadata=profiler_metadata,
+                profiler=profiler,
+                tags=tags,
+            )
         except Exception:
             return None
 
@@ -335,14 +366,14 @@ class BenchmarkRun:
         Updates is_complete and missing_concurrencies fields.
         """
         # Parse expected concurrencies from metadata
-        if not self.profiler.concurrencies:
+        if not self.profiler_metadata.concurrencies:
             # No expected concurrencies specified, assume manual run
             self.is_complete = True
             self.missing_concurrencies = []
             return
 
         expected = set()
-        for val in self.profiler.concurrencies.split("x"):
+        for val in self.profiler_metadata.concurrencies.split("x"):
             try:
                 expected.add(int(val.strip()))
             except ValueError:
@@ -407,34 +438,71 @@ class MemoryMetrics:
 
 
 @dataclass
-class NodeMetrics:
-    """Metrics from a single node (prefill or decode worker), parsed from log files."""
+class NodeMetadata:
+    """Node identification and worker information.
+    
+    This is the equivalent of RunMetadata but for individual worker nodes.
+    """
 
-    node_info: dict  # Has node name, worker type, worker_id
+    node_name: str  # Node identifier (e.g., "worker-3")
+    worker_type: str  # Worker type: prefill, decode, agg
+    worker_id: str  # Worker ID (e.g., "w0")
+
+
+@dataclass
+class NodeMetrics:
+    """Metrics from a single node (prefill or decode worker), parsed from log files.
+    
+    This class contains ONLY metrics data. Configuration is in NodeConfig.
+    """
+
+    metadata: NodeMetadata
     batches: list[BatchMetrics] = field(default_factory=list)
     memory_snapshots: list[MemoryMetrics] = field(default_factory=list)
-    config: dict = field(default_factory=dict)  # TP/DP/EP config
+    config: dict = field(default_factory=dict)  # Runtime config: TP/PP/EP, batch sizes, etc.
     run_id: str = ""
 
+    # Convenience properties for backward compatibility
     @property
     def node_name(self) -> str:
-        """Get node name."""
-        return self.node_info.get("node", "Unknown")
+        """Get node name from metadata."""
+        return self.metadata.node_name
 
     @property
     def worker_type(self) -> str:
-        """Get worker type (prefill/decode/frontend)."""
-        return self.node_info.get("worker_type", "unknown")
+        """Get worker type from metadata."""
+        return self.metadata.worker_type
+
+    @property
+    def worker_id(self) -> str:
+        """Get worker ID from metadata."""
+        return self.metadata.worker_id
 
     @property
     def is_prefill(self) -> bool:
         """Check if this is a prefill node."""
-        return self.worker_type == "prefill"
+        return self.metadata.worker_type == "prefill"
 
     @property
     def is_decode(self) -> bool:
         """Check if this is a decode node."""
-        return self.worker_type == "decode"
+        return self.metadata.worker_type == "decode"
+
+
+@dataclass
+class NodeLaunchCommand:
+    """Parsed node worker launch command information.
+    
+    Source: logs/{node}_{worker_type}_{worker_id}.out or .err
+    Only contains essential fields. All parsed arguments go into extra_args.
+    """
+
+    backend_type: str
+    worker_type: str  # prefill, decode, agg
+    raw_command: str
+
+    # All parsed arguments as dict
+    extra_args: dict[str, Any] = field(default_factory=dict)
 
 
 # Config-related TypedDicts (from config_reader.py)
@@ -447,6 +515,91 @@ class GPUInfo(TypedDict, total=False):
     memory_total: str
     driver_version: str
 
+class NodeConfig(TypedDict, total=False):
+    """Expected structure of a node config JSON file (*_config.json)."""
+
+    filename: str
+    gpu_info: GPUInfo
+    config: dict[str, Any]  # Contains 'server_args' and other fields
+    environment: dict[str, str]
+    launch_command: NodeLaunchCommand | None  # Parsed launch command (added at runtime)
+
+
+@dataclass
+class NodeInfo:
+    """Complete information about a node, combining metrics and configuration.
+    
+    This is the top-level container for all node data.
+    """
+
+    metrics: NodeMetrics  # Performance metrics (batches, memory, throughput)
+    node_config: NodeConfig | None = None  # Configuration (environment, launch_command, gpu_info)
+
+    # Convenience properties that delegate to metrics
+    @property
+    def node_name(self) -> str:
+        """Get node name from metrics."""
+        return self.metrics.node_name
+
+    @property
+    def worker_type(self) -> str:
+        """Get worker type from metrics."""
+        return self.metrics.worker_type
+
+    @property
+    def worker_id(self) -> str:
+        """Get worker ID from metrics."""
+        return self.metrics.worker_id
+
+    @property
+    def is_prefill(self) -> bool:
+        """Check if this is a prefill node."""
+        return self.metrics.is_prefill
+
+    @property
+    def is_decode(self) -> bool:
+        """Check if this is a decode node."""
+        return self.metrics.is_decode
+
+    @property
+    def batches(self) -> list[BatchMetrics]:
+        """Get batches from metrics."""
+        return self.metrics.batches
+
+    @property
+    def memory_snapshots(self) -> list[MemoryMetrics]:
+        """Get memory snapshots from metrics."""
+        return self.metrics.memory_snapshots
+
+    @property
+    def config(self) -> dict:
+        """Get runtime config from metrics."""
+        return self.metrics.config
+
+    @property
+    def run_id(self) -> str:
+        """Get run_id from metrics."""
+        return self.metrics.run_id
+
+    @run_id.setter
+    def run_id(self, value: str):
+        """Set run_id on metrics."""
+        self.metrics.run_id = value
+
+    # Convenience properties that delegate to node_config
+    @property
+    def environment(self) -> dict[str, str]:
+        """Get environment variables from node_config."""
+        if self.node_config:
+            return self.node_config.get("environment", {})
+        return {}
+
+    @property
+    def launch_command(self) -> NodeLaunchCommand | None:
+        """Get launch command from node_config."""
+        if self.node_config:
+            return self.node_config.get("launch_command")
+        return None
 
 class ServerArgs(TypedDict, total=False):
     """Expected structure of server_args in node config.
@@ -467,18 +620,14 @@ class ServerArgs(TypedDict, total=False):
     disaggregation_mode: str
     context_length: int
 
-
-class NodeConfig(TypedDict, total=False):
-    """Expected structure of a node config JSON file (*_config.json)."""
-
-    filename: str
-    gpu_info: GPUInfo
-    config: dict[str, Any]  # Contains 'server_args' and other fields
-    environment: dict[str, str]
-
-
-class ParsedCommandInfo(TypedDict):
-    """Expected return structure from parse_command_line_from_err."""
+class TopologyInfo(TypedDict):
+    """Service topology and configuration information from log files.
+    
+    Returned by parse_command_line_from_err() which analyzes log files to discover:
+    - Which flags were explicitly set in launch commands
+    - Physical node to service type mapping
+    """
 
     explicit_flags: set
-    services: dict[str, list[str]]
+    services: dict[str, list[str]]  # {node_name: [service_types]}
+

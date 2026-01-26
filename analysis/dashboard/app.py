@@ -102,8 +102,8 @@ def render_sidebar(logs_dir, runs):
     with st.sidebar.expander("📊 ISL/OSL", expanded=False):
         isl_osl_pairs = set()
         for run in sorted_runs:
-            if run.profiler.isl and run.profiler.osl:
-                isl_osl_pairs.add(f"{run.profiler.isl}/{run.profiler.osl}")
+            if run.profiler_metadata.isl and run.profiler_metadata.osl:
+                isl_osl_pairs.add(f"{run.profiler_metadata.isl}/{run.profiler_metadata.osl}")
 
         if isl_osl_pairs:
             pair_options = sorted(isl_osl_pairs)
@@ -115,7 +115,7 @@ def render_sidebar(logs_dir, runs):
             )
 
             if selected_pairs:
-                sorted_runs = [r for r in sorted_runs if f"{r.profiler.isl}/{r.profiler.osl}" in selected_pairs]
+                sorted_runs = [r for r in sorted_runs if f"{r.profiler_metadata.isl}/{r.profiler_metadata.osl}" in selected_pairs]
         else:
             st.caption("No ISL/OSL information available")
 
@@ -176,8 +176,8 @@ def render_sidebar(logs_dir, runs):
 
     for run in sorted_runs:
         topology = run.metadata.topology_label
-        isl = run.profiler.isl
-        osl = run.profiler.osl
+        isl = run.profiler_metadata.isl
+        osl = run.profiler_metadata.osl
         gpu_type = run.metadata.gpu_type
         gpu_suffix = f" [{gpu_type}]" if gpu_type else ""
         # Include job ID to ensure unique labels
@@ -284,7 +284,7 @@ def render_sidebar(logs_dir, runs):
                 f"{run.job_id} | "
                 f"{run.metadata.agg_workers}A | "
                 f"{total_gpus} GPUs | "
-                f"{run.profiler.isl}/{run.profiler.osl}"
+                f"{run.profiler_metadata.isl}/{run.profiler_metadata.osl}"
             )
         else:
             run_id = (
@@ -298,7 +298,7 @@ def render_sidebar(logs_dir, runs):
                 f"{run.job_id} | "
                 f"{run.metadata.prefill_workers}P{run.metadata.decode_workers}D | "
                 f"{prefill_gpus}/{decode_gpus} | "
-                f"{run.profiler.isl}/{run.profiler.osl}"
+                f"{run.profiler_metadata.isl}/{run.profiler_metadata.osl}"
             )
 
         if run.metadata.gpu_type:

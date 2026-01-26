@@ -56,15 +56,9 @@ if [ ! -f "${INPUT_FILE}" ]; then
 fi
 
 # Run small benchmark for warmup
-echo "Running small benchmark for warmup..."
-aiperf profile \
-    -m "${MODEL_NAME}" \
-    --url "${ENDPOINT}" \
-    --streaming \
-    --ui simple \
-    --concurrency 10 \
-    --request-count 20
-echo "Small benchmark for warmup complete"
+command="aiperf profile -m ${MODEL_NAME} --url ${ENDPOINT} --streaming --ui simple --concurrency 10 --request-count 20"
+echo "[CMD-WARMUP] $command"
+eval "$command"
 
 # Setup artifact directory with model and timestamp
 MODEL_BASE_NAME="${MODEL_NAME##*/}"
@@ -80,18 +74,9 @@ echo ""
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting benchmark"
 
 # Run aiperf profile exactly as dynamo does
-aiperf profile \
-    -m "${MODEL_NAME}" \
-    --input-file "${INPUT_FILE}" \
-    --custom-dataset-type mooncake_trace \
-    --fixed-schedule \
-    --url "${ENDPOINT}" \
-    --streaming \
-    --random-seed 42 \
-    --ui simple \
-    --artifact-dir "${RUN_ARTIFACT_DIR}" \
-    --goodput "time_to_first_token:${TTFT_THRESHOLD} inter_token_latency:${ITL_THRESHOLD}"
-
+command="aiperf profile -m ${MODEL_NAME} --input-file ${INPUT_FILE} --custom-dataset-type mooncake_trace --fixed-schedule --url ${ENDPOINT} --streaming --random-seed 42 --ui simple --artifact-dir ${RUN_ARTIFACT_DIR} --goodput \"time_to_first_token:${TTFT_THRESHOLD} inter_token_latency:${ITL_THRESHOLD}\""
+echo "[CMD] $command"
+eval "$command"
 BENCH_EXIT_CODE=$?
 
 echo ""

@@ -26,14 +26,9 @@ export OPENAI_API_KEY="${OPENAI_API_KEY:-EMPTY}"
 
 echo "Running GPQA evaluation..."
 
-python3 -m sglang.test.run_eval \
-    --base-url "${ENDPOINT}" \
-    --model "${MODEL_NAME}" \
-    --eval-name gpqa \
-    --num-examples "${NUM_EXAMPLES}" \
-    --max-tokens "${MAX_TOKENS}" \
-    --repeat "${REPEAT}" \
-    --num-threads "${NUM_THREADS}"
+command="python3 -m sglang.test.run_eval --base-url ${ENDPOINT} --model ${MODEL_NAME} --eval-name gpqa --num-examples ${NUM_EXAMPLES} --max-tokens ${MAX_TOKENS} --repeat ${REPEAT} --num-threads ${NUM_THREADS}"
+echo "[CMD] $command"
+eval "$command"
 
 # Copy result file
 result_file=$(ls -t /tmp/gpqa_*.json 2>/dev/null | head -n1)

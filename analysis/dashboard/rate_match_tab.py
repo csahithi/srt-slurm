@@ -84,11 +84,11 @@ def render(filtered_runs: list, logs_dir: str):
                 decode_gpus = run.metadata.decode_nodes * run.metadata.gpus_per_node
                 st.metric("GPU Split", f"{prefill_gpus} / {decode_gpus}")
             with col4:
-                st.metric("ISL/OSL", f"{run.profiler.isl}/{run.profiler.osl}")
+                st.metric("ISL/OSL", f"{run.profiler_metadata.isl}/{run.profiler_metadata.osl}")
 
             # Create rate match graph
-            isl = int(run.profiler.isl) if run.profiler.isl else None
-            osl = int(run.profiler.osl) if run.profiler.osl else None
+            isl = int(run.profiler_metadata.isl) if run.profiler_metadata.isl else None
+            osl = int(run.profiler_metadata.osl) if run.profiler_metadata.osl else None
             rate_fig = _create_rate_match_graph(
                 prefill_nodes, decode_nodes, run.job_id, show_request_rate=show_request_rate, isl=isl, osl=osl
             )

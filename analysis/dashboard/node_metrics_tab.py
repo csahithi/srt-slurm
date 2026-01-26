@@ -72,8 +72,8 @@ def render(filtered_runs: list, logs_dir: str):
                         "agg_workers": run.metadata.agg_workers,
                         "gpus_per_node": run.metadata.gpus_per_node,
                         "total_gpus": run.total_gpus,
-                        "isl": run.profiler.isl,
-                        "osl": run.profiler.osl,
+                        "isl": run.profiler_metadata.isl,
+                        "osl": run.profiler_metadata.osl,
                         "gpu_type": run.metadata.gpu_type,
                     }
                 all_node_metrics.extend(node_metrics)

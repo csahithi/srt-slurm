@@ -8,11 +8,14 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
 
 import pandas as pd
 
 from .cache_manager import CacheManager
-from .models import BenchmarkRun
+from .log_parser import NodeAnalyzer
+from .models import BenchmarkRun, NodeMetrics
+from .parsers import get_benchmark_parser, get_node_parser
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +65,7 @@ class RunLoader:
                 run = BenchmarkRun.from_json_file(path)
                 if run is not None:
                     # Skip profiling jobs (they don't have benchmark results)
-                    if run.profiler.profiler_type == "torch-profiler":
+                    if run.profiler_metadata.profiler_type == "torch-profiler":
                         reason = "Profiling job (no benchmark results)"
                         logger.debug(f"Skipping profiling job {run.job_id}")
                         skipped.append((run.job_id, run_dir, reason))
@@ -214,20 +217,33 @@ class RunLoader:
         run_path = run.metadata.path
 
         # Check both run_path and run_path/logs for benchmark results
-        search_paths = [run_path]
-        logs_subdir = os.path.join(run_path, "logs")
-        if os.path.exists(logs_subdir):
-            search_paths.append(logs_subdir)
-
         # Initialize cache manager
         cache_mgr = CacheManager(run_path)
 
-        # Use profiler_type from metadata to construct directory name
-        profiler_type = run.profiler.profiler_type
-        pattern_strs = [f"{profiler_type}_isl_{run.profiler.isl}_osl_{run.profiler.osl}"]
+        # Use profiler_type from metadata
+        profiler_type = run.profiler_metadata.profiler_type
+        
+        # Get the parser for this benchmark type
+        try:
+            parser = get_benchmark_parser(profiler_type)
+        except ValueError as e:
+            logger.warning(f"No parser available for {profiler_type}: {e}")
+            return
 
-        # Define source patterns for cache validation (check all possible patterns)
-        source_patterns = [f"{pattern}/*.json" for pattern in pattern_strs]
+        # Let the parser find its result directory
+        result_dir = parser.find_result_directory(
+            Path(run_path),
+            isl=run.profiler_metadata.isl,
+            osl=run.profiler_metadata.osl
+        )
+        
+        if not result_dir:
+            logger.warning(f"No results directory found for {profiler_type} in {run_path}")
+            return
+
+        # Define source patterns for cache validation (relative to run_path)
+        result_dir_rel = result_dir.relative_to(Path(run_path)) if result_dir.is_relative_to(Path(run_path)) else result_dir.name
+        source_patterns = [f"{result_dir_rel}/*.json"]
 
         # Try to load from cache first
         if cache_mgr.is_cache_valid("benchmark_results", source_patterns):
@@ -273,62 +289,176 @@ class RunLoader:
                 run.profiler.add_benchmark_results(results)
                 return
 
-        # Cache miss or invalid - parse from JSON files
-        for pattern_str in pattern_strs:
-            profiler_pattern = re.compile(pattern_str)
-            for search_path in search_paths:
-                for entry in os.listdir(search_path):
-                    if profiler_pattern.match(entry):
-                        result_dir = os.path.join(search_path, entry)
-                        if os.path.isdir(result_dir):
-                            results = self._parse_profiler_results(result_dir)
-                            run.profiler.add_benchmark_results(results)
+        # Cache miss - parse results
+        results = self._parse_profiler_results(str(result_dir), profiler_type)
+        run.profiler.add_benchmark_results(results)
 
-                            # Save to cache
-                            if results["concurrencies"]:
-                                # Convert to DataFrame for caching - cache ALL parsed fields
-                                cache_data = {
-                                    "concurrency": results["concurrencies"],
-                                    "output_tps": results["output_tps"],
-                                    "mean_itl_ms": results["mean_itl_ms"],
-                                    "mean_ttft_ms": results["mean_ttft_ms"],
-                                    "request_rate": results["request_rate"],
-                                }
+        # Save to cache
+        if results["concurrencies"]:
+            # Convert to DataFrame for caching - cache ALL parsed fields
+            cache_data = {
+                "concurrency": results["concurrencies"],
+                "output_tps": results["output_tps"],
+                "mean_itl_ms": results["mean_itl_ms"],
+                "mean_ttft_ms": results["mean_ttft_ms"],
+                "request_rate": results["request_rate"],
+            }
 
-                                # Add all optional fields if they have data
-                                optional_fields = {
-                                    "mean_tpot_ms": "mean_tpot_ms",
-                                    "total_tps": "total_tps",
-                                    "request_throughput": "request_throughput",
-                                    "request_goodput": "request_goodput",
-                                    "mean_e2el_ms": "mean_e2el_ms",
-                                    "median_ttft_ms": "median_ttft_ms",
-                                    "median_tpot_ms": "median_tpot_ms",
-                                    "median_itl_ms": "median_itl_ms",
-                                    "median_e2el_ms": "median_e2el_ms",
-                                    "p99_ttft_ms": "p99_ttft_ms",
-                                    "p99_tpot_ms": "p99_tpot_ms",
-                                    "p99_itl_ms": "p99_itl_ms",
-                                    "p99_e2el_ms": "p99_e2el_ms",
-                                    "std_ttft_ms": "std_ttft_ms",
-                                    "std_tpot_ms": "std_tpot_ms",
-                                    "std_itl_ms": "std_itl_ms",
-                                    "std_e2el_ms": "std_e2el_ms",
-                                    "total_input_tokens": "total_input_tokens",
-                                    "total_output_tokens": "total_output_tokens",
-                                }
+            # Add all optional fields if they have data
+            optional_fields = {
+                "mean_tpot_ms": "mean_tpot_ms",
+                "total_tps": "total_tps",
+                "request_throughput": "request_throughput",
+                "request_goodput": "request_goodput",
+                "mean_e2el_ms": "mean_e2el_ms",
+                "median_ttft_ms": "median_ttft_ms",
+                "median_tpot_ms": "median_tpot_ms",
+                "median_itl_ms": "median_itl_ms",
+                "median_e2el_ms": "median_e2el_ms",
+                "p99_ttft_ms": "p99_ttft_ms",
+                "p99_tpot_ms": "p99_tpot_ms",
+                "p99_itl_ms": "p99_itl_ms",
+                "p99_e2el_ms": "p99_e2el_ms",
+                "std_ttft_ms": "std_ttft_ms",
+                "std_tpot_ms": "std_tpot_ms",
+                "std_itl_ms": "std_itl_ms",
+                "std_e2el_ms": "std_e2el_ms",
+                "total_input_tokens": "total_input_tokens",
+                "total_output_tokens": "total_output_tokens",
+            }
 
-                                for result_key, cache_key in optional_fields.items():
-                                    if results.get(result_key):
-                                        cache_data[cache_key] = results[result_key]
+            for result_key, cache_key in optional_fields.items():
+                if results.get(result_key):
+                    cache_data[cache_key] = results[result_key]
 
-                                cache_df = pd.DataFrame(cache_data)
-                                cache_mgr.save_to_cache("benchmark_results", cache_df, source_patterns)
+            cache_df = pd.DataFrame(cache_data)
+            cache_mgr.save_to_cache("benchmark_results", cache_df, source_patterns)
 
-                            return  # Found results, stop searching
+    def _parse_profiler_results(self, result_dir: str, profiler_type: str) -> dict:
+        """Parse profiler result JSON files using the parser infrastructure.
 
-    def _parse_profiler_results(self, result_dir: str) -> dict:
-        """Parse profiler result JSON files.
+        Args:
+            result_dir: Path to directory containing benchmark result JSON files
+            profiler_type: Type of profiler/benchmark (e.g., "sa-bench", "mooncake-router")
+
+        Returns:
+            Dict with concurrencies, output_tps, mean_itl_ms, etc.
+        """
+        result_dir_path = Path(result_dir)
+
+        try:
+            # Get the appropriate parser
+            parser = get_benchmark_parser(profiler_type)
+
+            # Let the parser find and parse all result files in the directory
+            # The parser knows where to look (e.g., artifacts/ subdirectories)
+            results_list = parser.parse_result_directory(result_dir_path)
+
+            # Convert results to the format expected by the rest of the code
+            return self._convert_parser_results_to_dict(results_list)
+
+        except ValueError as e:
+            # Parser not found - fall back to manual parsing
+            logger.warning(f"Parser not available for {profiler_type}, falling back to manual parsing: {e}")
+            return self._parse_profiler_results_manual(result_dir)
+
+    def _convert_parser_results_to_dict(self, results_list: list[dict]) -> dict:
+        """Convert parser results to the dict format expected by add_benchmark_results.
+
+        Args:
+            results_list: List of result dicts from parser (one per concurrency level)
+
+        Returns:
+            Dict with lists of metrics across concurrency levels
+        """
+        out = {
+            # Primary metrics
+            "concurrencies": [],
+            "output_tps": [],
+            "total_tps": [],
+            "request_throughput": [],
+            "request_goodput": [],
+            "request_rate": [],
+            # Mean latencies
+            "mean_ttft_ms": [],
+            "mean_tpot_ms": [],
+            "mean_itl_ms": [],
+            "mean_e2el_ms": [],
+            # Median latencies
+            "median_ttft_ms": [],
+            "median_tpot_ms": [],
+            "median_itl_ms": [],
+            "median_e2el_ms": [],
+            # P99 latencies
+            "p99_ttft_ms": [],
+            "p99_tpot_ms": [],
+            "p99_itl_ms": [],
+            "p99_e2el_ms": [],
+            # Std dev latencies
+            "std_ttft_ms": [],
+            "std_tpot_ms": [],
+            "std_itl_ms": [],
+            "std_e2el_ms": [],
+            # Token counts
+            "total_input_tokens": [],
+            "total_output_tokens": [],
+            # Metadata
+            "backend": [],
+            "model_id": [],
+            "date": [],
+            "duration": [],
+            "completed": [],
+            "num_prompts": [],
+        }
+
+        # results_list is already sorted by the parser
+        for data in results_list:
+            # Concurrency
+            concurrency = data.get("max_concurrency") or data.get("concurrency") or 0
+            out["concurrencies"].append(concurrency)
+            # Throughput - normalize field names
+            out["output_tps"].append(data.get("output_throughput") or data.get("output_tps"))
+            out["total_tps"].append(data.get("total_token_throughput") or data.get("total_tps"))
+            out["request_throughput"].append(data.get("request_throughput"))
+            out["request_goodput"].append(data.get("request_goodput"))
+            out["request_rate"].append(data.get("request_rate"))
+            # Mean latencies
+            out["mean_ttft_ms"].append(data.get("mean_ttft_ms"))
+            out["mean_tpot_ms"].append(data.get("mean_tpot_ms"))
+            out["mean_itl_ms"].append(data.get("mean_itl_ms"))
+            out["mean_e2el_ms"].append(data.get("mean_e2el_ms"))
+            # Median latencies
+            out["median_ttft_ms"].append(data.get("median_ttft_ms"))
+            out["median_tpot_ms"].append(data.get("median_tpot_ms"))
+            out["median_itl_ms"].append(data.get("median_itl_ms"))
+            out["median_e2el_ms"].append(data.get("median_e2el_ms"))
+            # P99 latencies
+            out["p99_ttft_ms"].append(data.get("p99_ttft_ms"))
+            out["p99_tpot_ms"].append(data.get("p99_tpot_ms"))
+            out["p99_itl_ms"].append(data.get("p99_itl_ms"))
+            out["p99_e2el_ms"].append(data.get("p99_e2el_ms"))
+            # Std dev latencies
+            out["std_ttft_ms"].append(data.get("std_ttft_ms"))
+            out["std_tpot_ms"].append(data.get("std_tpot_ms"))
+            out["std_itl_ms"].append(data.get("std_itl_ms"))
+            out["std_e2el_ms"].append(data.get("std_e2el_ms"))
+            # Token counts
+            out["total_input_tokens"].append(data.get("total_input_tokens"))
+            out["total_output_tokens"].append(data.get("total_output_tokens"))
+            # Metadata
+            out["backend"].append(data.get("backend"))
+            out["model_id"].append(data.get("model_id"))
+            out["date"].append(data.get("date"))
+            out["duration"].append(data.get("duration"))
+            out["completed"].append(data.get("completed"))
+            out["num_prompts"].append(data.get("num_prompts"))
+
+        return out
+
+    def _parse_profiler_results_manual(self, result_dir: str) -> dict:
+        """Fallback manual parser for benchmark result JSON files.
+
+        This is kept for backward compatibility when parsers are not available.
 
         Args:
             result_dir: Path to directory containing benchmark result JSON files
@@ -393,88 +523,9 @@ class RunLoader:
                 logger.warning(f"Error parsing {filepath}: {e}")
                 continue
 
-        # Organize results - sort by concurrency
-        out = {
-            # Primary metrics
-            "concurrencies": [],
-            "output_tps": [],
-            "total_tps": [],
-            "request_throughput": [],
-            "request_goodput": [],
-            "request_rate": [],
-            # Mean latencies
-            "mean_ttft_ms": [],
-            "mean_tpot_ms": [],
-            "mean_itl_ms": [],
-            "mean_e2el_ms": [],
-            # Median latencies
-            "median_ttft_ms": [],
-            "median_tpot_ms": [],
-            "median_itl_ms": [],
-            "median_e2el_ms": [],
-            # P99 latencies
-            "p99_ttft_ms": [],
-            "p99_tpot_ms": [],
-            "p99_itl_ms": [],
-            "p99_e2el_ms": [],
-            # Std dev latencies
-            "std_ttft_ms": [],
-            "std_tpot_ms": [],
-            "std_itl_ms": [],
-            "std_e2el_ms": [],
-            # Token counts
-            "total_input_tokens": [],
-            "total_output_tokens": [],
-            # Metadata
-            "backend": [],
-            "model_id": [],
-            "date": [],
-            "duration": [],
-            "completed": [],
-            "num_prompts": [],
-        }
-
-        # Sort by concurrency and aggregate
-        for data in sorted(result, key=lambda x: x.get("max_concurrency", 0) or 0):
-            out["concurrencies"].append(data.get("max_concurrency"))
-            # Throughput
-            out["output_tps"].append(data.get("output_throughput"))
-            out["total_tps"].append(data.get("total_token_throughput"))
-            out["request_throughput"].append(data.get("request_throughput"))
-            out["request_goodput"].append(data.get("request_goodput"))
-            out["request_rate"].append(data.get("request_rate"))
-            # Mean latencies
-            out["mean_ttft_ms"].append(data.get("mean_ttft_ms"))
-            out["mean_tpot_ms"].append(data.get("mean_tpot_ms"))
-            out["mean_itl_ms"].append(data.get("mean_itl_ms"))
-            out["mean_e2el_ms"].append(data.get("mean_e2el_ms"))
-            # Median latencies
-            out["median_ttft_ms"].append(data.get("median_ttft_ms"))
-            out["median_tpot_ms"].append(data.get("median_tpot_ms"))
-            out["median_itl_ms"].append(data.get("median_itl_ms"))
-            out["median_e2el_ms"].append(data.get("median_e2el_ms"))
-            # P99 latencies
-            out["p99_ttft_ms"].append(data.get("p99_ttft_ms"))
-            out["p99_tpot_ms"].append(data.get("p99_tpot_ms"))
-            out["p99_itl_ms"].append(data.get("p99_itl_ms"))
-            out["p99_e2el_ms"].append(data.get("p99_e2el_ms"))
-            # Std dev latencies
-            out["std_ttft_ms"].append(data.get("std_ttft_ms"))
-            out["std_tpot_ms"].append(data.get("std_tpot_ms"))
-            out["std_itl_ms"].append(data.get("std_itl_ms"))
-            out["std_e2el_ms"].append(data.get("std_e2el_ms"))
-            # Token counts
-            out["total_input_tokens"].append(data.get("total_input_tokens"))
-            out["total_output_tokens"].append(data.get("total_output_tokens"))
-            # Metadata
-            out["backend"].append(data.get("backend"))
-            out["model_id"].append(data.get("model_id"))
-            out["date"].append(data.get("date"))
-            out["duration"].append(data.get("duration"))
-            out["completed"].append(data.get("completed"))
-            out["num_prompts"].append(data.get("num_prompts"))
-
-        return out
+        # Sort by concurrency and convert to dict format
+        results_list = sorted(result, key=lambda x: x.get("max_concurrency", 0) or 0)
+        return self._convert_parser_results_to_dict(results_list)
 
     def get_run_count(self) -> int:
         """Get count of valid benchmark runs in logs directory.
@@ -553,9 +604,9 @@ class RunLoader:
                 row = {
                     "Run ID": run_id,
                     "Run Date": run.metadata.run_date,
-                    "Profiler": run.profiler.profiler_type,
-                    "ISL": run.profiler.isl,
-                    "OSL": run.profiler.osl,
+                    "Profiler": run.profiler_metadata.profiler_type,
+                    "ISL": run.profiler_metadata.isl,
+                    "OSL": run.profiler_metadata.osl,
                     "Prefill Nodes": run.metadata.prefill_nodes,
                     "Decode Nodes": run.metadata.decode_nodes,
                     "Prefill Workers": run.metadata.prefill_workers,
@@ -620,3 +671,43 @@ class RunLoader:
         except Exception as e:
             logger.error(f"Error updating tags for {json_path}: {e}")
             return False
+
+    def load_node_metrics(self, run_path: str, backend_type: str = "sglang") -> list[NodeMetrics]:
+        """Load node metrics from worker log files using NodeAnalyzer.
+
+        Args:
+            run_path: Path to the run directory
+            backend_type: Backend type (sglang or trtllm) - deprecated, auto-detected
+
+        Returns:
+            List of NodeInfo objects, one per worker
+        """
+        # Handle both relative and absolute paths
+        if not os.path.isabs(run_path):
+            run_path = os.path.join(self.logs_dir, run_path)
+
+        # Use NodeAnalyzer which handles caching, backend detection, and config loading
+        analyzer = NodeAnalyzer()
+        return analyzer.parse_run_logs(run_path, return_dicts=False)
+
+    def load_node_metrics_for_run(self, run: BenchmarkRun) -> list[NodeMetrics]:
+        """Load node metrics for a BenchmarkRun.
+
+        Automatically detects backend type from the run's container image.
+
+        Args:
+            run: BenchmarkRun object
+
+        Returns:
+            List of NodeMetrics objects
+        """
+        # Detect backend type from container
+        backend_type = "sglang"  # Default
+        container = run.metadata.container.lower()
+
+        if "trtllm" in container or "dynamo" in container or "tensorrt" in container:
+            backend_type = "trtllm"
+        elif "sglang" in container:
+            backend_type = "sglang"
+
+        return self.load_node_metrics(run.metadata.path, backend_type)
