@@ -408,7 +408,79 @@ Each parser implements:
 
 ---
 
-## 9. Caching Layer
+## 9. Parsing Strategy: JSON-First Approach
+
+### Design Principle: JSON as Source of Truth ✨
+
+The parser infrastructure follows a **JSON-first** approach for benchmark results:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Benchmark Result Parsing Priority                     │
+│                                                                          │
+│  1️⃣ PRIMARY: JSON Result Files (Source of Truth)                        │
+│     📁 result_*.json (SA-Bench)                                         │
+│     📁 profile_export_aiperf.json (Mooncake-Router)                     │
+│     - Complete, structured data                                         │
+│     - Machine-readable, validated format                                │
+│     - Contains all metrics with precision                               │
+│                                                                          │
+│  2️⃣ FALLBACK: benchmark.out Parsing                                     │
+│     📁 logs/benchmark.out                                               │
+│     - Used ONLY when JSON files are unavailable                         │
+│     - Regex-based extraction from human-readable logs                   │
+│     - May be incomplete or imprecise                                    │
+│     - Logged as fallback in parser output                               │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Implementation
+
+All benchmark parsers implement this strategy in `parse_result_directory()`:
+
+```python
+def parse_result_directory(self, result_dir: Path) -> list[dict[str, Any]]:
+    results = []
+    
+    # 1️⃣ PRIMARY: Try JSON files first
+    for json_file in result_dir.glob("*.json"):  # or rglob() for nested
+        result = self.parse_result_json(json_file)
+        if result.get("output_tps"):
+            results.append(result)
+            logger.info(f"Loaded from JSON: {json_file}")
+    
+    # 2️⃣ FALLBACK: If no JSON found, try benchmark.out
+    if not results:
+        benchmark_out = result_dir / "benchmark.out"
+        if benchmark_out.exists():
+            logger.info("No JSON results found, falling back to .out parsing")
+            fallback_result = self.parse(benchmark_out)
+            if fallback_result.get("output_tps"):
+                results.append(fallback_result)
+        else:
+            logger.warning(f"No results found in {result_dir}")
+    
+    return results
+```
+
+### Rationale
+
+1. **Accuracy**: JSON files contain exact, validated data
+2. **Completeness**: JSON includes all metrics, not just what's in logs
+3. **Reliability**: Structured format vs regex parsing
+4. **Performance**: JSON parsing is faster than regex on large logs
+5. **Maintainability**: Less brittle than log format changes
+
+### When Fallback is Used
+
+The fallback to `.out` file parsing occurs when:
+- JSON result files are missing (incomplete benchmark run)
+- Results directory doesn't contain expected JSON files
+- Legacy runs from before JSON export was implemented
+
+---
+
+## 10. Caching Layer
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -436,56 +508,64 @@ Flow with cache:
 
 ---
 
-## 10. File Structure Summary
+## 11. File Structure Summary
 
 ```
 {run_directory}/
 ├── metadata.json              → RunMetadata
 ├── config.yaml                → ProfilerMetadata.isl/osl
 ├── logs/
-│   ├── benchmark.out          → BenchmarkLaunchCommand, ProfilerMetadata
+│   ├── benchmark.out          → BenchmarkLaunchCommand, ProfilerMetadata, (fallback metrics)
 │   ├── config.yaml            → NodeConfig.environment
 │   ├── {node}_{type}_{id}.out → NodeMetrics, NodeLaunchCommand
 │   ├── {node}_config.json     → NodeConfig.gpu_info
 │   └── sa-bench_isl_*/
-│       └── result_*.json      → ProfilerResults (SA-Bench)
+│       └── result_*.json      → ProfilerResults (PRIMARY ✨)
 │   └── artifacts/
 │       └── */
-│           └── profile_export_aiperf.json → ProfilerResults (Mooncake)
+│           └── profile_export_aiperf.json → ProfilerResults (PRIMARY ✨)
 └── cached_assets/
     ├── benchmark_results.parquet
     ├── node_metrics.parquet
     └── cache_metadata.json
 ```
 
+**Note**: JSON files are the primary source of truth for benchmark results.
+The `.out` files serve as fallback for legacy/incomplete runs.
+
 ---
 
-## 11. Key Design Principles
+## 12. Key Design Principles
 
 1. **Parser Autonomy**: Each parser knows how to find and parse its own files
    - `find_result_directory()` encapsulates file discovery logic
    - RunLoader doesn't need benchmark-specific knowledge
 
-2. **Separation of Concerns**:
+2. **JSON-First Parsing** ✨: JSON files are the primary source of truth
+   - `parse_result_json()` for structured, accurate data
+   - `parse()` method is fallback for when JSON is unavailable
+   - Logged clearly when fallback is used
+
+3. **Separation of Concerns**:
    - **Metrics** (NodeMetrics): Performance data from log parsing
    - **Configuration** (NodeConfig): Launch commands, environment, GPU info
    - **Metadata** (NodeMetadata): Worker identification
 
-3. **Caching Strategy**:
+4. **Caching Strategy**:
    - Cache expensive parsing operations (batch/memory metrics)
    - Don't cache configuration (files are small, may change)
    - Validate cache against source file timestamps
 
-4. **Extensibility**:
+5. **Extensibility**:
    - New benchmark types: Implement BenchmarkParserProtocol
    - New node backends: Implement NodeParserProtocol
    - Register with decorator → automatically available
 
-5. **Data Flow Direction**:
+6. **Data Flow Direction**:
    ```
-   Raw Files → Parsers → Data Models → Cache → Application
-                ↓                        ↓
-           (specific)              (generic)
+   JSON Files (Primary) ──┐
+                          ├──► Parsers ──► Data Models ──► Cache ──► Application
+   .out Files (Fallback) ─┘
    ```
 
 ---
