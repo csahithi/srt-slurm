@@ -121,11 +121,11 @@ class WorkerStageMixin:
         # Unknown placeholders are left unchanged (no error thrown)
         node_id = self.runtime.nodes.worker.index(process.node)
         template_vars = {"node": process.node, "node_id": node_id}
-        
+
         class SafeDict(dict):
             def __missing__(self, key: str) -> str:
                 return "{" + key + "}"  # Leave unknown placeholders unchanged
-        
+
         for key, value in self.backend.get_environment_for_mode(mode).items():
             formatted_value = value.format_map(SafeDict(template_vars))
             env_to_set[key] = formatted_value
