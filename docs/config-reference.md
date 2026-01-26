@@ -5,6 +5,7 @@ Complete reference for job configuration YAML files.
 ## Table of Contents
 
 - [Overview](#overview)
+- [Cluster Config Discovery](#cluster-config-discovery)
 - [name](#name)
 - [model](#model)
 - [resources](#resources)
@@ -76,6 +77,26 @@ health_check:                  # Optional: health check settings
 
 setup_script: "my-setup.sh"    # Optional: custom setup script
 ```
+
+---
+
+## Cluster Config Discovery
+
+srtctl looks for `srtslurm.yaml` (cluster-wide settings) in this order:
+
+1. **`SRTSLURM_CONFIG` environment variable** (if set) - explicit path to config file
+2. Current working directory
+3. Parent directory (1 level up)
+4. Grandparent directory (2 levels up)
+
+For users working in deep directory structures (e.g., study directories), set `SRTSLURM_CONFIG` in your shell profile:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export SRTSLURM_CONFIG="/path/to/srt-slurm/srtslurm.yaml"
+```
+
+This allows you to run `srtctl apply -f config.yaml` from anywhere without needing `srtslurm.yaml` nearby.
 
 ---
 

@@ -16,7 +16,6 @@ resources:
   gpus_per_node: 4
 
 backend:
-
   # Prefill-specific environment variables
   prefill_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
@@ -66,14 +65,13 @@ backend:
     prefill:
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       skip-tokenizer-init: true
       trust-remote-code: true
 
       # Parallelism
       tp-size: 8
       dp-size: 8
-      ep-size: 8 
+      ep-size: 8
       enable-dp-attention: true
 
       # KV cache and attention
@@ -126,7 +124,6 @@ backend:
     decode:
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       skip-tokenizer-init: true
       trust-remote-code: true
 
@@ -174,7 +171,43 @@ backend:
       deepep-config: "/configs/deepep_config.json"
 
       # CUDA graphs
-      cuda-graph-bs: [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256] #, 264, 272, 280, 288, 296, 304, 312, 320, 328, 336, 344, 352, 360, 368, 376, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 736, 768]
+      cuda-graph-bs: [
+          1,
+          2,
+          4,
+          8,
+          16,
+          24,
+          32,
+          40,
+          48,
+          56,
+          64,
+          72,
+          80,
+          88,
+          96,
+          104,
+          112,
+          120,
+          128,
+          136,
+          144,
+          152,
+          160,
+          168,
+          176,
+          184,
+          192,
+          200,
+          208,
+          216,
+          224,
+          232,
+          240,
+          248,
+          256,
+        ] #, 264, 272, 280, 288, 296, 304, 312, 320, 328, 336, 344, 352, 360, 368, 376, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 736, 768]
       cuda-graph-max-bs: 256
 
       # MTP
@@ -189,4 +222,3 @@ benchmark:
   osl: 1024
   concurrencies: "1024x2048x4096"
   req_rate: "inf"
-

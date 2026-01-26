@@ -1,6 +1,10 @@
 # Example cluster configuration (srtslurm.yaml)
 # Copy this to srtslurm.yaml and customize for your cluster
 # This file is gitignored to keep cluster-specific settings private
+#
+# Discovery: srtctl searches cwd and up to 2 parent directories.
+# For deep directory structures, set SRTSLURM_CONFIG in your shell:
+#   export SRTSLURM_CONFIG="/path/to/srt-slurm/srtslurm.yaml"
 
 # SLURM defaults
 default_account: "your-gpu-account"

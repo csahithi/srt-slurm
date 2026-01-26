@@ -77,7 +77,6 @@ backend:
     prefill:
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       trust-remote-code: true
 
       # KV cache and attention
@@ -136,7 +135,6 @@ backend:
     decode:
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       trust-remote-code: true
 
       # KV cache and attention

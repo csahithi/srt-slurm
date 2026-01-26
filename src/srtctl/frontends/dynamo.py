@@ -100,7 +100,7 @@ class DynamoFrontend:
                 bash_preamble=bash_preamble,
                 # TODO(jthomson): I don't have the faintest clue of
                 # why this is needed in later versions of Dynamo, but it is.
-                mpi="pmix", 
+                mpi="pmix",
             )
 
             processes.append(
