@@ -242,8 +242,9 @@ class RunLoader:
             return
 
         # Define source patterns for cache validation (relative to run_path)
+        # Use recursive glob to catch nested result files (e.g., artifacts/*/profile_export_aiperf.json)
         result_dir_rel = result_dir.relative_to(Path(run_path)) if result_dir.is_relative_to(Path(run_path)) else result_dir.name
-        source_patterns = [f"{result_dir_rel}/*.json"]
+        source_patterns = [f"{result_dir_rel}/**/*.json"]
 
         # Try to load from cache first
         if cache_mgr.is_cache_valid("benchmark_results", source_patterns):
@@ -413,12 +414,28 @@ class RunLoader:
 
         # results_list is already sorted by the parser
         for data in results_list:
-            # Concurrency
-            concurrency = data.get("max_concurrency") or data.get("concurrency") or 0
+            # Concurrency - explicit None checks to preserve 0 values
+            if data.get("max_concurrency") is not None:
+                concurrency = data.get("max_concurrency")
+            elif data.get("concurrency") is not None:
+                concurrency = data.get("concurrency")
+            else:
+                concurrency = 0
             out["concurrencies"].append(concurrency)
-            # Throughput - normalize field names
-            out["output_tps"].append(data.get("output_throughput") or data.get("output_tps"))
-            out["total_tps"].append(data.get("total_token_throughput") or data.get("total_tps"))
+            
+            # Throughput - normalize field names with explicit None checks to preserve 0.0
+            if "output_throughput" in data and data["output_throughput"] is not None:
+                output_tps = data["output_throughput"]
+            else:
+                output_tps = data.get("output_tps")
+            out["output_tps"].append(output_tps)
+            
+            if "total_token_throughput" in data and data["total_token_throughput"] is not None:
+                total_tps = data["total_token_throughput"]
+            else:
+                total_tps = data.get("total_tps")
+            out["total_tps"].append(total_tps)
+            
             out["request_throughput"].append(data.get("request_throughput"))
             out["request_goodput"].append(data.get("request_goodput"))
             out["request_rate"].append(data.get("request_rate"))
@@ -680,7 +697,7 @@ class RunLoader:
             backend_type: Backend type (sglang or trtllm) - deprecated, auto-detected
 
         Returns:
-            List of NodeInfo objects, one per worker
+            List of NodeMetrics objects, one per worker
         """
         # Handle both relative and absolute paths
         if not os.path.isabs(run_path):
@@ -688,7 +705,10 @@ class RunLoader:
 
         # Use NodeAnalyzer which handles caching, backend detection, and config loading
         analyzer = NodeAnalyzer()
-        return analyzer.parse_run_logs(run_path, return_dicts=False)
+        node_infos = analyzer.parse_run_logs(run_path, return_dicts=False)
+        
+        # Extract only the metrics from each NodeInfo
+        return [node.metrics for node in node_infos]
 
     def load_node_metrics_for_run(self, run: BenchmarkRun) -> list[NodeMetrics]:
         """Load node metrics for a BenchmarkRun.

@@ -342,7 +342,8 @@ class ParserTestHarness:
             assert field in results, f"Missing expected field: {field}"
             value = results[field]
             # Check it's not None and if it's a list, check it's not empty
-            assert value is not None or value == [], f"Field {field} is None"
+            assert value is not None and (not isinstance(value, list) or len(value) > 0), \
+                f"Field {field} is None or empty list"
 
     @staticmethod
     def assert_valid_node_metrics(node_metrics, min_batches: int = 0):

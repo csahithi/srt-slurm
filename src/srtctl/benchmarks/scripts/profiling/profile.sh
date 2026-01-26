@@ -131,14 +131,35 @@ if [[ "${PROFILING_MODE}" == "prefill" ]]; then
     echo ""
     echo "Generating profiling traffic..."
     
-    command="python3 -m sglang.bench_serving --backend sglang --model ${model_name} --host ${head_node} --port ${head_port} --dataset-name random --max-concurrency ${PROFILE_CONCURRENCY} --num-prompts 128 --random-input-len ${PROFILE_ISL} --random-output-len ${PROFILE_OSL} --random-range-ratio 1 --warmup-request 0"
-    echo "[CMD] $command"
-    eval "$command"
+    cmd=(
+        python3 -m sglang.bench_serving
+        --backend sglang
+        --model "${model_name}"
+        --host "${head_node}"
+        --port "${head_port}"
+        --dataset-name random
+        --max-concurrency "${PROFILE_CONCURRENCY}"
+        --num-prompts 128
+        --random-input-len "${PROFILE_ISL}"
+        --random-output-len "${PROFILE_OSL}"
+        --random-range-ratio 1
+        --warmup-request 0
+    )
+    printf "[CMD] %s\n" "${cmd[*]}"
+    "${cmd[@]}"
 
     # Run lm-eval for additional profiling coverage
-    command="python -m lm_eval --model local-completions --tasks gsm8k --model_args \"base_url=http://${head_node}:${head_port}/v1/completions,model=${model_name},tokenized_requests=False,tokenizer_backend=None,num_concurrent=${PROFILE_CONCURRENCY},timeout=6000,max_retries=1\" --limit 10"
-    echo "[CMD-LM-EVAL] $command"
-    eval "$command"
+    # Note: model_args must be a single array element to prevent splitting
+    model_args="base_url=http://${head_node}:${head_port}/v1/completions,model=${model_name},tokenized_requests=False,tokenizer_backend=None,num_concurrent=${PROFILE_CONCURRENCY},timeout=6000,max_retries=1"
+    lm_cmd=(
+        python -m lm_eval
+        --model local-completions
+        --tasks gsm8k
+        --model_args "${model_args}"
+        --limit 10
+    )
+    printf "[CMD-LM-EVAL] %s\n" "${lm_cmd[*]}"
+    "${lm_cmd[@]}"
 fi
 
 exit_code=$?

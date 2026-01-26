@@ -1,0 +1,1091 @@
+{
+  "metadata": {
+    "job_id": "4405566",
+    "job_name": "disagg-kv-dynamo",
+    "run_date": "2025-12-30 07:45:37",
+    "mode": "disaggregated",
+    "container": "/lustre/fsw/coreai_tritoninference_triton3/idhanani/lmsysorg+sglang+v0.5.6.post2.sqsh",
+    "prefill_nodes": 2,
+    "decode_nodes": 0,
+    "prefill_workers": 6,
+    "decode_workers": 2,
+    "model_dir": "/lustre/fsw/coreai_tritoninference_triton3/idhanani/qwen32b",
+    "gpus_per_node": 8,
+    "gpu_type": "h100",
+    "partition": ""
+  },
+  "profiler_metadata": {
+    "profiler_type": "mooncake-router",
+    "isl": "None",
+    "osl": "None",
+    "concurrencies": ""
+  },
+  "profiler_results": {
+    "output_tps": [
+      1150.9244871905873
+    ],
+    "request_throughput": [
+      3.372979548010381
+    ],
+    "concurrency_values": [
+      0
+    ],
+    "mean_ttft_ms": [
+      40618.77639945425
+    ],
+    "mean_tpot_ms": [
+      23.95447833171341
+    ],
+    "mean_itl_ms": [
+      23.95447833171341
+    ],
+    "mean_e2el_ms": [
+      48790.48244293251
+    ],
+    "p99_ttft_ms": [
+      90226.47291000008
+    ],
+    "median_ttft_ms": [
+      43941.271566999996
+    ],
+    "total_input_tokens": [
+      null
+    ],
+    "total_output_tokens": [
+      null
+    ],
+    "total_tps": [
+      null
+    ],
+    "request_goodput": [
+      null
+    ]
+  },
+  "benchmark_command": null,
+  "node_metrics": [
+    {
+      "metadata": {
+        "node_name": "eos0219",
+        "worker_type": "prefill",
+        "worker_id": "w0"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "2025-12-30T15:52:33.006497Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 2,
+          "new_token": 1152,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:36.982941Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.574408Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.725257Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.753706Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        }
+      ],
+      "total_batches": 3455,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "2025-12-30T15:49:50.419744Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:50.419758Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:51.513673Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:51.514008Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:51:35.770502Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 46.94,
+          "mem_usage_gb": 30.64,
+          "kv_cache_gb": null
+        }
+      ],
+      "total_memory_snapshots": 8
+    },
+    {
+      "metadata": {
+        "node_name": "eos0219",
+        "worker_type": "prefill",
+        "worker_id": "w1"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "2025-12-30T15:52:33.012601Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:36.927954Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.723525Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 2,
+          "new_token": 1152,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:22.456717Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 7360,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:25.404620Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 6848,
+          "cached_token": 512,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        }
+      ],
+      "total_batches": 3517,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "2025-12-30T15:49:54.916394Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:54.916394Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:55.991768Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:55.992136Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:51:35.967407Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 46.94,
+          "mem_usage_gb": 30.64,
+          "kv_cache_gb": null
+        }
+      ],
+      "total_memory_snapshots": 8
+    },
+    {
+      "metadata": {
+        "node_name": "eos0219",
+        "worker_type": "prefill",
+        "worker_id": "w2"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "2025-12-30T15:52:32.929926Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:36.762916Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.705654Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:22.527700Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 7296,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:25.340856Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 5824,
+          "cached_token": 512,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        }
+      ],
+      "total_batches": 3464,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "2025-12-30T15:49:47.416555Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:47.416798Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:48.628013Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:48.628441Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:51:35.967487Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 46.94,
+          "mem_usage_gb": 30.64,
+          "kv_cache_gb": null
+        }
+      ],
+      "total_memory_snapshots": 8
+    },
+    {
+      "metadata": {
+        "node_name": "eos0219",
+        "worker_type": "prefill",
+        "worker_id": "w3"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "2025-12-30T15:52:33.005841Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.733732Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:22.527290Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 6784,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:23.473058Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 8192,
+          "cached_token": 512,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:23.628404Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 8192,
+          "cached_token": 0,
+          "token_usage": 0.03,
+          "running_req": 0,
+          "queue_req": 0
+        }
+      ],
+      "total_batches": 3532,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "2025-12-30T15:49:58.600285Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:58.600316Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:59.729690Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:59.730974Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:51:35.824848Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 46.94,
+          "mem_usage_gb": 30.64,
+          "kv_cache_gb": null
+        }
+      ],
+      "total_memory_snapshots": 8
+    },
+    {
+      "metadata": {
+        "node_name": "eos0222",
+        "worker_type": "decode",
+        "worker_id": "w0"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "2025-12-30T15:52:38.206058Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:38.803501Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.402332Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:40.163757Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:40.761164Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        }
+      ],
+      "total_batches": 3846,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "2025-12-30T15:49:57.308943Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:57.308953Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:58.370263Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:58.370400Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:51:46.420882Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 46.94,
+          "mem_usage_gb": 30.64,
+          "kv_cache_gb": null
+        }
+      ],
+      "total_memory_snapshots": 12
+    },
+    {
+      "metadata": {
+        "node_name": "eos0222",
+        "worker_type": "decode",
+        "worker_id": "w1"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "2025-12-30T15:52:37.722171Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:38.341097Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:38.931990Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.599897Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:40.187303Z",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": 0.01,
+          "running_req": 5,
+          "queue_req": 0
+        }
+      ],
+      "total_batches": 3864,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "2025-12-30T15:49:52.655883Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:52.656957Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:53.708240Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:53.711032Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:51:46.134369Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 46.94,
+          "mem_usage_gb": 30.64,
+          "kv_cache_gb": null
+        }
+      ],
+      "total_memory_snapshots": 12
+    },
+    {
+      "metadata": {
+        "node_name": "eos0222",
+        "worker_type": "prefill",
+        "worker_id": "w4"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "2025-12-30T15:52:32.923440Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.722934Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:22.456085Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 6784,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:23.846651Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 8192,
+          "cached_token": 512,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:24.000062Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 8192,
+          "cached_token": 0,
+          "token_usage": 0.03,
+          "running_req": 0,
+          "queue_req": 0
+        }
+      ],
+      "total_batches": 3414,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "2025-12-30T15:49:54.137445Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:54.139498Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:55.197554Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:55.197829Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:51:46.171554Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 46.94,
+          "mem_usage_gb": 30.64,
+          "kv_cache_gb": null
+        }
+      ],
+      "total_memory_snapshots": 8
+    },
+    {
+      "metadata": {
+        "node_name": "eos0222",
+        "worker_type": "prefill",
+        "worker_id": "w5"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "2025-12-30T15:52:33.012108Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.103041Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:52:39.719468Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 576,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:22.380331Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 2304,
+          "cached_token": 0,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        },
+        {
+          "timestamp": "2025-12-30T15:53:22.779594Z",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": 1,
+          "new_token": 8192,
+          "cached_token": 512,
+          "token_usage": 0.0,
+          "running_req": 0,
+          "queue_req": 0
+        }
+      ],
+      "total_batches": 3553,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "2025-12-30T15:49:54.770786Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:54.770827Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": 1.01,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:55.885527Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:49:55.886845Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 77.58,
+          "mem_usage_gb": null,
+          "kv_cache_gb": null
+        },
+        {
+          "timestamp": "2025-12-30T15:51:46.420708Z",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 46.94,
+          "mem_usage_gb": 30.64,
+          "kv_cache_gb": null
+        }
+      ],
+      "total_memory_snapshots": 8
+    }
+  ]
+}

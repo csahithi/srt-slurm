@@ -1,0 +1,963 @@
+{
+  "metadata": {
+    "job_id": "553",
+    "job_name": "ctx2_gen5_tep8_batch128_eplb0_mtp0",
+    "run_date": "2026-01-15 07:14:56",
+    "mode": "disaggregated",
+    "container": "/home/nlevin/containers/jwillthomson_dynamo-0.8.0_trtllm-1.2.0rc6-post1-router-patch-x86.sqsh",
+    "prefill_nodes": 2,
+    "decode_nodes": 5,
+    "prefill_workers": 2,
+    "decode_workers": 5,
+    "model_dir": "/models/dsr1-fp8/",
+    "gpus_per_node": 8,
+    "gpu_type": "h200",
+    "partition": ""
+  },
+  "profiler_metadata": {
+    "profiler_type": "sa-bench",
+    "isl": "8192",
+    "osl": "1024",
+    "concurrencies": ""
+  },
+  "profiler_results": {
+    "output_tps": [
+      1748.0954656979873
+    ],
+    "request_throughput": [
+      1.9035306394778506
+    ],
+    "concurrency_values": [
+      32
+    ],
+    "mean_ttft_ms": [
+      895.2331849702091
+    ],
+    "mean_tpot_ms": [
+      16.621064921028896
+    ],
+    "mean_itl_ms": [
+      1573.2346725090367
+    ],
+    "mean_e2el_ms": [
+      16142.089245179704
+    ],
+    "p99_ttft_ms": [
+      5329.597819654006
+    ],
+    "median_ttft_ms": [
+      487.5694230067893
+    ],
+    "total_input_tokens": [
+      1885733
+    ],
+    "total_output_tokens": [
+      235096
+    ],
+    "total_tps": [
+      15769.777275754572
+    ],
+    "request_goodput": [
+      null
+    ]
+  },
+  "benchmark_command": null,
+  "node_metrics": [
+    {
+      "metadata": {
+        "node_name": "worker-0",
+        "worker_type": "prefill",
+        "worker_id": "w0"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "01/15/2026-07:52:14",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 16462,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 2,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:52:44",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 2,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:05",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 6,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 7237,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 15157,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 2,
+          "queue_req": null
+        }
+      ],
+      "total_batches": 145,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "01/15/2026-07:52:44",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 42.64,
+          "mem_usage_gb": 97.17,
+          "kv_cache_gb": 36.71
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.54
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.54
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.54
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.54
+        }
+      ],
+      "total_memory_snapshots": 17
+    },
+    {
+      "metadata": {
+        "node_name": "worker-10",
+        "worker_type": "decode",
+        "worker_id": "w1"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:56",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:51:56",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:28",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:28",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:28",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        }
+      ],
+      "total_batches": 10483,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:56",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 49.769999999999996,
+          "mem_usage_gb": 90.04,
+          "kv_cache_gb": 42.31
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        }
+      ],
+      "total_memory_snapshots": 17
+    },
+    {
+      "metadata": {
+        "node_name": "worker-13",
+        "worker_type": "decode",
+        "worker_id": "w0"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:58",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:51:58",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        }
+      ],
+      "total_batches": 10169,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:59",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 49.769999999999996,
+          "mem_usage_gb": 90.04,
+          "kv_cache_gb": 42.31
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        }
+      ],
+      "total_memory_snapshots": 17
+    },
+    {
+      "metadata": {
+        "node_name": "worker-3",
+        "worker_type": "prefill",
+        "worker_id": "w1"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "01/15/2026-07:52:02",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 16462,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 2,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:52:31",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 2,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:17",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 7237,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:28",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 7016,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 14902,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 2,
+          "queue_req": null
+        }
+      ],
+      "total_batches": 139,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "01/15/2026-07:52:31",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 42.64,
+          "mem_usage_gb": 97.17,
+          "kv_cache_gb": 36.71
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.54
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.54
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.54
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.54
+        }
+      ],
+      "total_memory_snapshots": 17
+    },
+    {
+      "metadata": {
+        "node_name": "worker-4",
+        "worker_type": "decode",
+        "worker_id": "w4"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:58",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:51:58",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        }
+      ],
+      "total_batches": 10395,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:58",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 49.769999999999996,
+          "mem_usage_gb": 90.04,
+          "kv_cache_gb": 42.31
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        }
+      ],
+      "total_memory_snapshots": 17
+    },
+    {
+      "metadata": {
+        "node_name": "worker-6",
+        "worker_type": "decode",
+        "worker_id": "w2"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:55",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:51:55",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:05",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:05",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:05",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        }
+      ],
+      "total_batches": 12129,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:55",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 49.769999999999996,
+          "mem_usage_gb": 90.04,
+          "kv_cache_gb": 42.31
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        }
+      ],
+      "total_memory_snapshots": 17
+    },
+    {
+      "metadata": {
+        "node_name": "worker-7",
+        "worker_type": "decode",
+        "worker_id": "w3"
+      },
+      "batches_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:55",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:51:55",
+          "batch_type": "prefill",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": 128,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 0,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        },
+        {
+          "timestamp": "01/15/2026-07:53:29",
+          "batch_type": "decode",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "new_seq": null,
+          "new_token": null,
+          "cached_token": null,
+          "token_usage": null,
+          "running_req": 1,
+          "queue_req": null
+        }
+      ],
+      "total_batches": 10415,
+      "memory_snapshots_sample": [
+        {
+          "timestamp": "01/15/2026-07:51:55",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": 49.769999999999996,
+          "mem_usage_gb": 90.04,
+          "kv_cache_gb": 42.31
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        },
+        {
+          "timestamp": "",
+          "dp": 0,
+          "tp": 0,
+          "ep": 0,
+          "metric_type": "memory",
+          "avail_mem_gb": null,
+          "mem_usage_gb": null,
+          "kv_cache_gb": 0.01
+        }
+      ],
+      "total_memory_snapshots": 17
+    }
+  ]
+}

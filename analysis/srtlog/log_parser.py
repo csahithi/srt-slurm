@@ -66,9 +66,10 @@ class NodeAnalyzer:
             return []
 
         # Get appropriate parser
-        parser = get_node_parser(backend_type)
-        if not parser:
-            logger.warning(f"No parser registered for backend '{backend_type}'")
+        try:
+            parser = get_node_parser(backend_type)
+        except ValueError as e:
+            logger.warning(f"No parser registered for backend '{backend_type}': {e}")
             return []
 
         # Use parser to parse logs directory

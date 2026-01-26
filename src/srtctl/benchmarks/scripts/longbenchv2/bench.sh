@@ -27,20 +27,28 @@ export OPENAI_API_KEY="${OPENAI_API_KEY:-EMPTY}"
 
 echo "Running LongBench-v2 evaluation..."
 
-# Build command
-command="python3 -m sglang.test.run_eval --base-url ${ENDPOINT} --model ${MODEL_NAME} --eval-name longbench_v2 --max-tokens ${MAX_TOKENS} --max-context-length ${MAX_CONTEXT_LENGTH} --num-threads ${NUM_THREADS}"
+# Build command array
+cmd=(
+    python3 -m sglang.test.run_eval
+    --base-url "$ENDPOINT"
+    --model "$MODEL_NAME"
+    --eval-name longbench_v2
+    --max-tokens "$MAX_TOKENS"
+    --max-context-length "$MAX_CONTEXT_LENGTH"
+    --num-threads "$NUM_THREADS"
+)
 
 # Add optional arguments
 if [ -n "$NUM_EXAMPLES" ]; then
-    command="$command --num-examples ${NUM_EXAMPLES}"
+    cmd+=(--num-examples "$NUM_EXAMPLES")
 fi
 
 if [ -n "$CATEGORIES" ]; then
-    command="$command --categories ${CATEGORIES}"
+    cmd+=(--categories "$CATEGORIES")
 fi
 
-echo "[CMD] $command"
-eval "$command"
+printf "[CMD] %s\n" "${cmd[*]}"
+"${cmd[@]}"
 
 # Copy result files
 result_file=$(ls -t /tmp/longbench_v2_*.json 2>/dev/null | head -n1)
