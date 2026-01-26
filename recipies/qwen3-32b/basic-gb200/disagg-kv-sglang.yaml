@@ -47,7 +47,6 @@ backend:
   sglang_config:
     prefill:
       served-model-name: "Qwen/Qwen3-32B"
-      model-path: "/model/"
       trust-remote-code: true
       tensor-parallel-size: 2
       disaggregation-mode: "prefill"
@@ -60,7 +59,6 @@ backend:
 
     decode:
       served-model-name: "Qwen/Qwen3-32B"
-      model-path: "/model/"
       trust-remote-code: true
       tensor-parallel-size: 2
       disaggregation-mode: "decode"

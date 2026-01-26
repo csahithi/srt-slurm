@@ -72,7 +72,6 @@ backend:
       expert-parallel-size: 4
       kv-cache-dtype: fp8_e4m3
       mem-fraction-static: 0.95
-      model-path: /model/
       moe-dense-tp-size: 1
       moe-runner-backend: flashinfer_trtllm
       prefill-round-robin-balance: true
@@ -98,7 +97,6 @@ backend:
       load-balance-method: round_robin
       max-running-requests: 8
       mem-fraction-static: 0.8
-      model-path: /model/
       moe-dense-tp-size: 1
       moe-runner-backend: flashinfer_trtllm
       pipeline-parallel-size: 4

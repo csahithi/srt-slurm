@@ -1,39 +1,83 @@
 # Example cluster configuration (srtslurm.yaml)
 # Copy this to srtslurm.yaml and customize for your cluster
 # This file is gitignored to keep cluster-specific settings private
+#
+# Discovery: srtctl searches for this file in:
+#   1. Current working directory
+#   2. Parent directories (up to 3 levels)
 
-# SLURM defaults
+# ============================================================================
+# SLURM Defaults
+# ============================================================================
 default_account: "your-gpu-account"
 default_partition: "gpu"
 default_time_limit: "04:00:00"
 
 # SLURM directive compatibility
-# Set to false if your cluster doesn't support --gpus-per-node
-use_gpus_per_node_directive: true  # Default: true
-# Set to false if your cluster doesn't support --segment for segment-based scheduling
-use_segment_sbatch_directive: true  # Default: true
-# Set to true if your cluster requires --exclusive to be set.
-use_exclusive_sbatch_directive: false # Default: false
-# Container registry
+use_gpus_per_node_directive: true   # Set false if cluster doesn't support --gpus-per-node
+use_segment_sbatch_directive: true  # Set false if cluster doesn't support --segment
+use_exclusive_sbatch_directive: false  # Set true if cluster requires --exclusive
+
+# ============================================================================
+# Paths and Outputs
+# ============================================================================
+
+# srtctl_root: Where srtctl repo is located (used to find configs/, compute output paths)
+# If not set, srtctl uses its installed package location
+srtctl_root: "/path/to/srt-slurm"
+
+# output_dir: Custom output directory (default: {srtctl_root}/outputs)
+# Useful for teams who want outputs in a shared NFS location
+# output_dir: "/lustre/my-team/srtctl-outputs"
+
+# ============================================================================
+# Container Mounts
+# ============================================================================
+# default_mounts: Cluster-wide mounts added to all containers
+# These are in addition to automatic mounts:
+#   - model.path -> /model/       (your model directory)
+#   - {log_dir} -> /logs/         (job logs)
+#   - {srtctl_root}/configs -> /configs/  (config files like deepep_config.json)
+#
+# Example: Mount entire NFS so HF cache paths work inside containers:
+# default_mounts:
+#   "/lustre": "/lustre"
+#
+# Example: Mount specific HF cache:
+# default_mounts:
+#   "$HF_HOME": "$HF_HOME"
+
+# ============================================================================
+# Container Registry (aliases)
+# ============================================================================
 default_container: "/shared/containers/sglang-latest.sqsh"
 containers:
   sglang-latest: "/shared/containers/sglang-v0.4.sqsh"
   sglang-dev: "/shared/containers/sglang-dev.sqsh"
   sglang-fp4: "/shared/containers/sglang-fp4.sqsh"
 
-# Model path aliases
+# ============================================================================
+# Model Path Aliases
+# ============================================================================
 model_paths:
   deepseek-r1: "/shared/models/deepseek/DeepSeek-R1"
   deepseek-r1-distill: "/shared/models/deepseek/DeepSeek-R1-Distill-Qwen-32B"
   llama-3-70b: "/shared/models/meta/llama-3-70b"
   llama-3-405b: "/shared/models/meta/llama-3-405b"
 
-# Usage:
-# In your job config, you can now use:
+# ============================================================================
+# Usage Examples
+# ============================================================================
+# In your job config, you can use aliases:
 #   model:
 #     path: "deepseek-r1"         # Resolves to /shared/models/deepseek/DeepSeek-R1
 #     container: "sglang-fp4"     # Resolves to /shared/containers/sglang-fp4.sqsh
 #
-# And you can omit SLURM fields:
+# Or absolute paths:
+#   model:
+#     path: "/lustre/user/models/my-model"
+#     container: "nvcr.io/nvidia/pytorch:24.01"
+#
+# Omit SLURM fields to use defaults:
 #   slurm:
 #     time_limit: "02:00:00"      # account and partition filled from defaults

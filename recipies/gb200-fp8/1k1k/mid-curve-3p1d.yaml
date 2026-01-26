@@ -58,7 +58,6 @@ backend:
     prefill:
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       skip-tokenizer-init: true
       trust-remote-code: true
 
@@ -110,7 +109,6 @@ backend:
     decode:
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       skip-tokenizer-init: true
       trust-remote-code: true
 

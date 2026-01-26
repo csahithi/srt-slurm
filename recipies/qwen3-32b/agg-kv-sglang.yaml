@@ -24,7 +24,6 @@ backend:
   sglang_config:
     aggregated:
       served-model-name: "Qwen/Qwen3-32B"
-      model-path: "/model/"
       trust-remote-code: true
       tensor-parallel-size: 2
       mem-fraction-static: 0.90
