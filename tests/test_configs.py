@@ -456,12 +456,11 @@ class TestWorkerEnvironmentTemplating:
 
                     # Create a mock worker stage
                     class MockWorkerStage(WorkerStageMixin):
-                        def __init__(self, config, backend, runtime):
+                        def __init__(self, config, runtime):
                             self.config = config
-                            self.backend = backend
                             self.runtime = runtime
 
-                    worker_stage = MockWorkerStage(config, config.backend, runtime)
+                    worker_stage = MockWorkerStage(config, runtime)
 
                     # Create test processes on different nodes
                     processes = [
@@ -496,7 +495,7 @@ class TestWorkerEnvironmentTemplating:
 
                     # Mock the backend command builder and srun process
                     with patch.object(
-                        worker_stage.backend,
+                        config.backend,
                         "build_worker_command",
                         return_value=["echo", "test"],
                     ):
@@ -591,12 +590,11 @@ class TestWorkerEnvironmentTemplating:
                     runtime = RuntimeContext.from_config(config, job_id="12345")
 
                     class MockWorkerStage(WorkerStageMixin):
-                        def __init__(self, config, backend, runtime):
+                        def __init__(self, config, runtime):
                             self.config = config
-                            self.backend = backend
                             self.runtime = runtime
 
-                    worker_stage = MockWorkerStage(config, config.backend, runtime)
+                    worker_stage = MockWorkerStage(config, runtime)
 
                     process = Process(
                         node="gpu-01",
@@ -609,7 +607,7 @@ class TestWorkerEnvironmentTemplating:
                     )
 
                     with patch.object(
-                        worker_stage.backend,
+                        config.backend,
                         "build_worker_command",
                         return_value=["echo", "test"],
                     ):
