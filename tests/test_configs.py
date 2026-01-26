@@ -493,12 +493,15 @@ class TestWorkerEnvironmentTemplating:
                         ),
                     ]
 
-                    # Mock the backend command builder and srun process
-                    with patch.object(
-                        config.backend,
-                        "build_worker_command",
-                        return_value=["echo", "test"],
-                    ):
+                    # Mock backend command builder and srun process to capture environment variables
+                    mock_backend = MagicMock()
+                    mock_backend.get_environment_for_mode.side_effect = config.backend.get_environment_for_mode
+                    mock_backend.build_worker_command.return_value = ["echo", "test"]
+                    
+                    with patch.object(worker_stage, 'config') as mock_config:
+                        mock_config.backend = mock_backend
+                        mock_config.profiling = config.profiling
+                        
                         with patch("srtctl.cli.mixins.worker_stage.start_srun_process") as mock_srun:
                             mock_srun.return_value = MagicMock()
 
@@ -606,11 +609,15 @@ class TestWorkerEnvironmentTemplating:
                         node_rank=0,
                     )
 
-                    with patch.object(
-                        config.backend,
-                        "build_worker_command",
-                        return_value=["echo", "test"],
-                    ):
+                    # Mock backend command builder and srun process to capture environment variables
+                    mock_backend = MagicMock()
+                    mock_backend.get_environment_for_mode.side_effect = config.backend.get_environment_for_mode
+                    mock_backend.build_worker_command.return_value = ["echo", "test"]
+                    
+                    with patch.object(worker_stage, 'config') as mock_config:
+                        mock_config.backend = mock_backend
+                        mock_config.profiling = config.profiling
+                        
                         with patch("srtctl.cli.mixins.worker_stage.start_srun_process") as mock_srun:
                             mock_srun.return_value = MagicMock()
 
