@@ -241,13 +241,15 @@ class SGLangProtocol:
         # Start with nsys prefix if provided
         cmd: list[str] = list(nsys_prefix) if nsys_prefix else []
 
+        # Use container path /model since model is mounted there (see runtime.py)
+        # Note: runtime.model_path is the HOST path, not usable inside container
         cmd.extend(
             [
                 "python3",
                 "-m",
                 python_module,
                 "--model-path",
-                str(runtime.model_path),
+                "/model",
                 "--served-model-name",
                 served_model_name,
                 "--host",
