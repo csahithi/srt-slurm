@@ -859,6 +859,15 @@ environment:
 | ------ | ------ | -------------------------------- |
 | string | string | Environment variable name=value  |
 
+### Per-Worker Template Variables
+
+Environment variable values support per-worker templating with these placeholders:
+
+| Placeholder | Description                                    | Example      |
+| ----------- | ---------------------------------------------- | ------------ |
+| `{node}`    | Hostname of the node where the worker runs     | `"gpu-01"`   |
+| `{node_id}` | Numeric index of the node in worker list (0-based) | `0`, `1`, `2` |
+
 **Note**: For per-worker-mode environment variables, use `backend.prefill_environment`, `backend.decode_environment`, or `backend.aggregated_environment`.
 
 ---
