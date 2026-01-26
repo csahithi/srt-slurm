@@ -118,14 +118,21 @@ class WorkerStageMixin:
 
         # Add mode-specific environment variables from backend
         # Support simple {node} and {node_id} templating
+        # Unknown placeholders are left unchanged (no error thrown)
         node_id = self.runtime.nodes.worker.index(process.node)
+        template_vars = {"node": process.node, "node_id": node_id}
+        
+        class SafeDict(dict):
+            def __missing__(self, key: str) -> str:
+                return "{" + key + "}"  # Leave unknown placeholders unchanged
+        
         for key, value in self.backend.get_environment_for_mode(mode).items():
-            formatted_value = value.format(node=process.node, node_id=node_id)
+            formatted_value = value.format_map(SafeDict(template_vars))
             env_to_set[key] = formatted_value
 
         # Add config environment variables with same templating support
         for key, value in self.runtime.environment.items():
-            formatted_value = value.format(node=process.node, node_id=node_id)
+            formatted_value = value.format_map(SafeDict(template_vars))
             env_to_set[key] = formatted_value
 
 
