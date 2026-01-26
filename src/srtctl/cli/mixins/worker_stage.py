@@ -117,10 +117,17 @@ class WorkerStageMixin:
         }
 
         # Add mode-specific environment variables from backend
-        env_to_set.update(self.backend.get_environment_for_mode(mode))
+        # Support simple {node} and {node_id} templating
+        node_id = self.runtime.nodes.worker.index(process.node)
+        for key, value in self.backend.get_environment_for_mode(mode).items():
+            formatted_value = value.format(node=process.node, node_id=node_id)
+            env_to_set[key] = formatted_value
 
-        # Add config environment variables
-        env_to_set.update(self.runtime.environment)
+        # Add config environment variables with same templating support
+        for key, value in self.runtime.environment.items():
+            formatted_value = value.format(node=process.node, node_id=node_id)
+            env_to_set[key] = formatted_value
+
 
         # Add profiling environment variables
         if profiling.enabled:
