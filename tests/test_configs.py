@@ -388,7 +388,7 @@ class TestSetupScript:
 class TestWorkerEnvironmentTemplating:
     """Tests for per-worker environment variable templating with {node} and {node_id}."""
 
-    def test_environment_variable_node_templating(self, monkeypatch):
+    def test_environment_variable_node_templating(self, monkeypatch, tmp_path):
         """Test that environment variables support {node} and {node_id} templating."""
         import os
         import subprocess
@@ -400,6 +400,12 @@ class TestWorkerEnvironmentTemplating:
         from srtctl.core.runtime import RuntimeContext
         from srtctl.core.schema import ModelConfig, ResourceConfig, SrtConfig
         from srtctl.core.topology import Process
+
+        # Create temporary model and container paths
+        model_path = tmp_path / "model"
+        model_path.mkdir()
+        container_path = tmp_path / "container.sqsh"
+        container_path.touch()
 
         # Mock SLURM environment
         slurm_env = {
@@ -425,8 +431,8 @@ class TestWorkerEnvironmentTemplating:
                     config = SrtConfig(
                         name="test",
                         model=ModelConfig(
-                            path="/model",
-                            container="/container.sqsh",
+                            path=str(model_path),
+                            container=str(container_path),
                             precision="fp8",
                         ),
                         resources=ResourceConfig(
@@ -520,7 +526,7 @@ class TestWorkerEnvironmentTemplating:
 
                             assert env_vars["SGLANG_DG_CACHE_DIR"] == "/configs/dg-2"
 
-    def test_environment_variable_unsupported_placeholder(self, monkeypatch):
+    def test_environment_variable_unsupported_placeholder(self, monkeypatch, tmp_path):
         """Test that unsupported placeholders like {foo} remain unchanged and don't throw errors."""
         import os
         import subprocess
@@ -532,6 +538,12 @@ class TestWorkerEnvironmentTemplating:
         from srtctl.core.runtime import RuntimeContext
         from srtctl.core.schema import ModelConfig, ResourceConfig, SrtConfig
         from srtctl.core.topology import Process
+
+        # Create temporary model and container paths
+        model_path = tmp_path / "model"
+        model_path.mkdir()
+        container_path = tmp_path / "container.sqsh"
+        container_path.touch()
 
         slurm_env = {
             "SLURM_JOB_ID": "12345",
@@ -556,8 +568,8 @@ class TestWorkerEnvironmentTemplating:
                     config = SrtConfig(
                         name="test",
                         model=ModelConfig(
-                            path="/model",
-                            container="/container.sqsh",
+                            path=str(model_path),
+                            container=str(container_path),
                             precision="fp8",
                         ),
                         resources=ResourceConfig(
