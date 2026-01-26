@@ -1,7 +1,8 @@
 import builtins
+from collections.abc import Sequence
 from dataclasses import field
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 import yaml
 from marshmallow import Schema
@@ -50,7 +51,7 @@ class TRTLLMProtocol:
     """
 
     type: Literal["trtllm"] = "trtllm"
-    
+
     prefill_environment: dict[str, str] = field(default_factory=dict)
     decode_environment: dict[str, str] = field(default_factory=dict)
 
@@ -82,7 +83,7 @@ class TRTLLMProtocol:
         elif mode == "decode":
             return dict(self.trtllm_config.decode or {})
         elif mode == "agg":
-            raise ValueError(f"Aggregated mode is not supported for TRTLLM")
+            raise ValueError("Aggregated mode is not supported for TRTLLM")
         return {}
 
     def get_environment_for_mode(self, mode: WorkerMode) -> dict[str, str]:
@@ -91,9 +92,9 @@ class TRTLLMProtocol:
         elif mode == "decode":
             return dict(self.decode_environment)
         elif mode == "agg":
-            raise ValueError(f"Aggregated mode is not supported for TRTLLM")
+            raise ValueError("Aggregated mode is not supported for TRTLLM")
         return {}
-    
+
     def allocate_endpoints(
         self,
         num_prefill: int,
@@ -128,7 +129,7 @@ class TRTLLMProtocol:
         from srtctl.core.topology import endpoints_to_processes
 
         return endpoints_to_processes(endpoints, base_sys_port=base_sys_port)
-    
+
     def build_worker_command(
         self,
         process: "Process",

@@ -12,6 +12,7 @@ This module provides:
 
 import copy
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -26,28 +27,40 @@ def load_cluster_config() -> dict[str, Any] | None:
     """
     Load cluster configuration from srtslurm.yaml if it exists.
 
-    Searches for srtslurm.yaml in:
-    1. Current working directory
-    2. Parent directories up to 3 levels
+    Searches for srtslurm.yaml in order:
+    1. SRTSLURM_CONFIG environment variable (if set)
+    2. Current working directory
+    3. Parent directories up to 3 levels
 
     Returns None if file doesn't exist (graceful degradation).
     """
-    # Search paths
-    search_paths = [
-        Path.cwd() / "srtslurm.yaml",
-        Path.cwd().parent / "srtslurm.yaml",
-        Path.cwd().parent.parent / "srtslurm.yaml",
-    ]
+    # Check env var first (highest priority)
+    env_config = os.environ.get("SRTSLURM_CONFIG")
+    if env_config:
+        env_path = Path(env_config)
+        if env_path.exists():
+            cluster_config_path = env_path
+            logger.debug(f"Using srtslurm.yaml from SRTSLURM_CONFIG: {cluster_config_path}")
+        else:
+            logger.warning(f"SRTSLURM_CONFIG set but file not found: {env_config}")
+            return None
+    else:
+        # Search paths
+        search_paths = [
+            Path.cwd() / "srtslurm.yaml",
+            Path.cwd().parent / "srtslurm.yaml",
+            Path.cwd().parent.parent / "srtslurm.yaml",
+        ]
 
-    cluster_config_path = None
-    for path in search_paths:
-        if path.exists():
-            cluster_config_path = path
-            break
+        cluster_config_path = None
+        for path in search_paths:
+            if path.exists():
+                cluster_config_path = path
+                break
 
-    if not cluster_config_path:
-        logger.debug("No srtslurm.yaml found - using config as-is")
-        return None
+        if not cluster_config_path:
+            logger.debug("No srtslurm.yaml found - using config as-is")
+            return None
 
     try:
         with open(cluster_config_path) as f:

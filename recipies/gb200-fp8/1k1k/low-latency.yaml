@@ -55,7 +55,6 @@ backend:
   sglang_config:
     prefill:
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       trust-remote-code: true
       kv-cache-dtype: "fp8_e4m3"
       attention-backend: "trtllm_mla"
@@ -82,7 +81,6 @@ backend:
 
     decode:
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       trust-remote-code: true
       kv-cache-dtype: "fp8_e4m3"
       attention-backend: "trtllm_mla"

@@ -128,7 +128,7 @@ class BackendConfigField(fields.Field):
             # Default to SGLang
             return SGLangProtocol()
 
-        if isinstance(value, (SGLangProtocol, TRTLLMProtocol)):
+        if isinstance(value, SGLangProtocol | TRTLLMProtocol):
             return value
 
         if not isinstance(value, dict):

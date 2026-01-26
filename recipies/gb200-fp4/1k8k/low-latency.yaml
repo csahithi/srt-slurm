@@ -56,7 +56,6 @@ backend:
     prefill:
       disaggregation-mode: "prefill"
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       trust-remote-code: true
       disable-radix-cache: true
       kv-cache-dtype: "fp8_e4m3"
@@ -83,7 +82,6 @@ backend:
     decode:
       disaggregation-mode: "decode"
       served-model-name: "deepseek-ai/DeepSeek-R1"
-      model-path: "/model/"
       prefill-round-robin-balance: true
       trust-remote-code: true
       disable-radix-cache: true
