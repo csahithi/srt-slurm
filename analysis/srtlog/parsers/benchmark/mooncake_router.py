@@ -30,7 +30,11 @@ class MooncakeRouterParser:
         return "mooncake-router"
 
     def parse(self, benchmark_out_path: Path) -> dict[str, Any]:
-        """Parse benchmark.out file for mooncake-router results.
+        """Parse benchmark.out file for mooncake-router results (FALLBACK method).
+        
+        This is a fallback method used when JSON result files are not available.
+        Prefer using parse_result_directory() which prioritizes JSON files.
+        
         Args:
             benchmark_out_path: Path to benchmark.out file
         Returns:
@@ -148,6 +152,10 @@ class MooncakeRouterParser:
 
     def parse_result_directory(self, result_dir: Path) -> list[dict[str, Any]]:
         """Parse AIPerf result files in a directory.
+        
+        Uses JSON files (profile_export_aiperf.json) as the primary source of truth.
+        Falls back to parsing benchmark.out only if no JSON results are found.
+        
         Args:
             result_dir: Directory containing profile_export_aiperf.json
         Returns:
@@ -155,11 +163,31 @@ class MooncakeRouterParser:
         """
         results = []
 
-        # Look for AIPerf JSON files
+        # Primary: Look for AIPerf JSON files (source of truth)
         for json_file in result_dir.rglob("profile_export_aiperf.json"):
             result = self.parse_result_json(json_file)
             if result.get("output_tps") is not None:
                 results.append(result)
+                logger.info(f"Loaded mooncake-router results from JSON: {json_file}")
+
+        # Fallback: If no JSON results found, try parsing benchmark.out
+        if not results:
+            benchmark_out = result_dir / "benchmark.out"
+            if benchmark_out.exists():
+                logger.info(f"No JSON results found in {result_dir}, falling back to benchmark.out parsing")
+                fallback_result = self.parse(benchmark_out)
+                if fallback_result.get("output_tps"):
+                    # Convert to format expected by caller
+                    results.append({
+                        "concurrency": 0,  # Mooncake doesn't track concurrency
+                        "output_tps": fallback_result.get("output_tps"),
+                        "request_throughput": fallback_result.get("request_throughput"),
+                        "mean_ttft_ms": fallback_result.get("mean_ttft_ms"),
+                        "mean_itl_ms": fallback_result.get("mean_itl_ms"),
+                        "total_requests": fallback_result.get("total_requests"),
+                    })
+            else:
+                logger.warning(f"No results found in {result_dir} (no profile_export_aiperf.json or benchmark.out)")
 
         return results
 

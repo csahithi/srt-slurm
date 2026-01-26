@@ -30,7 +30,11 @@ class SABenchParser:
         return "sa-bench"
 
     def parse(self, benchmark_out_path: Path) -> dict[str, Any]:
-        """Parse benchmark.out file for SA-Bench results.
+        """Parse benchmark.out file for SA-Bench results (FALLBACK method).
+        
+        This is a fallback method used when JSON result files are not available.
+        Prefer using parse_result_directory() which prioritizes JSON files.
+        
         Args:
             benchmark_out_path: Path to benchmark.out file
         Returns:
@@ -143,6 +147,10 @@ class SABenchParser:
 
     def parse_result_directory(self, result_dir: Path) -> list[dict[str, Any]]:
         """Parse all result JSON files in a benchmark result directory.
+        
+        Uses JSON files as the primary source of truth. Falls back to parsing
+        benchmark.out only if no JSON results are found.
+        
         Args:
             result_dir: Directory containing result_*.json files
         Returns:
@@ -150,10 +158,34 @@ class SABenchParser:
         """
         results = []
 
+        # Primary: Parse JSON result files (source of truth)
         for json_file in result_dir.glob("*.json"):
             result = self.parse_result_json(json_file)
             if result.get("max_concurrency") is not None:
                 results.append(result)
+
+        # Fallback: If no JSON results found, try parsing benchmark.out
+        if not results:
+            benchmark_out = result_dir / "benchmark.out"
+            if benchmark_out.exists():
+                logger.info(f"No JSON results found in {result_dir}, falling back to benchmark.out parsing")
+                # Parse benchmark.out and create a single result entry
+                fallback_result = self.parse(benchmark_out)
+                if fallback_result.get("output_tps"):
+                    # Wrap in list format expected by caller
+                    results.append({
+                        "max_concurrency": fallback_result.get("concurrencies", [0])[0] if fallback_result.get("concurrencies") else 0,
+                        "output_tps": fallback_result.get("output_tps"),
+                        "request_throughput": fallback_result.get("request_throughput"),
+                        "mean_ttft_ms": fallback_result.get("mean_ttft_ms"),
+                        "mean_itl_ms": fallback_result.get("mean_itl_ms"),
+                        "mean_tpot_ms": fallback_result.get("mean_tpot_ms"),
+                        "p99_ttft_ms": fallback_result.get("p99_ttft_ms"),
+                        "p99_itl_ms": fallback_result.get("p99_itl_ms"),
+                        "completed": fallback_result.get("completed_requests"),
+                    })
+            else:
+                logger.warning(f"No results found in {result_dir} (no JSON files or benchmark.out)")
 
         # Sort by concurrency
         results.sort(key=lambda x: x.get("max_concurrency", 0) or 0)

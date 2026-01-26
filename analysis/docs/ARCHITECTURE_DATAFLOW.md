@@ -91,23 +91,28 @@ This document describes the data flow through the log analysis system, from raw 
         │                                                                │
         │  SA-Bench:                    Mooncake-Router:                │
         │  📁 sa-bench_isl_*_osl_*/     📁 logs/artifacts/*/            │
-        │     result_*.json                profile_export_aiperf.json   │
+        │     result_*.json (PRIMARY)      profile_export_aiperf.json   │
+        │     benchmark.out (FALLBACK)     (PRIMARY)                    │
+        │                               📁 logs/benchmark.out           │
+        │                                  (FALLBACK)                   │
         └────────────────────────────────────────────────────────────────┘
                                          │
                                          │ parse_result_directory()
+                                         │ ⚠️ JSON files are PRIMARY source of truth
+                                         │    .out files are FALLBACK only
                                          ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          ProfilerResults                                  │
-│  Fields:                               Source Files:                      │
-│  • output_tps: list[float]             📁 result_*.json (SA-Bench)        │
-│  • request_throughput: list[float]     📁 profile_export_aiperf.json      │
-│  • concurrency_values: list[int]          (Mooncake-Router)              │
-│  • mean_ttft_ms: list[float]                                             │
-│  • mean_itl_ms: list[float]            One entry per concurrency level   │
-│  • mean_e2el_ms: list[float]                                             │
-│  • p99_ttft_ms, median_ttft_ms, ...    Aggregated from all result files  │
-│  • total_input_tokens: list[int]                                         │
-│  • total_output_tokens: list[int]                                        │
+│  Fields:                               Source Files (Priority Order):     │
+│  • output_tps: list[float]             1️⃣ 📁 result_*.json (SA-Bench)    │
+│  • request_throughput: list[float]        📁 profile_export_aiperf.json   │
+│  • concurrency_values: list[int]             (Mooncake-Router)            │
+│  • mean_ttft_ms: list[float]           2️⃣ 📁 logs/benchmark.out (fallback)│
+│  • mean_itl_ms: list[float]                                               │
+│  • mean_e2el_ms: list[float]            One entry per concurrency level   │
+│  • p99_ttft_ms, median_ttft_ms, ...                                       │
+│  • total_input_tokens: list[int]        JSON = Source of Truth ✨         │
+│  • total_output_tokens: list[int]       .out = Fallback only ⚠️           │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
