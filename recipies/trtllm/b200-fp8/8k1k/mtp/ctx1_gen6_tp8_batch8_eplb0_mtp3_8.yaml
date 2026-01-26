@@ -2,7 +2,7 @@ name: ctx1_gen6_tp8_batch8_eplb0_mtp3_8
 
 model:
   path: "dsr1-fp8"
-  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post1"
+  container: "nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post1"
   precision: "fp8"
 
 resources:
@@ -25,8 +25,8 @@ backend:
     OMPI_MCA_coll_ucc_enable: "0"
     TLLM_ALL_RANK_LOG: "1"
     TLLM_LOG_LEVEL: "INFO"
-    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_ENABLE_PDL: "1"
+    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_SERVER_DISABLE_GC: "1"
     TRTLLM_WORKER_DISABLE_GC: "1"
     UCX_CUDA_IPC_ENABLE_MNNVL: "n"
@@ -37,8 +37,8 @@ backend:
     OMPI_MCA_coll_ucc_enable: "0"
     TLLM_ALL_RANK_LOG: "1"
     TLLM_LOG_LEVEL: "INFO"
-    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_ENABLE_PDL: "1"
+    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_SERVER_DISABLE_GC: "1"
     TRTLLM_WORKER_DISABLE_GC: "1"
     UCX_CUDA_IPC_ENABLE_MNNVL: "n"

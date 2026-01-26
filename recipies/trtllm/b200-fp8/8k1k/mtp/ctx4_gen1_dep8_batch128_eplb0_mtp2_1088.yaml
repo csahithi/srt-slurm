@@ -1,18 +1,18 @@
-name: ctx1_gen4_tp8_batch16_eplb0_mtp3_96
+name: ctx4_gen1_dep8_batch128_eplb0_mtp2_1088
 
 model:
   path: "dsr1-fp8"
-  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post1"
+  container: "nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post1"
   precision: "fp8"
 
 resources:
   gpu_type: "b200"
-  prefill_nodes: 1
-  prefill_workers: 1
+  prefill_nodes: 4
+  prefill_workers: 4
   gpus_per_prefill: 8
 
-  decode_workers: 4
-  decode_nodes: 4
+  decode_workers: 1
+  decode_nodes: 1
   gpus_per_decode: 8
 
   gpus_per_node: 8
@@ -25,8 +25,8 @@ backend:
     OMPI_MCA_coll_ucc_enable: "0"
     TLLM_ALL_RANK_LOG: "1"
     TLLM_LOG_LEVEL: "INFO"
-    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_ENABLE_PDL: "1"
+    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_SERVER_DISABLE_GC: "1"
     TRTLLM_WORKER_DISABLE_GC: "1"
     UCX_CUDA_IPC_ENABLE_MNNVL: "n"
@@ -37,8 +37,8 @@ backend:
     OMPI_MCA_coll_ucc_enable: "0"
     TLLM_ALL_RANK_LOG: "1"
     TLLM_LOG_LEVEL: "INFO"
-    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_ENABLE_PDL: "1"
+    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_SERVER_DISABLE_GC: "1"
     TRTLLM_WORKER_DISABLE_GC: "1"
     UCX_CUDA_IPC_ENABLE_MNNVL: "n"
@@ -48,7 +48,7 @@ backend:
     prefill:
       allreduce_strategy: AUTO
       cache_transceiver_config:
-        backend: DEFAULT
+        backend: UCX
         max_tokens_in_buffer: 8320
       cuda_graph_config: null
       disable_overlap_scheduler: true
@@ -56,7 +56,7 @@ backend:
       kv_cache_config:
         dtype: fp8
         enable_block_reuse: false
-        free_gpu_memory_fraction: 0.2
+        free_gpu_memory_fraction: 0.4
       max_batch_size: 1
       max_num_tokens: 8320
       max_seq_len: 8320
@@ -67,37 +67,39 @@ backend:
       print_iter_log: true
       speculative_config:
         decoding_type: MTP
-        num_nextn_predict_layers: 3
+        num_nextn_predict_layers: 2
       tensor_parallel_size: 8
 
 
     decode:
       allreduce_strategy: AUTO
       attention_dp_config:
+        batching_wait_iters: 0
         enable_balance: true
+        timeout_iters: 60
       cache_transceiver_config:
-        backend: DEFAULT
+        backend: UCX
         max_tokens_in_buffer: 8320
       cuda_graph_config:
         enable_padding: true
-        max_batch_size: 16
+        max_batch_size: 128
       disable_overlap_scheduler: false
-      enable_attention_dp: false
+      enable_attention_dp: true
       kv_cache_config:
         dtype: fp8
         enable_block_reuse: false
         free_gpu_memory_fraction: 0.8
-      max_batch_size: 16
-      max_num_tokens: 64
+      max_batch_size: 128
+      max_num_tokens: 3072
       max_seq_len: 9344
       moe_config:
-        backend: TRTLLM
-      moe_expert_parallel_size: 1
+        backend: DEEPGEMM
+      moe_expert_parallel_size: 8
       pipeline_parallel_size: 1
       print_iter_log: true
       speculative_config:
         decoding_type: MTP
-        num_nextn_predict_layers: 3
+        num_nextn_predict_layers: 2
       stream_interval: 20
       tensor_parallel_size: 8
 
@@ -106,7 +108,7 @@ benchmark:
   type: "sa-bench"
   isl: 8192
   osl: 1024
-  concurrencies: [96]
+  concurrencies: [1088]
   req_rate: "inf"
 
 frontend:
