@@ -2,7 +2,7 @@ name: ctx1_gen1_dep8_batch768_eplb0_mtp0_6144
 
 model:
   path: "dsr1-fp8"
-  container: "jwillthomson/dynamo-0.8.1.post2-test"
+  container: "dynamo-trtllm"
   precision: "fp8"
 
 resources:

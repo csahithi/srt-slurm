@@ -2,7 +2,7 @@ name: ctx2_gen1_dep16_batch128_eplb0_mtp0_2253
 
 model:
   path: "dsr1-fp8"
-  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post1"
+  container: "dynamo-trtllm"
   precision: "fp8"
 
 resources:
