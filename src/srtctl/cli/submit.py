@@ -250,6 +250,7 @@ def submit_with_orchestrator(
             job_name=config.name,
             cluster=get_srtslurm_setting("cluster"),
             recipe=str(config_path),
+            tags=tags,
             metadata=metadata,
         )
 
