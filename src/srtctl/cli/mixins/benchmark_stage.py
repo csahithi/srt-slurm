@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from srtctl.core.health import wait_for_model
 from srtctl.core.slurm import get_hostname_ip, start_srun_process
+from srtctl.core.status import JobStage, JobStatus, StatusReporter
 
 if TYPE_CHECKING:
     from srtctl.benchmarks.base import BenchmarkRunner
@@ -45,9 +46,11 @@ class BenchmarkStageMixin:
         """Endpoint allocation topology."""
         ...
 
-    def run_benchmark(self, registry: "ProcessRegistry", stop_event: threading.Event) -> int:
+    def run_benchmark(
+        self, registry: "ProcessRegistry", stop_event: threading.Event, reporter: StatusReporter | None = None
+    ) -> int:
         """Run the benchmark."""
-        logger.info("Running benchmark")
+        logger.info("Waiting for workers to be ready...")
 
         r = self.config.resources
         num_workers = r.num_prefill + r.num_decode + r.num_agg
@@ -79,9 +82,13 @@ class BenchmarkStageMixin:
             stop_event=stop_event,
         ):
             logger.error("Server did not become healthy")
+            if reporter:
+                reporter.report(JobStatus.FAILED, JobStage.BENCHMARK, "Workers failed health check")
             return 1
 
-        logger.info("Server is healthy")
+        logger.info("Server is healthy - starting benchmark")
+        if reporter:
+            reporter.report(JobStatus.BENCHMARK, JobStage.BENCHMARK, "Running benchmark")
 
         # Auto-select profiling benchmark when profiling is enabled
         benchmark_type = self.config.benchmark.type

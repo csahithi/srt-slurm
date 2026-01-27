@@ -217,9 +217,8 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
 
             self._print_connection_info()
 
-            # Stage 4: Benchmark
-            reporter.report(JobStatus.BENCHMARK, JobStage.BENCHMARK, "Running benchmark")
-            exit_code = self.run_benchmark(registry, stop_event)
+            # Stage 4: Benchmark (status reported AFTER health check passes)
+            exit_code = self.run_benchmark(registry, stop_event, reporter)
 
         except Exception as e:
             logger.exception("Error during sweep: %s", e)
