@@ -118,6 +118,7 @@ srtctl_root: "/path/to/srtctl"
 # Custom output directory for job logs (optional)
 # If set, job outputs go here instead of {srtctl_root}/outputs/
 # Useful when running from temp dirs or CI/CD pipelines
+# Can also be set via CLI: srtctl apply -f config.yaml -o /path/to/outputs
 output_dir: "/persistent/path/to/outputs"
 
 # Model path aliases
