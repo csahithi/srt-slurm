@@ -6,7 +6,7 @@ name: "disagg-kv-sglang"
 
 model:
   path: "qwen3-32b"
-  container: "0.5.6.post2"
+  container: "lmsysorg/sglang:v0.5.8-runtime"
   precision: "bf16"
 
 resources:
@@ -17,7 +17,7 @@ resources:
   # 2 decode workers @ TP2 = 4 GPUs (0.5 nodes)
   # Total: 16 GPUs across 2 nodes
   prefill_nodes: 3
-  decode_nodes: 1 
+  decode_nodes: 1
   prefill_workers: 6
   decode_workers: 2
 
