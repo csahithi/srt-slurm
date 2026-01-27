@@ -51,6 +51,7 @@ def generate_minimal_sbatch_script(
     config: SrtConfig,
     config_path: Path,
     setup_script: str | None = None,
+    output_dir: Path | None = None,
 ) -> str:
     """Generate minimal sbatch script that calls the Python orchestrator.
 
@@ -61,6 +62,7 @@ def generate_minimal_sbatch_script(
         config: Typed SrtConfig
         config_path: Path to the YAML config file
         setup_script: Optional setup script override (passed via env var)
+        output_dir: Custom output directory (CLI flag, highest priority)
 
     Returns:
         Rendered sbatch script as string
@@ -74,6 +76,17 @@ def generate_minimal_sbatch_script(
     srtctl_root = get_srtslurm_setting("srtctl_root")
     # srtctl source is the parent of src/srtctl (i.e., the repo root)
     srtctl_source = Path(srtctl_root) if srtctl_root else Path(__file__).parent.parent.parent.parent
+
+    # Determine output base directory
+    # Priority: CLI -o flag > srtslurm.yaml output_dir > srtctl_root/outputs
+    if output_dir:
+        output_base = str(output_dir.resolve())
+    else:
+        custom_output_dir = get_srtslurm_setting("output_dir")
+        if custom_output_dir:
+            output_base = str(Path(os.path.expandvars(custom_output_dir)).resolve())
+        else:
+            output_base = str((srtctl_source / "outputs").resolve())
 
     env = Environment(loader=FileSystemLoader(str(template_dir)))
     template = env.get_template("job_script_minimal.j2")
@@ -100,6 +113,7 @@ def generate_minimal_sbatch_script(
         sbatch_directives=config.sbatch_directives,
         container_image=container_image,
         srtctl_source=str(srtctl_source.resolve()),
+        output_base=output_base,
         setup_script=setup_script,
     )
 
@@ -134,6 +148,7 @@ def submit_with_orchestrator(
         config=config,
         config_path=config_path,
         setup_script=setup_script,
+        output_dir=output_dir,
     )
 
     if dry_run:

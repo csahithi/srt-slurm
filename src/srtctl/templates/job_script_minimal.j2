@@ -19,7 +19,7 @@
 {% endif %}
 #SBATCH --account={{ account }}
 #SBATCH --time={{ time_limit }}
-#SBATCH --output={{ srtctl_source }}/outputs/%j/logs/sweep_%j.log
+#SBATCH --output={{ output_base }}/%j/logs/sweep_%j.log
 #SBATCH --partition={{ partition }}
 {% for key, value in sbatch_directives.items() %}
 {% if value %}
@@ -38,9 +38,10 @@
 
 set -e
 
-# Setup directories - use project root for consistent output location
+# Setup directories
 SRTCTL_SOURCE="{{ srtctl_source }}"
-OUTPUT_DIR="${SRTCTL_SOURCE}/outputs/${SLURM_JOB_ID}"
+OUTPUT_BASE="{{ output_base }}"
+OUTPUT_DIR="${OUTPUT_BASE}/${SLURM_JOB_ID}"
 LOG_DIR="${OUTPUT_DIR}/logs"
 mkdir -p "${LOG_DIR}"
 
