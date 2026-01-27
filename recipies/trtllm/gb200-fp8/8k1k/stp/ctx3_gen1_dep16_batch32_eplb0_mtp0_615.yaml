@@ -104,6 +104,7 @@ benchmark:
 
 frontend:
   type: "dynamo"
+  nginx_container: "/mnt/lustre01/artifacts/containers/nginx+1.27.4.sqsh"
 
 
 health_check:

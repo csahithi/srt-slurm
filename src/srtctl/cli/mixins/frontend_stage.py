@@ -143,7 +143,7 @@ class FrontendStageMixin:
             command=cmd,
             nodelist=[topology.nginx_node],
             output=str(nginx_log),
-            container_image="nginx:1.29.4",
+            container_image=self.config.frontend.nginx_container,
             container_mounts=self.runtime.container_mounts,
             use_bash_wrapper=False,  # Already wrapped in bash -c
             srun_options={

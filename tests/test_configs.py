@@ -276,6 +276,7 @@ class TestFrontendConfig:
 
         assert frontend.type == "dynamo"
         assert frontend.enable_multiple_frontends is True
+        assert frontend.nginx_container == "nginx:1.27.4"
         assert frontend.args is None
         assert frontend.env is None
 

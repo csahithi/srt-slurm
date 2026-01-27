@@ -649,6 +649,7 @@ class FrontendConfig:
         type: Frontend type - "dynamo" (default) or "sglang"
         enable_multiple_frontends: Scale with nginx + multiple routers
         num_additional_frontends: Additional routers beyond master (default: 9)
+        nginx_container: Custom nginx container image (default: nginx:1.27.4)
         args: CLI arguments passed to the frontend/router process
         env: Environment variables for frontend processes
     """
@@ -656,6 +657,7 @@ class FrontendConfig:
     type: str = "dynamo"
     enable_multiple_frontends: bool = True
     num_additional_frontends: int = 9
+    nginx_container: str = "nginx:1.27.4"
     args: dict[str, Any] | None = None
     env: dict[str, str] | None = None
 
