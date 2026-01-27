@@ -21,6 +21,7 @@ backend:
   type: trtllm
 
   prefill_environment:
+    TLLM_OVERRIDE_LAYER_NUM: "61"
     TLLM_LOG_LEVEL: "INFO"
     TRTLLM_SERVER_DISABLE_GC: "1"
     TRTLLM_WORKER_DISABLE_GC: "1"
@@ -30,6 +31,7 @@ backend:
     NCCL_GRAPH_MIXING_SUPPORT: "0"
 
   decode_environment:
+    TLLM_OVERRIDE_LAYER_NUM: "61"
     TLLM_LOG_LEVEL: "INFO"
     TRTLLM_SERVER_DISABLE_GC: "1"
     TRTLLM_WORKER_DISABLE_GC: "1"
