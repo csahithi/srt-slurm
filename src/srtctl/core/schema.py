@@ -47,6 +47,30 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# Reporting Configuration
+# ============================================================================
+
+
+@dataclass(frozen=True)
+class ReportingStatusConfig:
+    """Status reporting configuration."""
+
+    endpoint: str | None = None
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+@dataclass(frozen=True)
+class ReportingConfig:
+    """Reporting configuration for status updates and log exports."""
+
+    status: ReportingStatusConfig | None = None
+    # Future: logs, metrics, etc.
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+# ============================================================================
 # Cluster Configuration (srtslurm.yaml)
 # ============================================================================
 
@@ -55,6 +79,7 @@ logger = logging.getLogger(__name__)
 class ClusterConfig:
     """Cluster configuration from srtslurm.yaml."""
 
+    cluster: str | None = None  # Cluster name for status reporting
     default_account: str | None = None
     default_partition: str | None = None
     default_time_limit: str | None = None
@@ -71,6 +96,9 @@ class ClusterConfig:
     # Cluster-level container mounts (host_path -> container_path)
     # Applied to all jobs on this cluster, useful for cluster-specific paths
     default_mounts: dict[str, str] | None = None
+
+    # Reporting configuration (status API, future: logs to S3, etc.)
+    reporting: ReportingConfig | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 
@@ -601,7 +629,7 @@ class DynamoConfig:
             "cd dynamo && "
             f"{checkout_cmd + ' && ' if checkout_cmd else ''}"
             "cd lib/bindings/python/ && "
-            "export RUSTFLAGS=\"${RUSTFLAGS:-} -C target-cpu=native\" && "
+            'export RUSTFLAGS="${RUSTFLAGS:-} -C target-cpu=native" && '
             "maturin build -o /tmp && "
             "pip install /tmp/ai_dynamo_runtime*.whl && "
             "cd /sgl-workspace/dynamo/ && "
@@ -696,6 +724,9 @@ class SrtConfig:
     # Custom setup script (runs before dynamo install and worker startup)
     # e.g. "custom-setup.sh" -> runs /configs/custom-setup.sh
     setup_script: str | None = None
+
+    # Reporting configuration (status API, future: logs to S3, etc.)
+    reporting: ReportingConfig | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 

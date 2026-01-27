@@ -89,6 +89,57 @@ check_sglang_router_health(response_json, expected_prefill=2, expected_decode=4)
 
 For aggregated mode, pass `expected_prefill=0, expected_decode=num_agg`.
 
+### Status Reporting
+
+Optional fire-and-forget HTTP status reporting to external APIs. Configure in `srtslurm.yaml`:
+
+```yaml
+# Cluster-level config (srtslurm.yaml)
+cluster: "bruh"  # Cluster name for dashboard display
+reporting:
+  status:
+    endpoint: "test-endpoint.com"
+```
+
+**StatusReporter** - Used in `do_sweep.py` to report job lifecycle:
+
+```python
+from srtctl.core.status import StatusReporter, JobStatus, JobStage
+
+reporter = StatusReporter.from_config(config.reporting, job_id)
+reporter.report_started(runtime)  # Job started with metadata
+reporter.report(JobStatus.WORKERS_READY, JobStage.WORKERS, "All workers healthy")
+reporter.report_completed(exit_code)  # Final status
+```
+
+**Status lifecycle:**
+```
+submitted → starting → head_ready → workers_starting → workers_ready
+         → frontend_starting → frontend_ready → benchmark → completed | failed
+```
+
+**create_job_record()** - Standalone function for job submission:
+
+```python
+from srtctl.core.status import create_job_record
+
+# Called in submit.py after sbatch succeeds
+create_job_record(
+    reporting=config.reporting,
+    job_id=job_id,
+    job_name=config.name,
+    cluster=get_srtslurm_setting("cluster"),
+    recipe=str(config_path),
+    metadata=metadata,  # Tags go in metadata["tags"]
+)
+```
+
+**Key behaviors:**
+- All HTTP requests have 5-second timeout
+- Failures are logged at DEBUG and silently ignored
+- Job execution is never blocked by status reporting
+- Tags are passed via `metadata["tags"]` (not a separate field)
+
 ## Testing
 
 Tests are located in `tests/`. Run `make check` to run lint + all tests.
@@ -135,3 +186,4 @@ with patch.dict(os.environ, H100Rack.slurm_env()):
 ```bash
 srtctl dry-run -f config.yaml
 ```
+

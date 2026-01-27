@@ -137,7 +137,6 @@ class WorkerStageMixin:
             formatted_value = value.format_map(SafeDict(template_vars))
             env_to_set[key] = formatted_value
 
-
         # Add profiling environment variables
         if profiling.enabled:
             profile_dir = str(self.runtime.log_dir / "profiles")

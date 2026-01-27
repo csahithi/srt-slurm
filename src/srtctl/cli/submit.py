@@ -35,6 +35,7 @@ from rich.table import Table
 # Import from srtctl modules
 from srtctl.core.config import get_srtslurm_setting, load_config
 from srtctl.core.schema import SrtConfig
+from srtctl.core.status import create_job_record
 
 console = Console()
 
@@ -241,6 +242,17 @@ def submit_with_orchestrator(
 
         with open(job_output_dir / f"{job_id}.json", "w") as f:
             json.dump(metadata, f, indent=2)
+
+        # Report to status API (fire-and-forget, silent on failure)
+        # Note: tags are already included in metadata dict above
+        create_job_record(
+            reporting=config.reporting,
+            job_id=job_id,
+            job_name=config.name,
+            cluster=get_srtslurm_setting("cluster"),
+            recipe=str(config_path),
+            metadata=metadata,
+        )
 
         console.print(f"[bold green]✅ Job {job_id} submitted![/]")
         console.print(f"[dim]📁 Logs:[/] {job_output_dir}/logs")
@@ -467,7 +479,9 @@ def submit_directory(
             if is_sweep:
                 submit_sweep(yaml_file, dry_run=dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir)
             else:
-                submit_single(config_path=yaml_file, dry_run=dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir)
+                submit_single(
+                    config_path=yaml_file, dry_run=dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir
+                )
             success_count += 1
         except Exception as e:
             console.print(f"[bold red]  ❌ Error:[/] {e}")
@@ -551,9 +565,17 @@ def main():
         else:
             is_sweep = args.sweep or is_sweep_config(args.config)
             if is_sweep:
-                submit_sweep(args.config, dry_run=is_dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir)
+                submit_sweep(
+                    args.config, dry_run=is_dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir
+                )
             else:
-                submit_single(config_path=args.config, dry_run=is_dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir)
+                submit_single(
+                    config_path=args.config,
+                    dry_run=is_dry_run,
+                    setup_script=setup_script,
+                    tags=tags,
+                    output_dir=output_dir,
+                )
     except Exception as e:
         console.print(f"[bold red]Error:[/] {e}")
         logging.debug("Full traceback:", exc_info=True)

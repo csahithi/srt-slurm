@@ -33,6 +33,7 @@ from srtctl.core.processes import (
 from srtctl.core.runtime import RuntimeContext
 from srtctl.core.schema import SrtConfig
 from srtctl.core.slurm import get_slurm_job_id, start_srun_process
+from srtctl.core.status import JobStage, JobStatus, StatusReporter
 from srtctl.core.topology import Endpoint, Process
 from srtctl.logging_utils import setup_logging
 
@@ -171,6 +172,10 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
 
     def run(self) -> int:
         """Run the complete sweep."""
+        # Create status reporter (fire-and-forget, no-op if not configured)
+        reporter = StatusReporter.from_config(self.config.reporting, self.runtime.job_id)
+        reporter.report_started(self.config, self.runtime)
+
         logger.info("Sweep Orchestrator")
         logger.info("Job ID: %s", self.runtime.job_id)
         logger.info("Run name: %s", self.runtime.run_name)
@@ -194,26 +199,35 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
         exit_code = 1
 
         try:
+            # Stage 1: Head infrastructure (NATS, etcd)
+            reporter.report(JobStatus.STARTING, JobStage.HEAD_INFRASTRUCTURE, "Starting head infrastructure")
             head_proc = self.start_head_infrastructure(registry)
             registry.add_process(head_proc)
 
+            # Stage 2: Workers
+            reporter.report(JobStatus.WORKERS, JobStage.WORKERS, "Starting workers")
             worker_procs = self.start_all_workers()
             registry.add_processes(worker_procs)
 
+            # Stage 3: Frontend
+            reporter.report(JobStatus.FRONTEND, JobStage.FRONTEND, "Starting frontend")
             frontend_procs = self.start_frontend(registry)
             for proc in frontend_procs:
                 registry.add_process(proc)
 
             self._print_connection_info()
 
-            exit_code = self.run_benchmark(registry, stop_event)
+            # Stage 4: Benchmark (status reported AFTER health check passes)
+            exit_code = self.run_benchmark(registry, stop_event, reporter)
 
         except Exception as e:
             logger.exception("Error during sweep: %s", e)
+            reporter.report(JobStatus.FAILED, JobStage.CLEANUP, str(e))
             exit_code = 1
 
         finally:
             logger.info("Cleanup")
+            reporter.report_completed(exit_code)
             stop_event.set()
             registry.cleanup()
             if exit_code != 0:
