@@ -179,7 +179,7 @@ def start_etcd(
     stdout = None
     if log_dir:
         etcd_log = log_dir / "etcd.log"
-        stdout = open(etcd_log, "w")  # noqa: SIM115 - stays open for subprocess
+        stdout = open(etcd_log, "w")  # noqa: SIM115, F841 - stays open for subprocess
 
     proc = subprocess.Popen(
         cmd,

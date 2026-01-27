@@ -16,12 +16,12 @@ class TestConfigLoading:
     """Tests for config file loading."""
 
     def test_config_loading_from_yaml(self):
-        """Test that config files in recipies/ can be loaded."""
-        # Find all yaml files in recipies/
-        config_files = glob.glob("recipies/**/*.yaml", recursive=True)
+        """Test that config files in recipes/ can be loaded."""
+        # Find all yaml files in recipes/
+        config_files = glob.glob("recipes/**/*.yaml", recursive=True)
 
         if not config_files:
-            pytest.skip("No config files found in recipies/")
+            pytest.skip("No config files found in recipes/")
 
         errors = []
         loaded = 0

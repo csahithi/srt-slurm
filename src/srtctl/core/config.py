@@ -148,7 +148,6 @@ def resolve_config_with_defaults(user_config: dict[str, Any], cluster_config: di
         config["frontend"] = frontend
         logger.debug(f"Resolved nginx_container alias '{nginx_container}' -> '{resolved_nginx}'")
 
-
     return config
 
 

@@ -1,120 +1,120 @@
 name: CI
 
 on:
-    push:
-        branches: [main, master]
-    pull_request:
-        branches: [main, master]
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
 
 jobs:
-    lint:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Install uv
-              uses: astral-sh/setup-uv@v4
-              with:
-                  version: "latest"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
 
-            - name: Set up Python
-              run: uv python install 3.10
+      - name: Set up Python
+        run: uv python install 3.10
 
-            - name: Install dependencies
-              run: uv sync --dev
+      - name: Install dependencies
+        run: uv sync --dev
 
-            - name: Run ruff check
-              run: uv run ruff check src/srtctl/
+      - name: Run ruff check
+        run: uv run ruff check src/srtctl/
 
-            - name: Run ruff format check
-              run: uv run ruff format --check src/srtctl/
+      - name: Run ruff format check
+        run: uv run ruff format --check src/srtctl/
 
-    typecheck:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Install uv
-              uses: astral-sh/setup-uv@v4
-              with:
-                  version: "latest"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
 
-            - name: Set up Python
-              run: uv python install 3.10
+      - name: Set up Python
+        run: uv python install 3.10
 
-            - name: Install dependencies
-              run: uv sync --dev
+      - name: Install dependencies
+        run: uv sync --dev
 
-            - name: Run ty
-              run: uv run ty check src/srtctl/
-              continue-on-error: true # ty is still experimental
+      - name: Run ty
+        run: uv run ty check src/srtctl/
+        continue-on-error: true # ty is still experimental
 
-    test:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Install uv
-              uses: astral-sh/setup-uv@v4
-              with:
-                  version: "latest"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
 
-            - name: Set up Python
-              run: uv python install 3.10
+      - name: Set up Python
+        run: uv python install 3.10
 
-            - name: Install dependencies
-              run: uv sync --dev
+      - name: Install dependencies
+        run: uv sync --dev
 
-            - name: Run tests
-              run: uv run pytest tests/ -v --tb=short
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
 
-            - name: Run tests with coverage
-              run: uv run pytest tests/ --cov=srtctl --cov-report=xml --cov-report=term-missing
+      - name: Run tests with coverage
+        run: uv run pytest tests/ --cov=srtctl --cov-report=xml --cov-report=term-missing
 
-            - name: Upload coverage
-              uses: codecov/codecov-action@v4
-              with:
-                  files: coverage.xml
-                  fail_ci_if_error: false
-              continue-on-error: true
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+        continue-on-error: true
 
-    # Quick sanity check that recipes are valid
-    validate-recipes:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  # Quick sanity check that recipes are valid
+  validate-recipes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Install uv
-              uses: astral-sh/setup-uv@v4
-              with:
-                  version: "latest"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
 
-            - name: Set up Python
-              run: uv python install 3.10
+      - name: Set up Python
+        run: uv python install 3.10
 
-            - name: Install dependencies
-              run: uv sync --dev
+      - name: Install dependencies
+        run: uv sync --dev
 
-            - name: Validate all recipes load
-              run: |
-                  uv run python -c "
-                  from pathlib import Path
-                  from srtctl.core.config import load_config
+      - name: Validate all recipes load
+        run: |
+          uv run python -c "
+          from pathlib import Path
+          from srtctl.core.config import load_config
 
-                  recipes = list(Path('recipies').rglob('*.yaml'))
-                  print(f'Found {len(recipes)} recipes')
+          recipes = list(Path('recipes').rglob('*.yaml'))
+          print(f'Found {len(recipes)} recipes')
 
-                  failed = []
-                  for recipe in recipes:
-                      try:
-                          config = load_config(str(recipe))
-                          print(f'✓ {recipe.name}')
-                      except Exception as e:
-                          print(f'✗ {recipe.name}: {e}')
-                          failed.append(recipe)
+          failed = []
+          for recipe in recipes:
+              try:
+                  config = load_config(str(recipe))
+                  print(f'✓ {recipe.name}')
+              except Exception as e:
+                  print(f'✗ {recipe.name}: {e}')
+                  failed.append(recipe)
 
-                  if failed:
-                      print(f'\n{len(failed)} recipes failed validation')
-                      exit(1)
-                  print(f'\nAll {len(recipes)} recipes valid')
-                  "
+          if failed:
+              print(f'\n{len(failed)} recipes failed validation')
+              exit(1)
+          print(f'\nAll {len(recipes)} recipes valid')
+          "

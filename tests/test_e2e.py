@@ -13,7 +13,7 @@ import pytest
 from srtctl.core.config import load_config
 from srtctl.core.topology import allocate_endpoints, endpoints_to_processes
 
-RECIPES_DIR = Path(__file__).parent.parent / "recipies"
+RECIPES_DIR = Path(__file__).parent.parent / "recipes"
 CI_DIR = Path(__file__).parent.parent / "ci"
 
 
