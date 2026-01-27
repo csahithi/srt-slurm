@@ -4,20 +4,28 @@
 """
 Post-process stage mixin for SweepOrchestrator.
 
-Handles AI-powered failure analysis using Claude Code CLI in headless mode.
+Handles:
+- Benchmark result extraction
+- srtlog parsing and S3 upload
+- AI-powered failure analysis using Claude Code CLI
+
 Uses OpenRouter for authentication (simple API key, works in headless environments).
 See: https://openrouter.ai/docs/guides/guides/claude-code-integration
 """
 
+import json
 import logging
 import os
 import shlex
 import subprocess
 import time
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+import requests
 
 from srtctl.core.config import load_cluster_config
-from srtctl.core.schema import AIAnalysisConfig
+from srtctl.core.schema import AIAnalysisConfig, S3Config
 from srtctl.core.slurm import start_srun_process
 
 if TYPE_CHECKING:
@@ -43,25 +51,53 @@ class PostProcessStageMixin:
     runtime: "RuntimeContext"
 
     def _get_ai_analysis_config(self) -> AIAnalysisConfig | None:
-        """Load AI analysis config from cluster config.
+        """Load AI analysis config from cluster config (reporting.ai_analysis).
 
         Returns:
-            AIAnalysisConfig if configured and enabled, None otherwise
+            AIAnalysisConfig if configured, None otherwise
         """
         cluster_config = load_cluster_config()
         if not cluster_config:
             return None
 
-        ai_config_dict = cluster_config.get("ai_analysis")
+        reporting = cluster_config.get("reporting")
+        if not reporting:
+            return None
+
+        ai_config_dict = reporting.get("ai_analysis")
         if not ai_config_dict:
             return None
 
-        # Parse with schema
         try:
             schema = AIAnalysisConfig.Schema()
             return schema.load(ai_config_dict)
         except Exception as e:
-            logger.warning("Failed to parse ai_analysis config: %s", e)
+            logger.warning("Failed to parse reporting.ai_analysis config: %s", e)
+            return None
+
+    def _get_s3_config(self) -> S3Config | None:
+        """Load S3 config from cluster config (under reporting.s3).
+
+        Returns:
+            S3Config if configured, None otherwise
+        """
+        cluster_config = load_cluster_config()
+        if not cluster_config:
+            return None
+
+        reporting = cluster_config.get("reporting")
+        if not reporting:
+            return None
+
+        s3_dict = reporting.get("s3")
+        if not s3_dict:
+            return None
+
+        try:
+            schema = S3Config.Schema()
+            return schema.load(s3_dict)
+        except Exception as e:
+            logger.warning("Failed to parse reporting.s3 config: %s", e)
             return None
 
     def _resolve_secret(self, config_value: str | None, env_var: str) -> str | None:
@@ -81,26 +117,181 @@ class PostProcessStageMixin:
     def run_postprocess(self, exit_code: int) -> None:
         """Run post-processing after benchmark completion.
 
-        Currently handles AI-powered failure analysis when enabled.
+        Handles:
+        1. Benchmark result extraction (always)
+        2. srtlog parsing + S3 upload (if S3 configured)
+        3. Metrics reporting to dashboard (if status endpoint configured)
+        4. AI-powered failure analysis (only on failures, if enabled)
 
         Args:
             exit_code: Exit code from the benchmark run
         """
-        if exit_code == 0:
-            logger.debug("Benchmark succeeded, skipping AI analysis")
+        # Extract benchmark results (always)
+        benchmark_results = self._extract_benchmark_results()
+
+        # Run srtlog + S3 upload in single container (if S3 configured)
+        parquet_path, s3_url = self._run_postprocess_container()
+
+        # Report metrics to dashboard
+        self._report_metrics(benchmark_results, s3_url)
+
+        # AI analysis only on failures
+        if exit_code != 0:
+            ai_config = self._get_ai_analysis_config()
+            if ai_config and ai_config.enabled:
+                logger.info("Running AI-powered failure analysis...")
+                self._run_ai_analysis(ai_config)
+
+    def _extract_benchmark_results(self) -> dict[str, Any] | None:
+        """Extract benchmark results based on benchmark type.
+
+        Returns:
+            Dictionary with benchmark results, or None if not found
+        """
+        benchmark_type = self.config.benchmark.type
+
+        if benchmark_type == "sa-bench":
+            benchmark_out = self.runtime.log_dir / "benchmark.out"
+            if benchmark_out.exists():
+                return {"type": "sa-bench", "raw_output": benchmark_out.read_text()}
+
+        elif benchmark_type == "mooncake-router":
+            artifacts_dir = self.runtime.log_dir / "artifacts"
+            if artifacts_dir.exists():
+                aiperf_files = list(artifacts_dir.glob("*/profile_export_aiperf.json"))
+                if aiperf_files:
+                    latest = max(aiperf_files, key=lambda p: p.stat().st_mtime)
+                    try:
+                        return {"type": "mooncake-router", "data": json.loads(latest.read_text())}
+                    except json.JSONDecodeError as e:
+                        logger.warning("Failed to parse aiperf JSON: %s", e)
+
+        return None
+
+    def _run_postprocess_container(self) -> tuple[Path | None, str | None]:
+        """Run srtlog and upload entire log directory to S3.
+
+        Uploads the complete log directory including:
+        - Worker logs (prefill_*.out, decode_*.out, etc.)
+        - Benchmark output (benchmark.out, artifacts/)
+        - Parquet files from srtlog (cached_assets/)
+        - Any other artifacts
+
+        Returns:
+            (parquet_path, s3_url) tuple - s3_url points to the log directory
+        """
+        s3_config = self._get_s3_config()
+        if not s3_config:
+            logger.debug("S3 not configured, skipping srtlog/upload")
+            return None, None
+
+        # S3 path for the entire log directory
+        s3_prefix = f"{s3_config.prefix or 'srtslurm'}/{self.runtime.job_id}"
+        s3_url = f"s3://{s3_config.bucket}/{s3_prefix}/"
+
+        # Build the post-processing script
+        script = f"""
+set -e
+
+# Install srtlog from source and awscli
+echo "Installing srtlog and awscli..."
+cd /tmp
+git clone --depth 1 https://github.com/ishandhanani/srtlog.git
+uv pip install --system ./srtlog awscli
+
+# Run srtlog to generate parquet
+echo "Running srtlog parse..."
+cd /logs
+srtlog parse .
+
+# Upload entire log directory to S3
+echo "Uploading entire log directory to S3..."
+aws s3 sync /logs {s3_url} --quiet
+echo "Upload complete: {s3_url}"
+
+# Report what was uploaded
+echo ""
+echo "Uploaded files:"
+find /logs -type f | wc -l
+echo "files total"
+"""
+
+        # Build env for AWS credentials
+        env: dict[str, str] = {}
+        access_key = self._resolve_secret(s3_config.access_key_id, "AWS_ACCESS_KEY_ID")
+        secret_key = self._resolve_secret(s3_config.secret_access_key, "AWS_SECRET_ACCESS_KEY")
+        if access_key:
+            env["AWS_ACCESS_KEY_ID"] = access_key
+        if secret_key:
+            env["AWS_SECRET_ACCESS_KEY"] = secret_key
+        if s3_config.region:
+            env["AWS_DEFAULT_REGION"] = s3_config.region
+
+        try:
+            logger.info("Running post-processing container (srtlog + S3 sync)...")
+            proc = start_srun_process(
+                command=["bash", "-c", script],
+                nodelist=[self.runtime.nodes.head],
+                output=str(self.runtime.log_dir / "postprocess.log"),
+                container_image="ghcr.io/astral-sh/uv:latest",
+                container_mounts={str(self.runtime.log_dir): "/logs"},
+                env_to_set=env,
+            )
+            proc.wait(timeout=600)  # 10 min timeout for install + parse + full sync
+
+            parquet_path = self.runtime.log_dir / "cached_assets" / "node_metrics.parquet"
+
+            if proc.returncode == 0:
+                logger.info("Post-processing complete: %s", s3_url)
+                return parquet_path if parquet_path.exists() else None, s3_url
+            else:
+                logger.warning("Post-processing failed (exit code: %s)", proc.returncode)
+                return parquet_path if parquet_path.exists() else None, None
+
+        except subprocess.TimeoutExpired:
+            logger.warning("Post-processing container timed out")
+            proc.kill()
+            return None, None
+        except Exception as e:
+            logger.warning("Post-processing container failed: %s", e)
+            return None, None
+
+    def _report_metrics(self, benchmark_results: dict[str, Any] | None, s3_url: str | None) -> None:
+        """Report metrics to dashboard via status API.
+
+        Args:
+            benchmark_results: Extracted benchmark results
+            s3_url: S3 URL where logs were uploaded
+        """
+        cluster_config = load_cluster_config()
+        if not cluster_config:
             return
 
-        ai_config = self._get_ai_analysis_config()
-        if not ai_config:
-            logger.debug("AI analysis not configured in srtslurm.yaml")
+        reporting = cluster_config.get("reporting")
+        if not reporting:
             return
 
-        if not ai_config.enabled:
-            logger.debug("AI analysis is disabled")
+        status_dict = reporting.get("status")
+        if not status_dict or not status_dict.get("endpoint"):
             return
 
-        logger.info("Running AI-powered failure analysis...")
-        self._run_ai_analysis(ai_config)
+        endpoint = status_dict["endpoint"]
+
+        metadata: dict[str, Any] = {}
+        if benchmark_results:
+            metadata["benchmark_results"] = benchmark_results
+        if s3_url:
+            metadata["logs_url"] = s3_url
+
+        if not metadata:
+            return
+
+        try:
+            url = f"{endpoint}/api/jobs/{self.runtime.job_id}"
+            requests.put(url, json={"metadata": metadata}, timeout=5)
+            logger.debug("Reported metrics to dashboard: %s", url)
+        except Exception as e:
+            logger.debug("Metrics report failed: %s", e)
 
     def _run_ai_analysis(self, config: AIAnalysisConfig) -> None:
         """Run AI analysis using Claude Code CLI via OpenRouter.

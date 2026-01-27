@@ -123,6 +123,59 @@ class AIAnalysisConfig:
     Schema: ClassVar[type[Schema]] = Schema
 
 
+@dataclass(frozen=True)
+class S3Config:
+    """S3 upload configuration for log artifacts.
+
+    Attributes:
+        bucket: S3 bucket name
+        prefix: Optional prefix/path within bucket (e.g., "srtslurm/logs")
+        region: AWS region (e.g., "us-west-2")
+        access_key_id: AWS access key ID (falls back to AWS_ACCESS_KEY_ID env var)
+        secret_access_key: AWS secret access key (falls back to AWS_SECRET_ACCESS_KEY env var)
+    """
+
+    bucket: str
+    prefix: str | None = None
+    region: str | None = None
+    access_key_id: str | None = None
+    secret_access_key: str | None = None
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+@dataclass(frozen=True)
+class ReportingStatusConfig:
+    """Status reporting configuration for dashboard API.
+
+    Attributes:
+        endpoint: Dashboard API endpoint URL
+    """
+
+    endpoint: str
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+@dataclass(frozen=True)
+class ReportingConfig:
+    """Reporting configuration for status updates, AI analysis, and log exports.
+
+    Consolidates all reporting-related configuration in one place.
+
+    Attributes:
+        status: Dashboard API status reporting
+        ai_analysis: AI-powered failure analysis configuration
+        s3: S3 upload configuration for log artifacts
+    """
+
+    status: ReportingStatusConfig | None = None
+    ai_analysis: AIAnalysisConfig | None = None
+    s3: S3Config | None = None
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
 @dataclass
 class ClusterConfig:
     """Cluster configuration from srtslurm.yaml."""
@@ -138,7 +191,7 @@ class ClusterConfig:
     model_paths: dict[str, str] | None = None
     containers: dict[str, str] | None = None
     cloud: dict[str, str] | None = None
-    ai_analysis: AIAnalysisConfig | None = None
+    reporting: ReportingConfig | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 
