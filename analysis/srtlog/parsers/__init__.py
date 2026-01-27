@@ -25,7 +25,7 @@ class BenchmarkParserProtocol(Protocol):
     """Protocol for benchmark output parsers.
     Each benchmark type (sa-bench, mooncake-router, etc.) should have
     a parser that implements this protocol.
-    
+
     Design principle: JSON files are the primary source of truth.
     The parse() method is a fallback for when JSON files are unavailable.
     """
@@ -37,11 +37,11 @@ class BenchmarkParserProtocol(Protocol):
 
     def parse(self, benchmark_out_path: Path) -> dict[str, Any]:
         """Parse benchmark.out file and return results (FALLBACK method).
-        
+
         This is a fallback method used when JSON result files are not available.
         Prefer using parse_result_directory() which prioritizes JSON files as
         the source of truth.
-        
+
         Args:
             benchmark_out_path: Path to the benchmark.out file
         Returns:
@@ -64,10 +64,10 @@ class BenchmarkParserProtocol(Protocol):
 
     def parse_result_json(self, json_path: Path) -> dict[str, Any]:
         """Parse a benchmark result JSON file (PRIMARY source of truth).
-        
+
         JSON files contain the complete, accurate benchmark results and should
         be used as the primary data source whenever available.
-        
+
         Args:
             json_path: Path to a result JSON file
         Returns:
@@ -77,34 +77,34 @@ class BenchmarkParserProtocol(Protocol):
 
     def find_result_directory(self, run_path: Path, isl: int | None = None, osl: int | None = None) -> Path | None:
         """Find the directory containing benchmark results within a run directory.
-        
+
         This method encapsulates the logic for locating result files, which varies by benchmark type.
         For example:
         - sa-bench: looks for directories like "sa-bench_isl_8192_osl_1024"
         - mooncake-router: looks in "logs/artifacts/" subdirectory
-        
+
         Args:
             run_path: Path to the run directory (contains logs/, metadata, etc.)
             isl: Input sequence length (optional, used for pattern matching)
             osl: Output sequence length (optional, used for pattern matching)
-        
+
         Returns:
             Path to directory containing result files, or None if not found
         """
         ...
-    
+
     def parse_result_directory(self, result_dir: Path) -> list[dict[str, Any]]:
         """Parse all result files in a directory.
-        
+
         This is the primary entry point for parsing benchmark results.
         Implementation should:
         1. First attempt to parse JSON result files (primary source of truth)
         2. Fall back to parsing benchmark.out if no JSON files found
         3. Return list of results (one per concurrency level or benchmark run)
-        
+
         Args:
             result_dir: Directory containing benchmark result files
-            
+
         Returns:
             List of result dicts (one per concurrency level or benchmark run)
         """

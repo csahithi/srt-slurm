@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis.srtlog.models import BenchmarkRun
 from analysis.srtlog.run_loader import RunLoader
 from tests.fixtures_parsers import ParserTestHarness, SampleSABenchData
 
@@ -329,4 +328,3 @@ class TestRunLoaderWithParsers:
         assert run is not None
         # Verify mooncake-router results were parsed
         assert len(run.profiler.output_tps) >= 1
-

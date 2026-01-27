@@ -7,7 +7,6 @@ Clean, JSON-only implementation - requires {jobid}.json in each run directory.
 import json
 import logging
 import os
-import re
 from pathlib import Path
 
 import pandas as pd
@@ -15,7 +14,7 @@ import pandas as pd
 from .cache_manager import CacheManager
 from .log_parser import NodeAnalyzer
 from .models import BenchmarkRun, NodeMetrics
-from .parsers import get_benchmark_parser, get_node_parser
+from .parsers import get_benchmark_parser
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +221,7 @@ class RunLoader:
 
         # Use profiler_type from metadata
         profiler_type = run.profiler_metadata.profiler_type
-        
+
         # Get the parser for this benchmark type
         try:
             parser = get_benchmark_parser(profiler_type)
@@ -232,18 +231,18 @@ class RunLoader:
 
         # Let the parser find its result directory
         result_dir = parser.find_result_directory(
-            Path(run_path),
-            isl=run.profiler_metadata.isl,
-            osl=run.profiler_metadata.osl
+            Path(run_path), isl=run.profiler_metadata.isl, osl=run.profiler_metadata.osl
         )
-        
+
         if not result_dir:
             logger.warning(f"No results directory found for {profiler_type} in {run_path}")
             return
 
         # Define source patterns for cache validation (relative to run_path)
         # Use recursive glob to catch nested result files (e.g., artifacts/*/profile_export_aiperf.json)
-        result_dir_rel = result_dir.relative_to(Path(run_path)) if result_dir.is_relative_to(Path(run_path)) else result_dir.name
+        result_dir_rel = (
+            result_dir.relative_to(Path(run_path)) if result_dir.is_relative_to(Path(run_path)) else result_dir.name
+        )
         source_patterns = [f"{result_dir_rel}/**/*.json"]
 
         # Try to load from cache first
@@ -422,20 +421,20 @@ class RunLoader:
             else:
                 concurrency = 0
             out["concurrencies"].append(concurrency)
-            
+
             # Throughput - normalize field names with explicit None checks to preserve 0.0
             if "output_throughput" in data and data["output_throughput"] is not None:
                 output_tps = data["output_throughput"]
             else:
                 output_tps = data.get("output_tps")
             out["output_tps"].append(output_tps)
-            
+
             if "total_token_throughput" in data and data["total_token_throughput"] is not None:
                 total_tps = data["total_token_throughput"]
             else:
                 total_tps = data.get("total_tps")
             out["total_tps"].append(total_tps)
-            
+
             out["request_throughput"].append(data.get("request_throughput"))
             out["request_goodput"].append(data.get("request_goodput"))
             out["request_rate"].append(data.get("request_rate"))
@@ -706,7 +705,7 @@ class RunLoader:
         # Use NodeAnalyzer which handles caching, backend detection, and config loading
         analyzer = NodeAnalyzer()
         node_infos = analyzer.parse_run_logs(run_path, return_dicts=False)
-        
+
         # Extract only the metrics from each NodeInfo
         return [node.metrics for node in node_infos]
 

@@ -111,12 +111,12 @@ class NodeAnalyzer:
             Backend type string (e.g., 'sglang', 'trtllm') or None
         """
         run_path = Path(run_path)
-        
+
         # Try current directory and parent directory
         search_dirs = [run_path]
         if run_path.name == "logs" and run_path.parent.exists():
             search_dirs.insert(0, run_path.parent)  # Check parent first
-        
+
         # Try JSON files first
         for search_dir in search_dirs:
             json_files = list(search_dir.glob("*.json"))
@@ -128,7 +128,7 @@ class NodeAnalyzer:
                         container = metadata.get("container", "")
                         if not container:
                             container = metadata.get("model", {}).get("container", "")
-                        
+
                         container_lower = container.lower()
                         if "sglang" in container_lower:
                             logger.debug(f"Detected sglang from {json_file}")
@@ -189,7 +189,7 @@ class NodeAnalyzer:
         import os
 
         run_path = Path(run_path)
-        
+
         # If run_path is the logs directory, look in parent for config files
         if run_path.name == "logs" and run_path.parent.exists():
             config_dir = run_path.parent
@@ -242,7 +242,9 @@ class NodeAnalyzer:
                                 node_info.node_config["launch_command"] = launch_cmd
                         else:
                             node_info.node_config = file_config
-                        logger.debug(f"Loaded config for {node_name} with {len(file_config.get('environment', {}))} env vars")
+                        logger.debug(
+                            f"Loaded config for {node_name} with {len(file_config.get('environment', {}))} env vars"
+                        )
                 except Exception as e:
                     logger.warning(f"Could not load config from {config_path}: {e}")
                     # Keep existing minimal config with launch_command
@@ -260,7 +262,7 @@ class NodeAnalyzer:
                     node_info.node_config = {}
                 if "environment" not in node_info.node_config:
                     node_info.node_config["environment"] = {}
-                
+
                 # Merge YAML env vars (they take precedence over JSON)
                 yaml_worker_env = yaml_env[worker_type]
                 node_info.node_config["environment"].update(yaml_worker_env)
@@ -284,7 +286,7 @@ class NodeAnalyzer:
         try:
             with open(yaml_path) as f:
                 config = yaml.safe_load(f)
-            
+
             if not config or "backend" not in config:
                 logger.debug("config.yaml has no backend section")
                 return {}
@@ -337,7 +339,7 @@ class NodeAnalyzer:
             "environment": node_info.environment,  # Property accessor for backward compatibility
             "run_id": metrics.run_id,
         }
-        
+
     def get_prefill_nodes(self, nodes: list):
         """Filter for prefill nodes only.
 
@@ -476,7 +478,6 @@ class NodeAnalyzer:
         Returns:
             List of NodeInfo objects
         """
-        import time
         from .models import BatchMetrics, MemoryMetrics, NodeInfo, NodeMetadata, NodeMetrics
 
         start_time = time.time()
@@ -558,7 +559,7 @@ class NodeAnalyzer:
                 worker_type=worker_type,
                 worker_id=worker_id,
             )
-            
+
             # Create NodeMetrics (NEW structure)
             metrics = NodeMetrics(
                 metadata=node_metadata,
@@ -566,18 +567,18 @@ class NodeAnalyzer:
                 memory_snapshots=memory_snapshots,
                 config=config,
             )
-            
+
             # Create NodeInfo with empty config (will be populated below)
             node_info = NodeInfo(metrics=metrics, node_config={})
             nodes.append(node_info)
 
         elapsed = time.time() - start_time
         logger.info(f"Deserialized {len(nodes)} nodes in {elapsed:.2f}s")
-        
+
         # Populate config from files (environment, launch_command)
         if run_path and nodes:
             self._populate_config_from_files(run_path, nodes)
-        
+
         return nodes
 
 

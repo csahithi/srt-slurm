@@ -34,30 +34,30 @@ class SGLangNodeParser:
     """Parser for SGLang node logs.
     Handles SGLang structured logging with ISO 8601 timestamps.
     May contain ANSI color codes which are stripped during parsing.
-    
+
     Timestamp format: YYYY-MM-DDTHH:MM:SS.microsZ (e.g., 2025-12-30T15:52:38.206058Z)
     """
 
     @property
     def backend_type(self) -> str:
         return "sglang"
-    
+
     @staticmethod
     def parse_timestamp(timestamp: str) -> datetime:
         """Parse SGLang timestamp format to datetime object.
-        
+
         Args:
             timestamp: Timestamp string in ISO 8601 format (e.g., 2025-12-30T15:52:38.206058Z)
-            
+
         Returns:
             datetime object
-            
+
         Raises:
             ValueError: If timestamp format is invalid
         """
         # Handle both with and without microseconds and timezone
-        timestamp = timestamp.rstrip('Z')
-        if '.' in timestamp:
+        timestamp = timestamp.rstrip("Z")
+        if "." in timestamp:
             return datetime.fromisoformat(timestamp)
         else:
             return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S")
@@ -101,8 +101,7 @@ class SGLangNodeParser:
         node_info = self._extract_node_info_from_filename(str(log_path))
         if not node_info:
             logger.warning(
-                "Could not extract node info from filename: %s. "
-                "Expected format: <node>_<service>_<id>.err or .out",
+                "Could not extract node info from filename: %s. " "Expected format: <node>_<service>_<id>.err or .out",
                 log_path,
             )
             return None
@@ -212,7 +211,7 @@ class SGLangNodeParser:
             worker_type=node_info["worker_type"],
             worker_id=node_info["worker_id"],
         )
-        
+
         # Create NodeMetrics with metadata
         metrics = NodeMetrics(
             metadata=node_metadata,
@@ -220,35 +219,35 @@ class SGLangNodeParser:
             memory_snapshots=memory_snapshots,
             config=config,
         )
-        
+
         # Create NodeConfig with launch_command
         node_config = {}
         if launch_command:
             node_config["launch_command"] = launch_command
             node_config["environment"] = {}  # Will be populated by NodeAnalyzer if config file exists
-        
+
         # Return complete NodeInfo
         return NodeInfo(metrics=metrics, node_config=node_config if node_config else None)
 
     def _parse_timestamp(self, line: str) -> str | None:
         """Extract timestamp from log line.
-        
+
         Supports two formats:
         - Tagged format: [2025-11-04 05:31:43 DP0 TP0 EP0]
         - ISO format: 2025-12-30T15:52:38.206058Z (fallback)
-        
+
         Returns the timestamp string as-is without conversion.
         """
         # Try tagged format first (YYYY-MM-DD HH:MM:SS)
         match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
         if match:
             return match.group(1)
-        
+
         # Fall back to ISO format
         match = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z?)", line)
         if match:
             return match.group(1)
-        
+
         return None
 
     def _parse_parallelism_tags(self, line: str) -> tuple[int, int, int]:
@@ -292,9 +291,9 @@ class SGLangNodeParser:
         timestamp = self._parse_timestamp(line)
         if not timestamp:
             return None
-        
+
         dp, tp, ep = self._parse_parallelism_tags(line)
-        
+
         metrics = {
             "timestamp": timestamp,
             "type": "prefill",
@@ -332,9 +331,9 @@ class SGLangNodeParser:
         timestamp = self._parse_timestamp(line)
         if not timestamp:
             return None
-        
+
         dp, tp, ep = self._parse_parallelism_tags(line)
-        
+
         metrics = {
             "timestamp": timestamp,
             "type": "decode",
@@ -368,9 +367,9 @@ class SGLangNodeParser:
         timestamp = self._parse_timestamp(line)
         if not timestamp:
             return None
-        
+
         dp, tp, ep = self._parse_parallelism_tags(line)
-        
+
         metrics = {
             "timestamp": timestamp,
             "dp": dp,

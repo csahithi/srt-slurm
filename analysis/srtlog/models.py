@@ -145,7 +145,7 @@ class RunMetadata:
 @dataclass
 class ProfilerMetadata:
     """Metadata about the benchmark/profiler configuration.
-    
+
     This describes what the benchmark was configured to do,
     not the actual results.
     """
@@ -288,7 +288,7 @@ class ProfilerResults:
 @dataclass
 class BenchmarkLaunchCommand:
     """Parsed benchmark launch command information.
-    
+
     Source: logs/benchmark.out
     Only contains essential fields. All parsed arguments go into extra_args.
     """
@@ -298,6 +298,7 @@ class BenchmarkLaunchCommand:
 
     # All parsed arguments as dict
     extra_args: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class BenchmarkRun:
@@ -440,7 +441,7 @@ class MemoryMetrics:
 @dataclass
 class NodeMetadata:
     """Node identification and worker information.
-    
+
     This is the equivalent of RunMetadata but for individual worker nodes.
     """
 
@@ -452,7 +453,7 @@ class NodeMetadata:
 @dataclass
 class NodeMetrics:
     """Metrics from a single node (prefill or decode worker), parsed from log files.
-    
+
     This class contains ONLY metrics data. Configuration is in NodeConfig.
     """
 
@@ -492,7 +493,7 @@ class NodeMetrics:
 @dataclass
 class NodeLaunchCommand:
     """Parsed node worker launch command information.
-    
+
     Source: logs/{node}_{worker_type}_{worker_id}.out or .err
     Only contains essential fields. All parsed arguments go into extra_args.
     """
@@ -515,6 +516,7 @@ class GPUInfo(TypedDict, total=False):
     memory_total: str
     driver_version: str
 
+
 class NodeConfig(TypedDict, total=False):
     """Expected structure of a node config JSON file (*_config.json)."""
 
@@ -528,7 +530,7 @@ class NodeConfig(TypedDict, total=False):
 @dataclass
 class NodeInfo:
     """Complete information about a node, combining metrics and configuration.
-    
+
     This is the top-level container for all node data.
     """
 
@@ -601,6 +603,7 @@ class NodeInfo:
             return self.node_config.get("launch_command")
         return None
 
+
 class ServerArgs(TypedDict, total=False):
     """Expected structure of server_args in node config.
 
@@ -620,9 +623,10 @@ class ServerArgs(TypedDict, total=False):
     disaggregation_mode: str
     context_length: int
 
+
 class TopologyInfo(TypedDict):
     """Service topology and configuration information from log files.
-    
+
     Returned by parse_command_line_from_err() which analyzes log files to discover:
     - Which flags were explicitly set in launch commands
     - Physical node to service type mapping
@@ -630,4 +634,3 @@ class TopologyInfo(TypedDict):
 
     explicit_flags: set
     services: dict[str, list[str]]  # {node_name: [service_types]}
-

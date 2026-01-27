@@ -438,10 +438,10 @@ class TestSGLangNodeParser:
     def test_parse_dp_tp_ep_tag_full_format(self, parser):
         """Test parsing full DP/TP/EP tag format."""
         line = "[2025-11-04 05:31:43 DP0 TP2 EP1] Prefill batch, #new-seq: 5"
-        
+
         timestamp = parser._parse_timestamp(line)
         dp, tp, ep = parser._parse_parallelism_tags(line)
-        
+
         assert timestamp == "2025-11-04 05:31:43"
         assert dp == 0
         assert tp == 2
@@ -450,10 +450,10 @@ class TestSGLangNodeParser:
     def test_parse_dp_tp_ep_tag_simple_tp(self, parser):
         """Test parsing simple TP-only format (1P4D style)."""
         line = "[2025-11-04 07:05:55 TP0] Decode batch, #running-req: 10"
-        
+
         timestamp = parser._parse_timestamp(line)
         dp, tp, ep = parser._parse_parallelism_tags(line)
-        
+
         assert timestamp == "2025-11-04 07:05:55"
         assert dp == 0  # Default
         assert tp == 0
@@ -462,10 +462,10 @@ class TestSGLangNodeParser:
     def test_parse_dp_tp_ep_tag_pipeline(self, parser):
         """Test parsing pipeline parallelism format."""
         line = "[2025-12-08 14:34:44 PP3] Prefill batch, #new-seq: 8"
-        
+
         timestamp = parser._parse_timestamp(line)
         dp, tp, ep = parser._parse_parallelism_tags(line)
-        
+
         assert timestamp == "2025-12-08 14:34:44"
         assert dp == 0  # Default
         assert tp == 3  # PP mapped to TP
@@ -474,10 +474,10 @@ class TestSGLangNodeParser:
     def test_parse_dp_tp_ep_tag_no_tags(self, parser):
         """Test parsing line without parallelism tags."""
         line = "[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m Prefill batch"
-        
+
         timestamp = parser._parse_timestamp(line)
         dp, tp, ep = parser._parse_parallelism_tags(line)
-        
+
         assert timestamp == "2025-12-30T15:52:38.206058Z"  # ISO format fallback
         assert dp == 0
         assert tp == 0
@@ -491,7 +491,7 @@ class TestSGLangNodeParser:
         assert dp == 1
         assert tp == 2
         assert ep == 3
-        
+
         # Without tags - should default to 0
         line_without_tags = "Some log line without tags"
         dp, tp, ep = parser._parse_parallelism_tags(line_without_tags)
@@ -502,9 +502,9 @@ class TestSGLangNodeParser:
     def test_parse_prefill_batch_with_dp_tp_ep(self, parser):
         """Test that prefill batch parsing extracts DP/TP/EP values."""
         line = "[2025-11-04 05:31:43 DP1 TP2 EP3] Prefill batch, #new-seq: 5, #new-token: 40960, #running-req: 5, input throughput (token/s): 5000.5"
-        
+
         metrics = parser._parse_prefill_batch_line(line)
-        
+
         assert metrics is not None
         assert metrics["dp"] == 1
         assert metrics["tp"] == 2
@@ -517,9 +517,9 @@ class TestSGLangNodeParser:
     def test_parse_decode_batch_with_dp_tp_ep(self, parser):
         """Test that decode batch parsing extracts DP/TP/EP values."""
         line = "[2025-11-04 05:31:45 DP0 TP1 EP0] Decode batch, #running-req: 10, #token: 512, gen throughput (token/s): 1500.5"
-        
+
         metrics = parser._parse_decode_batch_line(line)
-        
+
         assert metrics is not None
         assert metrics["dp"] == 0
         assert metrics["tp"] == 1
@@ -531,9 +531,9 @@ class TestSGLangNodeParser:
     def test_parse_memory_with_dp_tp_ep(self, parser):
         """Test that memory line parsing extracts DP/TP/EP values."""
         line = "[2025-11-04 05:31:50 DP0 TP2 EP1] avail mem=75.11 GB, mem usage=107.07 GB, KV size: 17.16 GB"
-        
+
         metrics = parser._parse_memory_line(line)
-        
+
         assert metrics is not None
         assert metrics["dp"] == 0
         assert metrics["tp"] == 2
@@ -546,9 +546,9 @@ class TestSGLangNodeParser:
         """Test that parser supports ISO timestamp fallback."""
         # Prefill batch with ISO timestamp (old format) - should parse with default parallelism
         line = "[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m Prefill batch, #new-seq: 5, #new-token: 40960"
-        
+
         metrics = parser._parse_prefill_batch_line(line)
-        
+
         # Should parse successfully with ISO timestamp and default parallelism tags
         assert metrics is not None
         assert metrics["timestamp"] == "2025-12-30T15:52:38.206058Z"
@@ -559,9 +559,9 @@ class TestSGLangNodeParser:
     def test_parse_batch_with_simple_tp_format(self, parser):
         """Test parsing batch with simple TP format (1P4D disaggregated style)."""
         line = "[2025-11-04 07:05:55 TP0] Prefill batch, #new-seq: 3, #new-token: 24576, input throughput (token/s): 3000.0"
-        
+
         metrics = parser._parse_prefill_batch_line(line)
-        
+
         assert metrics is not None
         assert metrics["dp"] == 0
         assert metrics["tp"] == 0
@@ -571,9 +571,9 @@ class TestSGLangNodeParser:
     def test_parse_batch_with_pipeline_format(self, parser):
         """Test parsing batch with pipeline parallelism format."""
         line = "[2025-12-08 14:34:44 PP2] Prefill batch, #new-seq: 4, #new-token: 32768"
-        
+
         metrics = parser._parse_prefill_batch_line(line)
-        
+
         assert metrics is not None
         assert metrics["dp"] == 0
         assert metrics["tp"] == 2  # PP mapped to TP
@@ -598,20 +598,20 @@ class TestSGLangNodeParser:
         assert node.node_name == "test_node"
         assert node.worker_type == "prefill"
         assert node.worker_id == "w0"
-        
+
         # Check that batches have correct DP/TP/EP values
         assert len(node.batches) == 2
         for batch in node.batches:
             assert batch.dp == 0
             assert batch.tp == 0
             assert batch.ep == 0
-        
+
         # Check memory snapshots have correct DP/TP/EP values
         assert len(node.memory_snapshots) == 1
         assert node.memory_snapshots[0].dp == 0
         assert node.memory_snapshots[0].tp == 0
         assert node.memory_snapshots[0].ep == 0
-        
+
         # Verify config extraction still works
         assert node.config["tp_size"] == 8
         assert node.config["dp_size"] == 1
@@ -825,10 +825,10 @@ TensorRT-LLM engine args: {'tensor_parallel_size': 8, 'pipeline_parallel_size': 
     def test_parse_dp_tp_ep_tag_full_format(self, parser):
         """Test parsing full DP/TP/EP tag format in TRTLLM logs."""
         line = "[01/23/2026-08:04:38 DP1 TP2 EP3] [TRT-LLM] iter = 100, num_scheduled_requests: 5, states = {'num_ctx_requests': 2, 'num_ctx_tokens': 1024, 'num_generation_tokens': 0}"
-        
+
         timestamp = parser._extract_timestamp(line)
         dp, tp, ep = parser._parse_parallelism_tags(line)
-        
+
         assert timestamp == "01/23/2026-08:04:38"
         assert dp == 1
         assert tp == 2
@@ -837,10 +837,10 @@ TensorRT-LLM engine args: {'tensor_parallel_size': 8, 'pipeline_parallel_size': 
     def test_parse_dp_tp_ep_tag_simple_tp(self, parser):
         """Test parsing simple TP-only format (1P4D style) in TRTLLM logs."""
         line = "[01/23/2026-08:04:38 TP0] [TRT-LLM] iter = 100, num_scheduled_requests: 10, states = {'num_ctx_requests': 0, 'num_ctx_tokens': 0, 'num_generation_tokens': 512}"
-        
+
         timestamp = parser._extract_timestamp(line)
         dp, tp, ep = parser._parse_parallelism_tags(line)
-        
+
         assert timestamp == "01/23/2026-08:04:38"
         assert dp == 0  # Default
         assert tp == 0
@@ -849,10 +849,10 @@ TensorRT-LLM engine args: {'tensor_parallel_size': 8, 'pipeline_parallel_size': 
     def test_parse_dp_tp_ep_tag_pipeline(self, parser):
         """Test parsing pipeline parallelism format in TRTLLM logs."""
         line = "[01/23/2026-08:04:38 PP3] [TRT-LLM] iter = 100, num_scheduled_requests: 8, states = {'num_ctx_requests': 0, 'num_ctx_tokens': 0, 'num_generation_tokens': 256}"
-        
+
         timestamp = parser._extract_timestamp(line)
         dp, tp, ep = parser._parse_parallelism_tags(line)
-        
+
         assert timestamp == "01/23/2026-08:04:38"
         assert dp == 0  # Default
         assert tp == 3  # PP mapped to TP
@@ -861,10 +861,10 @@ TensorRT-LLM engine args: {'tensor_parallel_size': 8, 'pipeline_parallel_size': 
     def test_parse_dp_tp_ep_tag_no_tags(self, parser):
         """Test parsing line without parallelism tags in TRTLLM logs."""
         line = "[01/23/2026-08:04:38] [TRT-LLM] iter = 100, num_scheduled_requests: 5"
-        
+
         timestamp = parser._extract_timestamp(line)
         dp, tp, ep = parser._parse_parallelism_tags(line)
-        
+
         assert timestamp == "01/23/2026-08:04:38"
         assert dp == 0
         assert tp == 0
@@ -875,9 +875,9 @@ TensorRT-LLM engine args: {'tensor_parallel_size': 8, 'pipeline_parallel_size': 
         log_content = """
 [01/23/2026-08:04:38 DP0 TP1 EP0] [TRT-LLM] [RANK 0] [I] iter = 100, num_scheduled_requests: 5, states = {'num_ctx_requests': 2, 'num_ctx_tokens': 1024, 'num_generation_tokens': 0}, host_step_time = 50.0ms
         """
-        
+
         batches = parser._parse_iteration_logs(log_content, "prefill")
-        
+
         assert len(batches) == 1
         assert batches[0].dp == 0
         assert batches[0].tp == 1
@@ -889,9 +889,9 @@ TensorRT-LLM engine args: {'tensor_parallel_size': 8, 'pipeline_parallel_size': 
         log_content = """
 [01/23/2026-08:04:38 DP0 TP2 EP1] [TRT-LLM] [RANK 0] [I] Peak memory during memory usage profiling (torch + non-torch): 91.46 GiB, available KV cache memory when calculating max tokens: 41.11 GiB, fraction is set 0.85, kv size is 35136. device total memory 139.81 GiB
         """
-        
+
         memory_snapshots = parser._parse_memory_info(log_content)
-        
+
         assert len(memory_snapshots) >= 1
         assert memory_snapshots[0].dp == 0
         assert memory_snapshots[0].tp == 2
@@ -1110,4 +1110,3 @@ class TestParserWithFixtures:
         assert cmd is not None
         assert cmd.backend_type == "trtllm"
         assert cmd.worker_type == "decode"
-

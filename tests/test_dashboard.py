@@ -21,7 +21,7 @@ class TestRateMatchTab:
 
         ts = "2025-12-30 15:52:38"
         dt = _parse_timestamp(ts)
-        
+
         assert isinstance(dt, datetime)
         assert dt.year == 2025
         assert dt.month == 12
@@ -36,7 +36,7 @@ class TestRateMatchTab:
 
         ts = "2025-12-30T15:52:38.206058Z"
         dt = _parse_timestamp(ts)
-        
+
         assert isinstance(dt, datetime)
         assert dt.year == 2025
         assert dt.month == 12
@@ -51,7 +51,7 @@ class TestRateMatchTab:
 
         ts = "2025-12-30T15:52:38.206058"
         dt = _parse_timestamp(ts)
-        
+
         assert isinstance(dt, datetime)
         assert dt.year == 2025
         assert dt.month == 12
@@ -63,7 +63,7 @@ class TestRateMatchTab:
 
         ts = "2025-12-30T15:52:38"
         dt = _parse_timestamp(ts)
-        
+
         assert isinstance(dt, datetime)
         assert dt.year == 2025
         assert dt.hour == 15
@@ -74,7 +74,7 @@ class TestRateMatchTab:
 
         ts = "01/23/2026-08:04:38"
         dt = _parse_timestamp(ts)
-        
+
         assert isinstance(dt, datetime)
         assert dt.year == 2026
         assert dt.month == 1
@@ -137,10 +137,10 @@ class TestRateMatchTab:
 
         ts1 = "01/23/2026-08:04:38"
         ts2 = "01/23/2026-08:04:40"
-        
+
         dt1 = _parse_timestamp(ts1)
         dt2 = _parse_timestamp(ts2)
-        
+
         delta = dt2 - dt1
         assert delta.total_seconds() == 2.0
 
@@ -156,11 +156,11 @@ class TestRateMatchTab:
         ]
 
         dts = [_parse_timestamp(ts) for ts in timestamps]
-        
+
         # All should parse successfully
         assert len(dts) == 3
         assert all(isinstance(dt, datetime) for dt in dts)
-        
+
         # Should be able to compute deltas (even if not chronological)
         delta = dts[1] - dts[0]
         assert delta.total_seconds() == 1.1
@@ -175,16 +175,16 @@ class TestTimestampIntegration:
         from analysis.srtlog.parsers import get_node_parser
 
         parser = get_node_parser("sglang")
-        
+
         # SGLang format timestamp
         sglang_ts = "2025-12-30T15:52:38.206058Z"
-        
+
         # Parser should be able to parse it
         dt_parser = parser.parse_timestamp(sglang_ts)
-        
+
         # Dashboard should be able to parse it
         dt_dashboard = _parse_timestamp(sglang_ts)
-        
+
         # Both should produce same datetime
         assert dt_parser.year == dt_dashboard.year
         assert dt_parser.month == dt_dashboard.month
@@ -199,16 +199,16 @@ class TestTimestampIntegration:
         from analysis.srtlog.parsers import get_node_parser
 
         parser = get_node_parser("trtllm")
-        
+
         # TRTLLM format timestamp
         trtllm_ts = "01/23/2026-08:04:38"
-        
+
         # Parser should be able to parse it
         dt_parser = parser.parse_timestamp(trtllm_ts)
-        
+
         # Dashboard should be able to parse it
         dt_dashboard = _parse_timestamp(trtllm_ts)
-        
+
         # Both should produce same datetime
         assert dt_parser.year == dt_dashboard.year
         assert dt_parser.month == dt_dashboard.month
@@ -237,4 +237,3 @@ class TestTimestampIntegration:
 
         # Should be able to compute time deltas
         assert len(parsed) == 3
-

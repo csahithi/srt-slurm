@@ -31,10 +31,10 @@ class SABenchParser:
 
     def parse(self, benchmark_out_path: Path) -> dict[str, Any]:
         """Parse benchmark.out file for SA-Bench results (FALLBACK method).
-        
+
         This is a fallback method used when JSON result files are not available.
         Prefer using parse_result_directory() which prioritizes JSON files.
-        
+
         Args:
             benchmark_out_path: Path to benchmark.out file
         Returns:
@@ -147,10 +147,10 @@ class SABenchParser:
 
     def parse_result_directory(self, result_dir: Path) -> list[dict[str, Any]]:
         """Parse all result JSON files in a benchmark result directory.
-        
+
         Uses JSON files as the primary source of truth. Falls back to parsing
         benchmark.out only if no JSON results are found.
-        
+
         Args:
             result_dir: Directory containing result_*.json files
         Returns:
@@ -173,17 +173,21 @@ class SABenchParser:
                 fallback_result = self.parse(benchmark_out)
                 if fallback_result.get("output_tps"):
                     # Wrap in list format expected by caller
-                    results.append({
-                        "max_concurrency": fallback_result.get("concurrencies", [0])[0] if fallback_result.get("concurrencies") else 0,
-                        "output_tps": fallback_result.get("output_tps"),
-                        "request_throughput": fallback_result.get("request_throughput"),
-                        "mean_ttft_ms": fallback_result.get("mean_ttft_ms"),
-                        "mean_itl_ms": fallback_result.get("mean_itl_ms"),
-                        "mean_tpot_ms": fallback_result.get("mean_tpot_ms"),
-                        "p99_ttft_ms": fallback_result.get("p99_ttft_ms"),
-                        "p99_itl_ms": fallback_result.get("p99_itl_ms"),
-                        "completed": fallback_result.get("completed_requests"),
-                    })
+                    results.append(
+                        {
+                            "max_concurrency": fallback_result.get("concurrencies", [0])[0]
+                            if fallback_result.get("concurrencies")
+                            else 0,
+                            "output_tps": fallback_result.get("output_tps"),
+                            "request_throughput": fallback_result.get("request_throughput"),
+                            "mean_ttft_ms": fallback_result.get("mean_ttft_ms"),
+                            "mean_itl_ms": fallback_result.get("mean_itl_ms"),
+                            "mean_tpot_ms": fallback_result.get("mean_tpot_ms"),
+                            "p99_ttft_ms": fallback_result.get("p99_ttft_ms"),
+                            "p99_itl_ms": fallback_result.get("p99_itl_ms"),
+                            "completed": fallback_result.get("completed_requests"),
+                        }
+                    )
             else:
                 logger.warning(f"No results found in {result_dir} (no JSON files or benchmark.out)")
 
@@ -194,16 +198,16 @@ class SABenchParser:
 
     def find_result_directory(self, run_path: Path, isl: int | None = None, osl: int | None = None) -> Path | None:
         """Find the directory containing SA-Bench results.
-        
+
         SA-Bench results are typically in directories named like:
         - sa-bench_isl_8192_osl_1024
         - vllm_isl_8192_osl_1024
-        
+
         Args:
             run_path: Path to the run directory
             isl: Input sequence length
             osl: Output sequence length
-            
+
         Returns:
             Path to results directory, or None if not found
         """
@@ -212,7 +216,7 @@ class SABenchParser:
         logs_dir = run_path / "logs"
         if logs_dir.exists():
             search_paths.append(logs_dir)
-        
+
         # Build prefix patterns
         if isl is not None and osl is not None:
             prefixes = [
@@ -222,7 +226,7 @@ class SABenchParser:
         else:
             # Fallback: match any sa-bench or vllm directory
             prefixes = ["sa-bench", "vllm"]
-        
+
         # Search for matching directories
         for search_path in search_paths:
             if not search_path.exists():
@@ -241,9 +245,8 @@ class SABenchParser:
             except (OSError, PermissionError) as e:
                 logger.warning(f"Error accessing {search_path}: {e}")
                 continue
-        
-        return None
 
+        return None
 
     def parse_launch_command(self, log_content: str) -> BenchmarkLaunchCommand | None:
         """Parse the SA-Bench launch command from log content.

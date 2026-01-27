@@ -36,34 +36,34 @@ class TRTLLMNodeParser:
     - Launch command from dynamo.trtllm
     - Worker configuration from Config() dump
     - MPI rank and world size information
-    
+
     Timestamp format: MM/DD/YYYY-HH:MM:SS (e.g., 01/23/2026-08:04:38)
     """
 
     @property
     def backend_type(self) -> str:
         return "trtllm"
-    
+
     @staticmethod
     def parse_timestamp(timestamp: str) -> datetime:
         """Parse TRTLLM timestamp format to datetime object.
-        
+
         Args:
             timestamp: Timestamp string in format MM/DD/YYYY-HH:MM:SS
-            
+
         Returns:
             datetime object
-            
+
         Raises:
             ValueError: If timestamp format is invalid
         """
         return datetime.strptime(timestamp, "%m/%d/%Y-%H:%M:%S")
-    
+
     def _extract_timestamp(self, line: str) -> str | None:
         """Extract timestamp string from log line.
-        
+
         Supports format: [MM/DD/YYYY-HH:MM:SS ...]
-        
+
         Returns:
             Timestamp string or None if not found
         """
@@ -71,7 +71,7 @@ class TRTLLMNodeParser:
         if match:
             return match.group(1)
         return None
-    
+
     def _parse_parallelism_tags(self, line: str) -> tuple[int, int, int]:
         """Extract DP, TP, EP indices from TRTLLM log line.
 
@@ -237,7 +237,13 @@ class TRTLLMNodeParser:
             logger.error("Error parsing %s: %s", log_path, e)
             return None
 
-        logger.debug("Parsed %s: %d batches, %d memory snapshots, config=%s", log_path, len(batches), len(memory_snapshots), config)
+        logger.debug(
+            "Parsed %s: %d batches, %d memory snapshots, config=%s",
+            log_path,
+            len(batches),
+            len(memory_snapshots),
+            config,
+        )
 
         # Create NodeMetadata
         node_metadata = NodeMetadata(
@@ -245,7 +251,7 @@ class TRTLLMNodeParser:
             worker_type=node_info["worker_type"],
             worker_id=node_info["worker_id"],
         )
-        
+
         # Create NodeMetrics with metadata
         metrics = NodeMetrics(
             metadata=node_metadata,
@@ -253,13 +259,13 @@ class TRTLLMNodeParser:
             memory_snapshots=memory_snapshots,
             config=config,
         )
-        
+
         # Create NodeConfig with launch_command
         node_config = {}
         if launch_command:
             node_config["launch_command"] = launch_command
             node_config["environment"] = {}  # Will be populated by NodeAnalyzer if config file exists
-        
+
         # Return complete NodeInfo
         return NodeInfo(metrics=metrics, node_config=node_config if node_config else None)
 
@@ -278,25 +284,23 @@ class TRTLLMNodeParser:
 
         # Pattern to match TRTLLM iteration logs
         iter_pattern = re.compile(
-            r"iter\s*=\s*(\d+).*"
-            r"num_scheduled_requests:\s*(\d+).*"
-            r"states\s*=\s*\{([^}]+)\}"
+            r"iter\s*=\s*(\d+).*" r"num_scheduled_requests:\s*(\d+).*" r"states\s*=\s*\{([^}]+)\}"
         )
 
         for match in iter_pattern.finditer(content):
             # Extract timestamp and parallelism from the line
-            line_start = content.rfind('\n', 0, match.start()) + 1
-            line_end = content.find('\n', match.end())
+            line_start = content.rfind("\n", 0, match.start()) + 1
+            line_end = content.find("\n", match.end())
             if line_end == -1:
                 line_end = len(content)
             full_line = content[line_start:line_end]
-            
+
             timestamp = self._extract_timestamp(full_line)
             if not timestamp:
                 continue
-            
+
             dp, tp, ep = self._parse_parallelism_tags(full_line)
-            
+
             iteration = int(match.group(1))
             num_scheduled = int(match.group(2))
             states_str = match.group(3)
@@ -382,18 +386,18 @@ class TRTLLMNodeParser:
 
         for match in mem_pattern.finditer(content):
             # Extract timestamp and parallelism from the line
-            line_start = content.rfind('\n', 0, match.start()) + 1
-            line_end = content.find('\n', match.end())
+            line_start = content.rfind("\n", 0, match.start()) + 1
+            line_end = content.find("\n", match.end())
             if line_end == -1:
                 line_end = len(content)
             full_line = content[line_start:line_end]
-            
+
             timestamp = self._extract_timestamp(full_line)
             if not timestamp:
                 timestamp = ""  # Some memory lines may not have timestamps
-            
+
             dp, tp, ep = self._parse_parallelism_tags(full_line)
-            
+
             peak_mem = float(match.group(1))
             avail_kv = float(match.group(2))
             total_mem = float(match.group(3))
@@ -412,9 +416,7 @@ class TRTLLMNodeParser:
             )
 
         # Also parse KV cache allocation info (no timestamp/DP/TP/EP for these)
-        kv_alloc_pattern = re.compile(
-            r"\[MemUsageChange\] Allocated\s*([\d.]+)\s*GiB for max tokens.*?\((\d+)\)"
-        )
+        kv_alloc_pattern = re.compile(r"\[MemUsageChange\] Allocated\s*([\d.]+)\s*GiB for max tokens.*?\((\d+)\)")
 
         for match in kv_alloc_pattern.finditer(content):
             kv_gb = float(match.group(1))

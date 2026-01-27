@@ -12,18 +12,18 @@ from analysis.dashboard.components import load_node_metrics
 
 def _parse_timestamp(timestamp: str) -> datetime:
     """Parse timestamp from multiple possible formats.
-    
+
     Supports:
     - ISO 8601: 2025-12-30T15:52:38.206058Z
     - YYYY-MM-DD HH:MM:SS
     - MM/DD/YYYY-HH:MM:SS (TRTLLM format)
-    
+
     Args:
         timestamp: Timestamp string in one of the supported formats
-        
+
     Returns:
         datetime object
-        
+
     Raises:
         ValueError: If timestamp format is not recognized
     """
@@ -32,23 +32,23 @@ def _parse_timestamp(timestamp: str) -> datetime:
         return datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
     except ValueError:
         pass
-    
+
     # Try ISO 8601 format (SGLang)
     try:
-        ts = timestamp.rstrip('Z')
-        if '.' in ts:
+        ts = timestamp.rstrip("Z")
+        if "." in ts:
             return datetime.fromisoformat(ts)
         else:
             return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
     except ValueError:
         pass
-    
+
     # Try MM/DD/YYYY-HH:MM:SS format (TRTLLM)
     try:
         return datetime.strptime(timestamp, "%m/%d/%Y-%H:%M:%S")
     except ValueError:
         pass
-    
+
     raise ValueError(f"Unable to parse timestamp: {timestamp}")
 
 

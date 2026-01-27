@@ -115,7 +115,9 @@ def render_sidebar(logs_dir, runs):
             )
 
             if selected_pairs:
-                sorted_runs = [r for r in sorted_runs if f"{r.profiler_metadata.isl}/{r.profiler_metadata.osl}" in selected_pairs]
+                sorted_runs = [
+                    r for r in sorted_runs if f"{r.profiler_metadata.isl}/{r.profiler_metadata.osl}" in selected_pairs
+                ]
         else:
             st.caption("No ISL/OSL information available")
 

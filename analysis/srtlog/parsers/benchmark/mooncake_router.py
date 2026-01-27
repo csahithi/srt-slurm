@@ -31,10 +31,10 @@ class MooncakeRouterParser:
 
     def parse(self, benchmark_out_path: Path) -> dict[str, Any]:
         """Parse benchmark.out file for mooncake-router results (FALLBACK method).
-        
+
         This is a fallback method used when JSON result files are not available.
         Prefer using parse_result_directory() which prioritizes JSON files.
-        
+
         Args:
             benchmark_out_path: Path to benchmark.out file
         Returns:
@@ -152,10 +152,10 @@ class MooncakeRouterParser:
 
     def parse_result_directory(self, result_dir: Path) -> list[dict[str, Any]]:
         """Parse AIPerf result files in a directory.
-        
+
         Uses JSON files (profile_export_aiperf.json) as the primary source of truth.
         Falls back to parsing benchmark.out only if no JSON results are found.
-        
+
         Args:
             result_dir: Directory containing profile_export_aiperf.json
         Returns:
@@ -178,14 +178,16 @@ class MooncakeRouterParser:
                 fallback_result = self.parse(benchmark_out)
                 if fallback_result.get("output_tps"):
                     # Convert to format expected by caller
-                    results.append({
-                        "concurrency": 0,  # Mooncake doesn't track concurrency
-                        "output_tps": fallback_result.get("output_tps"),
-                        "request_throughput": fallback_result.get("request_throughput"),
-                        "mean_ttft_ms": fallback_result.get("mean_ttft_ms"),
-                        "mean_itl_ms": fallback_result.get("mean_itl_ms"),
-                        "total_requests": fallback_result.get("total_requests"),
-                    })
+                    results.append(
+                        {
+                            "concurrency": 0,  # Mooncake doesn't track concurrency
+                            "output_tps": fallback_result.get("output_tps"),
+                            "request_throughput": fallback_result.get("request_throughput"),
+                            "mean_ttft_ms": fallback_result.get("mean_ttft_ms"),
+                            "mean_itl_ms": fallback_result.get("mean_itl_ms"),
+                            "total_requests": fallback_result.get("total_requests"),
+                        }
+                    )
             else:
                 logger.warning(f"No results found in {result_dir} (no profile_export_aiperf.json or benchmark.out)")
 
@@ -193,18 +195,18 @@ class MooncakeRouterParser:
 
     def find_result_directory(self, run_path: Path, isl: int | None = None, osl: int | None = None) -> Path | None:
         """Find the directory containing mooncake-router/AIPerf results.
-        
+
         Mooncake-router results are typically in:
         - logs/artifacts/*/profile_export_aiperf.json
-        
+
         Since results can be in nested subdirectories, we return the logs directory
         and let parse_result_directory use rglob to find them.
-        
+
         Args:
             run_path: Path to the run directory
             isl: Input sequence length (not used for mooncake-router)
             osl: Output sequence length (not used for mooncake-router)
-            
+
         Returns:
             Path to logs directory where results can be found, or None
         """
@@ -219,7 +221,7 @@ class MooncakeRouterParser:
                         return logs_dir
             except (OSError, PermissionError) as e:
                 logger.warning(f"Error accessing {logs_dir}: {e}")
-        
+
         # Also check run_path directly in case logs are at root
         try:
             for item in run_path.rglob("profile_export_aiperf.json"):
@@ -227,7 +229,7 @@ class MooncakeRouterParser:
                 return run_path
         except (OSError, PermissionError) as e:
             logger.warning(f"Error accessing {run_path}: {e}")
-        
+
         return None
 
     def find_aiperf_results(self, log_dir: Path) -> list[Path]:
