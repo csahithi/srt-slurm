@@ -19,6 +19,7 @@ import os
 import shlex
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -185,8 +186,9 @@ class PostProcessStageMixin:
             logger.debug("S3 not configured, skipping srtlog/upload")
             return None, None
 
-        # S3 path for the entire log directory
-        s3_prefix = f"{s3_config.prefix or 'srtslurm'}/{self.runtime.job_id}"
+        # S3 path: {prefix}/{YYYY-MM-DD}/{job_id}/
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        s3_prefix = f"{s3_config.prefix or 'srtslurm'}/{date_str}/{self.runtime.job_id}"
         s3_url = f"s3://{s3_config.bucket}/{s3_prefix}/"
 
         # Build endpoint flag if custom endpoint provided
