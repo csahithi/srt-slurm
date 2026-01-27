@@ -132,32 +132,32 @@ class SampleSGLangLogData:
     def prefill_log_content() -> str:
         """Sample prefill worker log."""
         return """
-[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m [1msglang[0m Starting SGLang prefill worker
-[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m [1msglang[0m server_args=ServerArgs(tp_size=8, dp_size=1, ep_size=1, model_path=/models/qwen3-32b, served_model_name=Qwen3-32B, host=10.0.0.1, port=30000, disaggregation_mode=prefill, context_length=131072, max_running_requests=1024, mem_fraction_static=0.85, kv_cache_dtype=fp8_e5m2)
+[2025-12-30 15:52:38 DP0 TP0 EP0] INFO sglang Starting SGLang prefill worker
+[2025-12-30 15:52:38 DP0 TP0 EP0] INFO sglang server_args=ServerArgs(tp_size=8, dp_size=1, ep_size=1, model_path=/models/qwen3-32b, served_model_name=Qwen3-32B, host=10.0.0.1, port=30000, disaggregation_mode=prefill, context_length=131072, max_running_requests=1024, mem_fraction_static=0.85, kv_cache_dtype=fp8_e5m2)
 
 [CMD] python -m sglang.launch_server --model /models/qwen3-32b --served-model-name Qwen3-32B --tp-size 8 --dp-size 1 --ep-size 1 --host 10.0.0.1 --port 30000 --disaggregation-mode prefill --context-length 131072 --max-running-requests 1024 --mem-fraction-static 0.85 --kv-cache-dtype fp8_e5m2
 
-[2m2025-12-30T15:52:40.123456Z[0m [32m INFO[0m [1msglang[0m Prefill batch, #new-seq: 8, #new-token: 65536, #cached-token: 0, token usage: 0.78, #running-req: 8, #queue-req: 0, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 6500.5
-[2m2025-12-30T15:52:40.523456Z[0m [32m INFO[0m [1msglang[0m Prefill batch, #new-seq: 5, #new-token: 40960, #cached-token: 0, token usage: 0.85, #running-req: 13, #queue-req: 0, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 5120.0
-[2m2025-12-30T15:52:41.123456Z[0m [32m INFO[0m [1msglang[0m Prefill batch, #new-seq: 10, #new-token: 81920, #cached-token: 16384, token usage: 0.90, #running-req: 23, #queue-req: 2, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 8192.0
-[2m2025-12-30T15:52:42.000000Z[0m [32m INFO[0m [1msglang[0m avail mem=75.11 GB, mem usage=107.07 GB
-[2m2025-12-30T15:52:43.000000Z[0m [32m INFO[0m [1msglang[0m KV size: 32.50 GB, #tokens: 1048576
+[2025-12-30 15:52:40 DP0 TP0 EP0] INFO sglang Prefill batch, #new-seq: 8, #new-token: 65536, #cached-token: 0, token usage: 0.78, #running-req: 8, #queue-req: 0, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 6500.5
+[2025-12-30 15:52:40 DP0 TP0 EP0] INFO sglang Prefill batch, #new-seq: 5, #new-token: 40960, #cached-token: 0, token usage: 0.85, #running-req: 13, #queue-req: 0, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 5120.0
+[2025-12-30 15:52:41 DP0 TP0 EP0] INFO sglang Prefill batch, #new-seq: 10, #new-token: 81920, #cached-token: 16384, token usage: 0.90, #running-req: 23, #queue-req: 2, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 8192.0
+[2025-12-30 15:52:42 DP0 TP0 EP0] INFO sglang avail mem=75.11 GB, mem usage=107.07 GB
+[2025-12-30 15:52:43 DP0 TP0 EP0] INFO sglang KV size: 32.50 GB, #tokens: 1048576
         """
 
     @staticmethod
     def decode_log_content() -> str:
         """Sample decode worker log."""
         return """
-[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m [1msglang[0m Starting SGLang decode worker
-[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m [1msglang[0m server_args=ServerArgs(tp_size=4, dp_size=1, ep_size=1, model_path=/models/qwen3-32b, disaggregation_mode=decode)
+[2025-12-30 15:52:38 DP0 TP0 EP0] INFO sglang Starting SGLang decode worker
+[2025-12-30 15:52:38 DP0 TP0 EP0] INFO sglang server_args=ServerArgs(tp_size=4, dp_size=1, ep_size=1, model_path=/models/qwen3-32b, disaggregation_mode=decode)
 
 [CMD] python -m sglang.launch_server --model /models/qwen3-32b --tp-size 4 --disaggregation-mode decode
 
-[2m2025-12-30T15:52:40.123456Z[0m [32m INFO[0m [1msglang[0m Decode batch, #running-req: 15, #token: 512, token usage: 0.65, pre-allocated usage: 0.10, #prealloc-req: 3, #transfer-req: 0, #queue-req: 0, gen throughput (token/s): 2048.0
-[2m2025-12-30T15:52:40.523456Z[0m [32m INFO[0m [1msglang[0m Decode batch, #running-req: 20, #token: 768, token usage: 0.72, pre-allocated usage: 0.15, #prealloc-req: 5, #transfer-req: 2, #queue-req: 0, gen throughput (token/s): 3072.0
-[2m2025-12-30T15:52:41.123456Z[0m [32m INFO[0m [1msglang[0m Decode batch, #running-req: 18, #token: 640, token usage: 0.70, pre-allocated usage: 0.12, #prealloc-req: 4, #transfer-req: 1, #queue-req: 0, gen throughput (token/s): 2560.0
-[2m2025-12-30T15:52:42.000000Z[0m [32m INFO[0m [1msglang[0m avail mem=85.00 GB, mem usage=97.00 GB
-[2m2025-12-30T15:52:43.000000Z[0m [32m INFO[0m [1msglang[0m KV size: 48.00 GB, #tokens: 2097152
+[2025-12-30 15:52:40 DP0 TP0 EP0] INFO sglang Decode batch, #running-req: 15, #token: 512, token usage: 0.65, pre-allocated usage: 0.10, #prealloc-req: 3, #transfer-req: 0, #queue-req: 0, gen throughput (token/s): 2048.0
+[2025-12-30 15:52:40 DP0 TP0 EP0] INFO sglang Decode batch, #running-req: 20, #token: 768, token usage: 0.72, pre-allocated usage: 0.15, #prealloc-req: 5, #transfer-req: 2, #queue-req: 0, gen throughput (token/s): 3072.0
+[2025-12-30 15:52:41 DP0 TP0 EP0] INFO sglang Decode batch, #running-req: 18, #token: 640, token usage: 0.70, pre-allocated usage: 0.12, #prealloc-req: 4, #transfer-req: 1, #queue-req: 0, gen throughput (token/s): 2560.0
+[2025-12-30 15:52:42 DP0 TP0 EP0] INFO sglang avail mem=85.00 GB, mem usage=97.00 GB
+[2025-12-30 15:52:43 DP0 TP0 EP0] INFO sglang KV size: 48.00 GB, #tokens: 2097152
         """
 
 

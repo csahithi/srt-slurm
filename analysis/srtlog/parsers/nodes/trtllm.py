@@ -58,6 +58,51 @@ class TRTLLMNodeParser:
             ValueError: If timestamp format is invalid
         """
         return datetime.strptime(timestamp, "%m/%d/%Y-%H:%M:%S")
+    
+    def _extract_timestamp(self, line: str) -> str | None:
+        """Extract timestamp string from log line.
+        
+        Supports format: [MM/DD/YYYY-HH:MM:SS ...]
+        
+        Returns:
+            Timestamp string or None if not found
+        """
+        match = re.search(r"\[(\d{2}/\d{2}/\d{4}-\d{2}:\d{2}:\d{2})", line)
+        if match:
+            return match.group(1)
+        return None
+    
+    def _parse_parallelism_tags(self, line: str) -> tuple[int, int, int]:
+        """Extract DP, TP, EP indices from TRTLLM log line.
+
+        Supports three formats:
+        - Full: [01/23/2026-08:04:38 DP1 TP2 EP3]
+        - Simple TP: [01/23/2026-08:04:38 TP0] (defaults DP=0, EP=0)
+        - Pipeline: [01/23/2026-08:04:38 PP3] (defaults DP=0, EP=0, TP=PP value)
+
+        Args:
+            line: Log line to parse
+
+        Returns:
+            (dp, tp, ep) tuple with default values of 0 if not found
+        """
+        # Try full format first: DP0 TP0 EP0
+        match = re.search(r"DP(\d+)\s+TP(\d+)\s+EP(\d+)", line)
+        if match:
+            return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+        # Try simple format: TP0 only (1P4D style)
+        match = re.search(r"\[\d{2}/\d{2}/\d{4}-\d{2}:\d{2}:\d{2} TP(\d+)\]", line)
+        if match:
+            return 0, int(match.group(1)), 0  # Default DP=0, EP=0
+
+        # Try pipeline parallelism format: PP0
+        match = re.search(r"\[\d{2}/\d{2}/\d{4}-\d{2}:\d{2}:\d{2} PP(\d+)\]", line)
+        if match:
+            return 0, int(match.group(1)), 0  # Map PP to TP slot, default DP=0, EP=0
+
+        # Default: no parallelism tags found
+        return 0, 0, 0
 
     def parse_logs(self, log_dir: Path) -> list[NodeInfo]:
         """Parse all TRTLLM node logs in a directory.
@@ -233,17 +278,28 @@ class TRTLLMNodeParser:
 
         # Pattern to match TRTLLM iteration logs
         iter_pattern = re.compile(
-            r"\[(\d{2}/\d{2}/\d{4}-\d{2}:\d{2}:\d{2})\].*"
             r"iter\s*=\s*(\d+).*"
             r"num_scheduled_requests:\s*(\d+).*"
             r"states\s*=\s*\{([^}]+)\}"
         )
 
         for match in iter_pattern.finditer(content):
-            timestamp = match.group(1)
-            iteration = int(match.group(2))
-            num_scheduled = int(match.group(3))
-            states_str = match.group(4)
+            # Extract timestamp and parallelism from the line
+            line_start = content.rfind('\n', 0, match.start()) + 1
+            line_end = content.find('\n', match.end())
+            if line_end == -1:
+                line_end = len(content)
+            full_line = content[line_start:line_end]
+            
+            timestamp = self._extract_timestamp(full_line)
+            if not timestamp:
+                continue
+            
+            dp, tp, ep = self._parse_parallelism_tags(full_line)
+            
+            iteration = int(match.group(1))
+            num_scheduled = int(match.group(2))
+            states_str = match.group(3)
 
             # Parse states dict
             ctx_requests = 0
@@ -290,9 +346,9 @@ class TRTLLMNodeParser:
             batches.append(
                 BatchMetrics(
                     timestamp=timestamp,
-                    dp=0,
-                    tp=0,
-                    ep=0,
+                    dp=dp,
+                    tp=tp,
+                    ep=ep,
                     batch_type=batch_type,
                     running_req=num_scheduled,
                     new_token=ctx_tokens if batch_type == "prefill" else None,
@@ -319,24 +375,35 @@ class TRTLLMNodeParser:
 
         # Pattern to match memory info
         mem_pattern = re.compile(
-            r"\[(\d{2}/\d{2}/\d{4}-\d{2}:\d{2}:\d{2})\].*"
             r"Peak memory.*?:\s*([\d.]+)\s*GiB.*?"
             r"available KV cache memory.*?:\s*([\d.]+)\s*GiB.*?"
             r"device total memory\s*([\d.]+)\s*GiB"
         )
 
         for match in mem_pattern.finditer(content):
-            timestamp = match.group(1)
-            peak_mem = float(match.group(2))
-            avail_kv = float(match.group(3))
-            total_mem = float(match.group(4))
+            # Extract timestamp and parallelism from the line
+            line_start = content.rfind('\n', 0, match.start()) + 1
+            line_end = content.find('\n', match.end())
+            if line_end == -1:
+                line_end = len(content)
+            full_line = content[line_start:line_end]
+            
+            timestamp = self._extract_timestamp(full_line)
+            if not timestamp:
+                timestamp = ""  # Some memory lines may not have timestamps
+            
+            dp, tp, ep = self._parse_parallelism_tags(full_line)
+            
+            peak_mem = float(match.group(1))
+            avail_kv = float(match.group(2))
+            total_mem = float(match.group(3))
 
             memory_snapshots.append(
                 MemoryMetrics(
                     timestamp=timestamp,
-                    dp=0,
-                    tp=0,
-                    ep=0,
+                    dp=dp,
+                    tp=tp,
+                    ep=ep,
                     metric_type="memory",
                     mem_usage_gb=peak_mem,
                     avail_mem_gb=total_mem - peak_mem,
@@ -344,7 +411,7 @@ class TRTLLMNodeParser:
                 )
             )
 
-        # Also parse KV cache allocation info
+        # Also parse KV cache allocation info (no timestamp/DP/TP/EP for these)
         kv_alloc_pattern = re.compile(
             r"\[MemUsageChange\] Allocated\s*([\d.]+)\s*GiB for max tokens.*?\((\d+)\)"
         )

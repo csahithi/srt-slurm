@@ -302,7 +302,7 @@ class TestSGLangNodeParser:
 
     def test_parse_prefill_batch_line(self, parser):
         """Test parsing prefill batch log line."""
-        line = "[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m Prefill batch, #new-seq: 5, #new-token: 40960, #cached-token: 0, token usage: 0.78, #running-req: 5, #queue-req: 0, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 5000.5"
+        line = "[2025-12-30 15:52:38 DP0 TP0 EP0] Prefill batch, #new-seq: 5, #new-token: 40960, #cached-token: 0, token usage: 0.78, #running-req: 5, #queue-req: 0, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 5000.5"
 
         metrics = parser._parse_prefill_batch_line(line)
 
@@ -317,7 +317,7 @@ class TestSGLangNodeParser:
 
     def test_parse_decode_batch_line(self, parser):
         """Test parsing decode batch log line."""
-        line = "[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m Decode batch, #running-req: 10, #token: 512, token usage: 0.85, pre-allocated usage: 0.10, #prealloc-req: 2, #transfer-req: 0, #queue-req: 0, gen throughput (token/s): 1500.5"
+        line = "[2025-12-30 15:52:38 DP0 TP0 EP0] Decode batch, #running-req: 10, #token: 512, token usage: 0.85, pre-allocated usage: 0.10, #prealloc-req: 2, #transfer-req: 0, #queue-req: 0, gen throughput (token/s): 1500.5"
 
         metrics = parser._parse_decode_batch_line(line)
 
@@ -357,10 +357,10 @@ class TestSGLangNodeParser:
     def test_parse_single_log(self, parser, temp_dir):
         """Test parsing a complete SGLang log file."""
         log_content = """
-[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m Starting SGLang server with server_args=ServerArgs(tp_size=8, dp_size=1, ep_size=1, model_path=/models/qwen3-32b)
-[2m2025-12-30T15:52:40.206058Z[0m [32m INFO[0m Prefill batch, #new-seq: 5, #new-token: 40960, #cached-token: 0, token usage: 0.78, #running-req: 5, #queue-req: 0, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 5000.5
-[2m2025-12-30T15:52:41.206058Z[0m [32m INFO[0m Decode batch, #running-req: 5, #token: 512, token usage: 0.85, gen throughput (token/s): 1500.5
-[2m2025-12-30T15:52:42.206058Z[0m [32m INFO[0m avail mem=75.11 GB, mem usage=107.07 GB
+[2025-12-30 15:52:38 DP0 TP0 EP0] Starting SGLang server with server_args=ServerArgs(tp_size=8, dp_size=1, ep_size=1, model_path=/models/qwen3-32b)
+[2025-12-30 15:52:40 DP0 TP0 EP0] Prefill batch, #new-seq: 5, #new-token: 40960, #cached-token: 0, token usage: 0.78, #running-req: 5, #queue-req: 0, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 5000.5
+[2025-12-30 15:52:41 DP0 TP0 EP0] Decode batch, #running-req: 5, #token: 512, token usage: 0.85, gen throughput (token/s): 1500.5
+[2025-12-30 15:52:42 DP0 TP0 EP0] avail mem=75.11 GB, mem usage=107.07 GB
         """
 
         log_path = temp_dir / "eos0219_prefill_w0.out"
@@ -396,6 +396,226 @@ class TestSGLangNodeParser:
         assert cmd.extra_args["port"] == 30000
         assert cmd.extra_args["max_num_seqs"] == 1024
         assert cmd.extra_args["disaggregation_mode"] == "prefill"
+
+    def test_parse_timestamp(self, parser):
+        """Test parsing SGLang timestamp format."""
+        from datetime import datetime
+
+        # Test ISO 8601 format with microseconds and Z
+        ts1 = "2025-12-30T15:52:38.206058Z"
+        dt1 = parser.parse_timestamp(ts1)
+        assert isinstance(dt1, datetime)
+        assert dt1.year == 2025
+        assert dt1.month == 12
+        assert dt1.day == 30
+        assert dt1.hour == 15
+        assert dt1.minute == 52
+        assert dt1.second == 38
+
+        # Test ISO 8601 format without Z
+        ts2 = "2025-12-30T15:52:38.206058"
+        dt2 = parser.parse_timestamp(ts2)
+        assert isinstance(dt2, datetime)
+        assert dt2.year == 2025
+
+        # Test ISO 8601 format without microseconds
+        ts3 = "2025-12-30T15:52:38"
+        dt3 = parser.parse_timestamp(ts3)
+        assert isinstance(dt3, datetime)
+        assert dt3.year == 2025
+        assert dt3.hour == 15
+
+    def test_parse_timestamp_invalid(self, parser):
+        """Test parsing invalid timestamp raises ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError):
+            parser.parse_timestamp("invalid-timestamp")
+
+        with pytest.raises(ValueError):
+            parser.parse_timestamp("2025-13-40T25:99:99")  # Invalid date/time
+
+    def test_parse_dp_tp_ep_tag_full_format(self, parser):
+        """Test parsing full DP/TP/EP tag format."""
+        line = "[2025-11-04 05:31:43 DP0 TP2 EP1] Prefill batch, #new-seq: 5"
+        
+        timestamp = parser._parse_timestamp(line)
+        dp, tp, ep = parser._parse_parallelism_tags(line)
+        
+        assert timestamp == "2025-11-04 05:31:43"
+        assert dp == 0
+        assert tp == 2
+        assert ep == 1
+
+    def test_parse_dp_tp_ep_tag_simple_tp(self, parser):
+        """Test parsing simple TP-only format (1P4D style)."""
+        line = "[2025-11-04 07:05:55 TP0] Decode batch, #running-req: 10"
+        
+        timestamp = parser._parse_timestamp(line)
+        dp, tp, ep = parser._parse_parallelism_tags(line)
+        
+        assert timestamp == "2025-11-04 07:05:55"
+        assert dp == 0  # Default
+        assert tp == 0
+        assert ep == 0  # Default
+
+    def test_parse_dp_tp_ep_tag_pipeline(self, parser):
+        """Test parsing pipeline parallelism format."""
+        line = "[2025-12-08 14:34:44 PP3] Prefill batch, #new-seq: 8"
+        
+        timestamp = parser._parse_timestamp(line)
+        dp, tp, ep = parser._parse_parallelism_tags(line)
+        
+        assert timestamp == "2025-12-08 14:34:44"
+        assert dp == 0  # Default
+        assert tp == 3  # PP mapped to TP
+        assert ep == 0  # Default
+
+    def test_parse_dp_tp_ep_tag_no_tags(self, parser):
+        """Test parsing line without parallelism tags."""
+        line = "[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m Prefill batch"
+        
+        timestamp = parser._parse_timestamp(line)
+        dp, tp, ep = parser._parse_parallelism_tags(line)
+        
+        assert timestamp == "2025-12-30T15:52:38.206058Z"  # ISO format fallback
+        assert dp == 0
+        assert tp == 0
+        assert ep == 0
+
+    def test_parse_parallelism_wrapper(self, parser):
+        """Test _parse_parallelism_tags method."""
+        # With full tags
+        line_with_tags = "[2025-11-04 05:31:43 DP1 TP2 EP3] Prefill batch"
+        dp, tp, ep = parser._parse_parallelism_tags(line_with_tags)
+        assert dp == 1
+        assert tp == 2
+        assert ep == 3
+        
+        # Without tags - should default to 0
+        line_without_tags = "Some log line without tags"
+        dp, tp, ep = parser._parse_parallelism_tags(line_without_tags)
+        assert dp == 0
+        assert tp == 0
+        assert ep == 0
+
+    def test_parse_prefill_batch_with_dp_tp_ep(self, parser):
+        """Test that prefill batch parsing extracts DP/TP/EP values."""
+        line = "[2025-11-04 05:31:43 DP1 TP2 EP3] Prefill batch, #new-seq: 5, #new-token: 40960, #running-req: 5, input throughput (token/s): 5000.5"
+        
+        metrics = parser._parse_prefill_batch_line(line)
+        
+        assert metrics is not None
+        assert metrics["dp"] == 1
+        assert metrics["tp"] == 2
+        assert metrics["ep"] == 3
+        assert metrics["timestamp"] == "2025-11-04 05:31:43"
+        assert metrics["type"] == "prefill"
+        assert metrics["new_seq"] == 5
+        assert metrics["new_token"] == 40960
+
+    def test_parse_decode_batch_with_dp_tp_ep(self, parser):
+        """Test that decode batch parsing extracts DP/TP/EP values."""
+        line = "[2025-11-04 05:31:45 DP0 TP1 EP0] Decode batch, #running-req: 10, #token: 512, gen throughput (token/s): 1500.5"
+        
+        metrics = parser._parse_decode_batch_line(line)
+        
+        assert metrics is not None
+        assert metrics["dp"] == 0
+        assert metrics["tp"] == 1
+        assert metrics["ep"] == 0
+        assert metrics["timestamp"] == "2025-11-04 05:31:45"
+        assert metrics["type"] == "decode"
+        assert metrics["running_req"] == 10
+
+    def test_parse_memory_with_dp_tp_ep(self, parser):
+        """Test that memory line parsing extracts DP/TP/EP values."""
+        line = "[2025-11-04 05:31:50 DP0 TP2 EP1] avail mem=75.11 GB, mem usage=107.07 GB, KV size: 17.16 GB"
+        
+        metrics = parser._parse_memory_line(line)
+        
+        assert metrics is not None
+        assert metrics["dp"] == 0
+        assert metrics["tp"] == 2
+        assert metrics["ep"] == 1
+        assert metrics["timestamp"] == "2025-11-04 05:31:50"
+        assert metrics["type"] == "kv_cache"
+        assert metrics["kv_cache_gb"] == 17.16
+
+    def test_parse_batch_fallback_to_iso_timestamp(self, parser):
+        """Test that parser supports ISO timestamp fallback."""
+        # Prefill batch with ISO timestamp (old format) - should parse with default parallelism
+        line = "[2m2025-12-30T15:52:38.206058Z[0m [32m INFO[0m Prefill batch, #new-seq: 5, #new-token: 40960"
+        
+        metrics = parser._parse_prefill_batch_line(line)
+        
+        # Should parse successfully with ISO timestamp and default parallelism tags
+        assert metrics is not None
+        assert metrics["timestamp"] == "2025-12-30T15:52:38.206058Z"
+        assert metrics["dp"] == 0
+        assert metrics["tp"] == 0
+        assert metrics["ep"] == 0
+
+    def test_parse_batch_with_simple_tp_format(self, parser):
+        """Test parsing batch with simple TP format (1P4D disaggregated style)."""
+        line = "[2025-11-04 07:05:55 TP0] Prefill batch, #new-seq: 3, #new-token: 24576, input throughput (token/s): 3000.0"
+        
+        metrics = parser._parse_prefill_batch_line(line)
+        
+        assert metrics is not None
+        assert metrics["dp"] == 0
+        assert metrics["tp"] == 0
+        assert metrics["ep"] == 0
+        assert metrics["new_token"] == 24576
+
+    def test_parse_batch_with_pipeline_format(self, parser):
+        """Test parsing batch with pipeline parallelism format."""
+        line = "[2025-12-08 14:34:44 PP2] Prefill batch, #new-seq: 4, #new-token: 32768"
+        
+        metrics = parser._parse_prefill_batch_line(line)
+        
+        assert metrics is not None
+        assert metrics["dp"] == 0
+        assert metrics["tp"] == 2  # PP mapped to TP
+        assert metrics["ep"] == 0
+        assert metrics["new_token"] == 32768
+
+    def test_parse_single_log_with_parallelism_tags(self, parser, temp_dir):
+        """Test parsing complete log file with parallelism tags."""
+        log_content = """
+[2025-11-04 05:31:43 DP0 TP0 EP0] Starting SGLang server with server_args=ServerArgs(tp_size=8, dp_size=1, ep_size=1, model_path=/models/qwen3-32b)
+[2025-11-04 05:31:45 DP0 TP0 EP0] Prefill batch, #new-seq: 5, #new-token: 40960, #cached-token: 0, token usage: 0.78, #running-req: 5, #queue-req: 0, #prealloc-req: 0, #inflight-req: 0, input throughput (token/s): 5000.5
+[2025-11-04 05:31:46 DP0 TP0 EP0] Decode batch, #running-req: 5, #token: 512, token usage: 0.85, gen throughput (token/s): 1500.5
+[2025-11-04 05:31:47 DP0 TP0 EP0] avail mem=75.11 GB, mem usage=107.07 GB
+        """
+
+        log_path = temp_dir / "test_node_prefill_w0.out"
+        log_path.write_text(log_content)
+
+        node = parser.parse_single_log(log_path)
+
+        assert node is not None
+        assert node.node_name == "test_node"
+        assert node.worker_type == "prefill"
+        assert node.worker_id == "w0"
+        
+        # Check that batches have correct DP/TP/EP values
+        assert len(node.batches) == 2
+        for batch in node.batches:
+            assert batch.dp == 0
+            assert batch.tp == 0
+            assert batch.ep == 0
+        
+        # Check memory snapshots have correct DP/TP/EP values
+        assert len(node.memory_snapshots) == 1
+        assert node.memory_snapshots[0].dp == 0
+        assert node.memory_snapshots[0].tp == 0
+        assert node.memory_snapshots[0].ep == 0
+        
+        # Verify config extraction still works
+        assert node.config["tp_size"] == 8
+        assert node.config["dp_size"] == 1
+        assert node.config["ep_size"] == 1
 
     def test_extract_node_info_from_filename(self, parser):
         """Test extracting node info from filename."""
@@ -527,6 +747,156 @@ TensorRT-LLM engine args: {'tensor_parallel_size': 8, 'pipeline_parallel_size': 
         assert result["node"] == "worker-0"
         assert result["worker_type"] == "decode"
         assert result["worker_id"] == "w1"
+
+    def test_parse_timestamp(self, parser):
+        """Test parsing TRTLLM timestamp format."""
+        from datetime import datetime
+
+        # Test MM/DD/YYYY-HH:MM:SS format
+        ts1 = "01/23/2026-08:04:38"
+        dt1 = parser.parse_timestamp(ts1)
+        assert isinstance(dt1, datetime)
+        assert dt1.year == 2026
+        assert dt1.month == 1
+        assert dt1.day == 23
+        assert dt1.hour == 8
+        assert dt1.minute == 4
+        assert dt1.second == 38
+
+        # Test another timestamp
+        ts2 = "12/31/2025-23:59:59"
+        dt2 = parser.parse_timestamp(ts2)
+        assert isinstance(dt2, datetime)
+        assert dt2.year == 2025
+        assert dt2.month == 12
+        assert dt2.day == 31
+        assert dt2.hour == 23
+        assert dt2.minute == 59
+        assert dt2.second == 59
+
+        # Test with leading zeros
+        ts3 = "01/01/2026-00:00:00"
+        dt3 = parser.parse_timestamp(ts3)
+        assert isinstance(dt3, datetime)
+        assert dt3.year == 2026
+        assert dt3.month == 1
+        assert dt3.day == 1
+        assert dt3.hour == 0
+        assert dt3.minute == 0
+        assert dt3.second == 0
+
+    def test_parse_timestamp_invalid(self, parser):
+        """Test parsing invalid timestamp raises ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError):
+            parser.parse_timestamp("invalid-timestamp")
+
+        with pytest.raises(ValueError):
+            parser.parse_timestamp("13/40/2026-25:99:99")  # Invalid date/time
+
+        with pytest.raises(ValueError):
+            parser.parse_timestamp("2025-12-30 15:52:38")  # Wrong format
+
+    def test_timestamp_preserved_in_batches(self, parser):
+        """Test that timestamps are preserved in their original format."""
+        log_content = """
+[01/16/2026-06:20:17] [TRT-LLM] [RANK 0] [I] iter = 5559, host_step_time = 50.5ms, num_scheduled_requests: 3, states = {'num_ctx_requests': 2, 'num_ctx_tokens': 16384, 'num_generation_tokens': 0}
+        """
+
+        batches = parser._parse_iteration_logs(log_content, "prefill")
+
+        assert len(batches) == 1
+        # Timestamp should be preserved in original format
+        assert batches[0].timestamp == "01/16/2026-06:20:17"
+
+    def test_timestamp_preserved_in_memory(self, parser):
+        """Test that timestamps are preserved in memory snapshots."""
+        log_content = """
+[01/16/2026-06:20:17] [TRT-LLM] [I] Peak memory during memory usage profiling (torch + non-torch): 91.46 GiB, available KV cache memory when calculating max tokens: 41.11 GiB, fraction is set 0.85, kv size is 35136. device total memory 139.81 GiB
+        """
+
+        memory_snapshots = parser._parse_memory_info(log_content)
+
+        assert len(memory_snapshots) == 1
+        # Timestamp should be preserved in original format
+        assert memory_snapshots[0].timestamp == "01/16/2026-06:20:17"
+
+    def test_parse_dp_tp_ep_tag_full_format(self, parser):
+        """Test parsing full DP/TP/EP tag format in TRTLLM logs."""
+        line = "[01/23/2026-08:04:38 DP1 TP2 EP3] [TRT-LLM] iter = 100, num_scheduled_requests: 5, states = {'num_ctx_requests': 2, 'num_ctx_tokens': 1024, 'num_generation_tokens': 0}"
+        
+        timestamp = parser._extract_timestamp(line)
+        dp, tp, ep = parser._parse_parallelism_tags(line)
+        
+        assert timestamp == "01/23/2026-08:04:38"
+        assert dp == 1
+        assert tp == 2
+        assert ep == 3
+
+    def test_parse_dp_tp_ep_tag_simple_tp(self, parser):
+        """Test parsing simple TP-only format (1P4D style) in TRTLLM logs."""
+        line = "[01/23/2026-08:04:38 TP0] [TRT-LLM] iter = 100, num_scheduled_requests: 10, states = {'num_ctx_requests': 0, 'num_ctx_tokens': 0, 'num_generation_tokens': 512}"
+        
+        timestamp = parser._extract_timestamp(line)
+        dp, tp, ep = parser._parse_parallelism_tags(line)
+        
+        assert timestamp == "01/23/2026-08:04:38"
+        assert dp == 0  # Default
+        assert tp == 0
+        assert ep == 0  # Default
+
+    def test_parse_dp_tp_ep_tag_pipeline(self, parser):
+        """Test parsing pipeline parallelism format in TRTLLM logs."""
+        line = "[01/23/2026-08:04:38 PP3] [TRT-LLM] iter = 100, num_scheduled_requests: 8, states = {'num_ctx_requests': 0, 'num_ctx_tokens': 0, 'num_generation_tokens': 256}"
+        
+        timestamp = parser._extract_timestamp(line)
+        dp, tp, ep = parser._parse_parallelism_tags(line)
+        
+        assert timestamp == "01/23/2026-08:04:38"
+        assert dp == 0  # Default
+        assert tp == 3  # PP mapped to TP
+        assert ep == 0  # Default
+
+    def test_parse_dp_tp_ep_tag_no_tags(self, parser):
+        """Test parsing line without parallelism tags in TRTLLM logs."""
+        line = "[01/23/2026-08:04:38] [TRT-LLM] iter = 100, num_scheduled_requests: 5"
+        
+        timestamp = parser._extract_timestamp(line)
+        dp, tp, ep = parser._parse_parallelism_tags(line)
+        
+        assert timestamp == "01/23/2026-08:04:38"
+        assert dp == 0
+        assert tp == 0
+        assert ep == 0
+
+    def test_parse_iteration_with_dp_tp_ep(self, parser):
+        """Test that iteration parsing extracts DP/TP/EP values."""
+        log_content = """
+[01/23/2026-08:04:38 DP0 TP1 EP0] [TRT-LLM] [RANK 0] [I] iter = 100, num_scheduled_requests: 5, states = {'num_ctx_requests': 2, 'num_ctx_tokens': 1024, 'num_generation_tokens': 0}, host_step_time = 50.0ms
+        """
+        
+        batches = parser._parse_iteration_logs(log_content, "prefill")
+        
+        assert len(batches) == 1
+        assert batches[0].dp == 0
+        assert batches[0].tp == 1
+        assert batches[0].ep == 0
+        assert batches[0].timestamp == "01/23/2026-08:04:38"
+
+    def test_parse_memory_with_dp_tp_ep(self, parser):
+        """Test that memory parsing extracts DP/TP/EP values."""
+        log_content = """
+[01/23/2026-08:04:38 DP0 TP2 EP1] [TRT-LLM] [RANK 0] [I] Peak memory during memory usage profiling (torch + non-torch): 91.46 GiB, available KV cache memory when calculating max tokens: 41.11 GiB, fraction is set 0.85, kv size is 35136. device total memory 139.81 GiB
+        """
+        
+        memory_snapshots = parser._parse_memory_info(log_content)
+        
+        assert len(memory_snapshots) >= 1
+        assert memory_snapshots[0].dp == 0
+        assert memory_snapshots[0].tp == 2
+        assert memory_snapshots[0].ep == 1
+        assert memory_snapshots[0].timestamp == "01/23/2026-08:04:38"
 
 
 class TestBenchmarkLaunchCommand:

@@ -126,9 +126,9 @@ class SGLangNodeParser:
                         batches.append(
                             BatchMetrics(
                                 timestamp=batch_metrics["timestamp"],
-                                dp=0,  # Default since not in log
-                                tp=0,
-                                ep=0,
+                                dp=batch_metrics.get("dp", 0),
+                                tp=batch_metrics.get("tp", 0),
+                                ep=batch_metrics.get("ep", 0),
                                 batch_type=batch_metrics["type"],
                                 new_seq=batch_metrics.get("new_seq"),
                                 new_token=batch_metrics.get("new_token"),
@@ -148,9 +148,9 @@ class SGLangNodeParser:
                         batches.append(
                             BatchMetrics(
                                 timestamp=decode_metrics["timestamp"],
-                                dp=0,
-                                tp=0,
-                                ep=0,
+                                dp=decode_metrics.get("dp", 0),
+                                tp=decode_metrics.get("tp", 0),
+                                ep=decode_metrics.get("ep", 0),
                                 batch_type=decode_metrics["type"],
                                 running_req=decode_metrics.get("running_req"),
                                 queue_req=decode_metrics.get("queue_req"),
@@ -169,9 +169,9 @@ class SGLangNodeParser:
                         memory_snapshots.append(
                             MemoryMetrics(
                                 timestamp=mem_metrics["timestamp"],
-                                dp=0,
-                                tp=0,
-                                ep=0,
+                                dp=mem_metrics.get("dp", 0),
+                                tp=mem_metrics.get("tp", 0),
+                                ep=mem_metrics.get("ep", 0),
                                 metric_type=mem_metrics["type"],
                                 avail_mem_gb=mem_metrics.get("avail_mem_gb"),
                                 mem_usage_gb=mem_metrics.get("mem_usage_gb"),
@@ -231,25 +231,77 @@ class SGLangNodeParser:
         return NodeInfo(metrics=metrics, node_config=node_config if node_config else None)
 
     def _parse_timestamp(self, line: str) -> str | None:
-        """Extract ISO 8601 timestamp from log line.
-        Example: 2025-12-30T15:52:38.206058Z
+        """Extract timestamp from log line.
+        
+        Supports two formats:
+        - Tagged format: [2025-11-04 05:31:43 DP0 TP0 EP0]
+        - ISO format: 2025-12-30T15:52:38.206058Z (fallback)
+        
         Returns the timestamp string as-is without conversion.
         """
+        # Try tagged format first (YYYY-MM-DD HH:MM:SS)
+        match = re.search(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
+        if match:
+            return match.group(1)
+        
+        # Fall back to ISO format
         match = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z?)", line)
         if match:
             return match.group(1)
+        
         return None
+
+    def _parse_parallelism_tags(self, line: str) -> tuple[int, int, int]:
+        """Extract DP, TP, EP indices from log line prefix.
+
+        Supports three formats:
+        - Full: [2025-11-04 05:31:43 DP0 TP0 EP0]
+        - Simple TP: [2025-11-04 07:05:55 TP0] (defaults DP=0, EP=0)
+        - Pipeline: [2025-12-08 14:34:44 PP0] (defaults DP=0, EP=0, TP=PP value)
+
+        Args:
+            line: Log line to parse
+
+        Returns:
+            (dp, tp, ep) tuple with default values of 0 if not found
+        """
+        # Try full format first: DP0 TP0 EP0
+        match = re.search(r"DP(\d+)\s+TP(\d+)\s+EP(\d+)", line)
+        if match:
+            return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+        # Try simple format: TP0 only (1P4D style)
+        match = re.search(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} TP(\d+)\]", line)
+        if match:
+            return 0, int(match.group(1)), 0  # Default DP=0, EP=0
+
+        # Try pipeline parallelism format: PP0 (prefill with PP)
+        match = re.search(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} PP(\d+)\]", line)
+        if match:
+            return 0, int(match.group(1)), 0  # Map PP to TP slot, default DP=0, EP=0
+
+        # Default: no parallelism tags found
+        return 0, 0, 0
 
     def _parse_prefill_batch_line(self, line: str) -> dict | None:
         """Parse prefill batch log line for metrics."""
         if "Prefill batch" not in line:
             return None
 
+        # Parse timestamp and parallelism tags separately
         timestamp = self._parse_timestamp(line)
         if not timestamp:
             return None
-
-        metrics = {"timestamp": timestamp, "type": "prefill"}
+        
+        dp, tp, ep = self._parse_parallelism_tags(line)
+        
+        metrics = {
+            "timestamp": timestamp,
+            "type": "prefill",
+            "dp": dp,
+            "tp": tp,
+            "ep": ep,
+        }
 
         patterns = {
             "new_seq": r"#new-seq:\s*(\d+)",
@@ -276,11 +328,20 @@ class SGLangNodeParser:
         if "Decode batch" not in line:
             return None
 
+        # Parse timestamp and parallelism tags separately
         timestamp = self._parse_timestamp(line)
         if not timestamp:
             return None
-
-        metrics = {"timestamp": timestamp, "type": "decode"}
+        
+        dp, tp, ep = self._parse_parallelism_tags(line)
+        
+        metrics = {
+            "timestamp": timestamp,
+            "type": "decode",
+            "dp": dp,
+            "tp": tp,
+            "ep": ep,
+        }
 
         patterns = {
             "running_req": r"#running-req:\s*(\d+)",
@@ -303,11 +364,19 @@ class SGLangNodeParser:
 
     def _parse_memory_line(self, line: str) -> dict | None:
         """Parse memory-related log lines."""
+        # Parse timestamp and parallelism tags separately
         timestamp = self._parse_timestamp(line)
         if not timestamp:
             return None
-
-        metrics = {"timestamp": timestamp}
+        
+        dp, tp, ep = self._parse_parallelism_tags(line)
+        
+        metrics = {
+            "timestamp": timestamp,
+            "dp": dp,
+            "tp": tp,
+            "ep": ep,
+        }
 
         # Parse available memory from "avail mem=75.11 GB"
         avail_match = re.search(r"avail mem=([\d.]+)\s*GB", line)
