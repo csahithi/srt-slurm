@@ -151,9 +151,8 @@ class TRTLLMProtocol:
         host_config_path.write_text(yaml.safe_dump(config))
 
         # Use container paths for the command
-        # (model_path is mounted to /model, log_dir is mounted to /logs)
+        # runtime.container_model_path handles HuggingFace cache symlinks
         container_config_path = Path("/logs") / config_filename
-        container_model_path = Path("/model")
 
         cmd = [
             "trtllm-llmapi-launch",
@@ -161,7 +160,7 @@ class TRTLLMProtocol:
             "-m",
             "dynamo.trtllm",
             "--model-path",
-            str(container_model_path),
+            str(runtime.container_model_path),
             "--served-model-name",
             runtime.model_path.name,
             "--disaggregation-mode",

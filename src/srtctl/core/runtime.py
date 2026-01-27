@@ -8,7 +8,9 @@ This module provides the single source of truth for all runtime values,
 replacing scattered bash variables and Jinja templating with typed Python.
 """
 
+import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -18,6 +20,54 @@ from .slurm import get_hostname_ip, get_slurm_nodelist
 
 if TYPE_CHECKING:
     from srtctl.core.schema import SrtConfig
+
+logger = logging.getLogger(__name__)
+
+
+def detect_hf_cache_structure(model_path: Path) -> tuple[Path, Path] | None:
+    """Detect if model_path is inside a HuggingFace cache structure.
+
+    HuggingFace cache structure:
+        hub/
+            models--org--model-name/
+                blobs/
+                    <hash files>
+                snapshots/
+                    <revision>/
+                        config.json -> ../../blobs/<hash>
+                        model.safetensors -> ../../blobs/<hash>
+
+    The snapshot files are symlinks to blobs. If we only mount the snapshot,
+    the symlinks break. We need to mount the hub root to preserve symlink resolution.
+
+    Args:
+        model_path: Resolved path to the model directory
+
+    Returns:
+        Tuple of (hub_root, relative_path_from_hub) if HF cache detected, None otherwise
+    """
+    path_str = str(model_path)
+
+    # Pattern: .../models--<org>--<name>/snapshots/<revision>
+    # The hub root is the parent of models--*
+    match = re.search(r"(.*/)?(models--[^/]+/snapshots/[^/]+)$", path_str)
+    if not match:
+        return None
+
+    # Extract the relative path (models--org--name/snapshots/revision)
+    relative_path = match.group(2)
+
+    # Find hub root (parent of models--*)
+    hub_root = model_path
+    for _ in range(3):  # Go up 3 levels: revision -> snapshots -> models--* -> hub
+        hub_root = hub_root.parent
+
+    # Verify the structure exists
+    if not (hub_root / relative_path.split("/")[0]).exists():
+        return None
+
+    logger.info(f"Detected HuggingFace cache structure: hub_root={hub_root}, relative={relative_path}")
+    return hub_root, Path(relative_path)
 
 
 @dataclass(frozen=True)
@@ -78,7 +128,8 @@ class RuntimeContext:
 
     # Computed paths (all absolute)
     log_dir: Path
-    model_path: Path
+    model_path: Path  # Host path to model
+    container_model_path: Path  # Container-side path to model (may differ for HF cache)
     container_image: Path
 
     # Resource configuration
@@ -141,6 +192,9 @@ class RuntimeContext:
         if not model_path.is_dir():
             raise ValueError(f"Model path is not a directory: {model_path}")
 
+        # Check for HuggingFace cache structure - affects how we mount the model
+        hf_cache_info = detect_hf_cache_structure(model_path)
+
         # Resolve container image (expand env vars)
         # container_image can be either:
         # 1. A path to a container file (e.g., /containers/sglang.sqsh) - validate it exists
@@ -160,10 +214,20 @@ class RuntimeContext:
             container_image = Path(container_image_str)
 
         # Build container mounts
-        container_mounts: dict[Path, Path] = {
-            model_path: Path("/model"),
-            log_dir: Path("/logs"),
-        }
+        # For HuggingFace cache, mount the hub root to preserve symlinks
+        if hf_cache_info:
+            hub_root, relative_model_path = hf_cache_info
+            container_model_path = Path("/hf-hub") / relative_model_path
+            container_mounts: dict[Path, Path] = {
+                hub_root: Path("/hf-hub"),
+                log_dir: Path("/logs"),
+            }
+        else:
+            container_model_path = Path("/model")
+            container_mounts = {
+                model_path: Path("/model"),
+                log_dir: Path("/logs"),
+            }
 
         # Add configs directory (NATS, etcd binaries) from source root
         # SRTCTL_SOURCE_DIR is set by the sbatch script
@@ -202,6 +266,7 @@ class RuntimeContext:
             head_node_ip=head_node_ip,
             log_dir=log_dir,
             model_path=model_path,
+            container_model_path=container_model_path,
             container_image=container_image,
             gpus_per_node=config.resources.gpus_per_node,
             network_interface=get_srtslurm_setting("network_interface", "eth0"),
@@ -223,6 +288,7 @@ class RuntimeContext:
             head_node_ip=head_node_ip,
             log_dir=log_dir,
             model_path=model_path,
+            container_model_path=container_model_path,
             container_image=container_image,
             gpus_per_node=config.resources.gpus_per_node,
             network_interface=get_srtslurm_setting("network_interface", "eth0"),

@@ -125,9 +125,14 @@ def resolve_config_with_defaults(user_config: dict[str, Any], cluster_config: di
         logger.debug(f"Resolved model alias '{model_path}' -> '{resolved_path}'")
 
     # Resolve container alias
+    # Check job config first, then cluster config (job config takes precedence)
     container = model.get("container", "")
 
-    containers = cluster_config.get("containers")
+    containers = cluster_config.get("containers") or {}
+    job_containers = config.get("containers")
+    if job_containers:
+        containers = {**containers, **job_containers}
+
     if containers and container in containers:
         resolved_container = containers[container]
         model["container"] = resolved_container

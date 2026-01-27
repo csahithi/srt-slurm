@@ -697,6 +697,11 @@ class SrtConfig:
     # e.g. "custom-setup.sh" -> runs /configs/custom-setup.sh
     setup_script: str | None = None
 
+    # Job-level model_paths and containers aliases (merged with srtslurm.yaml)
+    # These allow defining aliases in the job config that override/supplement cluster config
+    model_paths: dict[str, str] | None = None
+    containers: dict[str, str] | None = None
+
     Schema: ClassVar[type[Schema]] = Schema
 
     def __post_init__(self):

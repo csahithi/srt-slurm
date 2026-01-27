@@ -238,15 +238,16 @@ class SGLangProtocol:
         # Start with nsys prefix if provided
         cmd: list[str] = list(nsys_prefix) if nsys_prefix else []
 
-        # Use container path /model since model is mounted there (see runtime.py)
-        # Note: runtime.model_path is the HOST path, not usable inside container
+        # Use runtime.container_model_path which handles HuggingFace cache symlinks
+        # For HF cache: /hf-hub/models--org--name/snapshots/rev
+        # For regular: /model
         cmd.extend(
             [
                 "python3",
                 "-m",
                 python_module,
                 "--model-path",
-                "/model",
+                str(runtime.container_model_path),
                 "--served-model-name",
                 served_model_name,
                 "--host",
