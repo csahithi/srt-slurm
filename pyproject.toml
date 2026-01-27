@@ -19,6 +19,7 @@ dependencies = [
     "pre-commit>=4.5.1",
     "pandas>=2.1.0",
     "pyarrow>=23.0.0",
+    "plotly>=6.5.2",
 ]
 
 [project.scripts]
@@ -37,8 +38,14 @@ packages = ["src/srtctl"]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0",
+    "pytest-typeguard>=4.0.0",
     "ruff>=0.8.0",
     "ty",  # Astral's fast type checker (replaces mypy)
+    # Analysis dependencies needed for tests
+    "streamlit>=1.30.0",
+    "plotly>=5.18.0",
+    "pandas>=2.1.0",
+    "pyarrow>=14.0.0",  # For parquet caching
 ]
 
 analysis = [
