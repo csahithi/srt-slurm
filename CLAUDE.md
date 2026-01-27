@@ -140,6 +140,30 @@ create_job_record(
 - Job execution is never blocked by status reporting
 - Tags are passed via `metadata["tags"]` (not a separate field)
 
+### InfraConfig
+
+Controls infrastructure placement (etcd/nats):
+
+```python
+infra:
+  etcd_nats_dedicated_node: true  # Reserve first node for infra services
+```
+
+### ResourceConfig
+
+Supports explicit GPUs per worker (overrides computed values):
+
+```python
+resources:
+  gpu_type: "gb200"
+  prefill_nodes: 2
+  prefill_workers: 4
+  decode_nodes: 4
+  decode_workers: 8
+  gpus_per_prefill: 4  # Optional: explicit override
+  gpus_per_decode: 2   # Optional: explicit override
+```
+
 ## Testing
 
 Tests are located in `tests/`. Run `make check` to run lint + all tests.
@@ -169,8 +193,19 @@ with patch.dict(os.environ, H100Rack.slurm_env()):
 ### Adding a New Backend
 
 1. Create `backends/mybackend.py` with a dataclass implementing `BackendProtocol`
-2. Add `build_worker_command(process, runtime)` method
+2. Implement required methods:
+   - `get_srun_config()` - MPI settings and launch strategy
+   - `get_config_for_mode(mode)` - Mode-specific configuration
+   - `get_environment_for_mode(mode)` - Environment variables
+   - `allocate_endpoints()` - Logical worker allocation
+   - `endpoints_to_processes()` - Physical process mapping
+   - `build_worker_command(process, runtime)` - Command construction
 3. Export from `backends/__init__.py`
+4. Add polymorphic deserialization in `BackendConfigField` in `schema.py`
+
+**Current backends:**
+- **SGLang**: Per-process srun launching, supports prefill/decode/aggregated modes
+- **TRTLLM**: MPI-style launching (one srun per endpoint with all nodes), prefill/decode only
 
 ### Adding a New Benchmark
 

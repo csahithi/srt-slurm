@@ -1,4 +1,5 @@
 import builtins
+import uuid
 from collections.abc import Sequence
 from dataclasses import field
 from pathlib import Path
@@ -89,10 +90,12 @@ class TRTLLMProtocol:
         return {}
 
     def get_environment_for_mode(self, mode: WorkerMode) -> dict[str, str]:
+        eplb_prefix = f"moe_shared_{uuid.uuid4().hex}"
+
         if mode == "prefill":
-            return dict(self.prefill_environment)
+            return {**self.prefill_environment, "TRTLLM_EPLB_SHM_NAME": eplb_prefix}
         elif mode == "decode":
-            return dict(self.decode_environment)
+            return {**self.decode_environment, "TRTLLM_EPLB_SHM_NAME": eplb_prefix}
         elif mode == "agg":
             raise ValueError("Aggregated mode is not supported for TRTLLM")
         return {}

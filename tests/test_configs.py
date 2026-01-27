@@ -276,6 +276,7 @@ class TestFrontendConfig:
 
         assert frontend.type == "dynamo"
         assert frontend.enable_multiple_frontends is True
+        assert frontend.nginx_container == "nginx:1.27.4"
         assert frontend.args is None
         assert frontend.env is None
 
@@ -292,6 +293,65 @@ class TestFrontendConfig:
         assert frontend.type == "sglang"
         assert frontend.args == {"policy": "round_robin", "verbose": True}
         assert frontend.env == {"MY_VAR": "value"}
+
+    def test_nginx_container_alias_resolution(self):
+        """Test that nginx_container can be resolved from cluster containers."""
+        from srtctl.core.config import resolve_config_with_defaults
+
+        user_config = {
+            "name": "test",
+            "model": {"path": "/model", "container": "sglang", "precision": "fp8"},
+            "resources": {"gpu_type": "h100", "gpus_per_node": 8, "agg_nodes": 1},
+            "frontend": {"nginx_container": "nginx"},
+        }
+
+        cluster_config = {
+            "containers": {
+                "sglang": "/path/to/sglang.sqsh",
+                "nginx": "/path/to/nginx.sqsh",
+            }
+        }
+
+        resolved = resolve_config_with_defaults(user_config, cluster_config)
+
+        assert resolved["frontend"]["nginx_container"] == "/path/to/nginx.sqsh"
+
+    def test_nginx_container_no_alias_when_path(self):
+        """Test that nginx_container path is kept when not an alias."""
+        from srtctl.core.config import resolve_config_with_defaults
+
+        user_config = {
+            "name": "test",
+            "model": {"path": "/model", "container": "/direct/container.sqsh", "precision": "fp8"},
+            "resources": {"gpu_type": "h100", "gpus_per_node": 8, "agg_nodes": 1},
+            "frontend": {"nginx_container": "/direct/nginx.sqsh"},
+        }
+
+        cluster_config = {
+            "containers": {
+                "nginx": "/path/to/nginx.sqsh",
+            }
+        }
+
+        resolved = resolve_config_with_defaults(user_config, cluster_config)
+
+        # Should keep the original path since it's not an alias
+        assert resolved["frontend"]["nginx_container"] == "/direct/nginx.sqsh"
+
+    def test_nginx_container_no_cluster_config(self):
+        """Test that nginx_container is kept when no cluster config."""
+        from srtctl.core.config import resolve_config_with_defaults
+
+        user_config = {
+            "name": "test",
+            "model": {"path": "/model", "container": "/container.sqsh", "precision": "fp8"},
+            "resources": {"gpu_type": "h100", "gpus_per_node": 8, "agg_nodes": 1},
+            "frontend": {"nginx_container": "nginx"},
+        }
+
+        resolved = resolve_config_with_defaults(user_config, None)
+
+        assert resolved["frontend"]["nginx_container"] == "nginx"
 
 
 class TestSetupScript:
@@ -649,3 +709,133 @@ class TestWorkerEnvironmentTemplating:
 
                             # Mixed case: supported replaced, unsupported kept
                             assert env_vars["MIXED"] == "gpu-01-{unsupported_var}-cache"
+
+class TestInfraConfig:
+    """Tests for InfraConfig dataclass."""
+
+    def test_infra_config_defaults(self):
+        """Test that InfraConfig has correct defaults."""
+        from srtctl.core.schema import InfraConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        # infra config should exist with default values
+        assert config.infra is not None
+        assert config.infra.etcd_nats_dedicated_node is False
+
+    def test_infra_config_enabled(self):
+        """Test InfraConfig with dedicated node enabled."""
+        from srtctl.core.schema import InfraConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+            infra=InfraConfig(etcd_nats_dedicated_node=True),
+        )
+
+        assert config.infra.etcd_nats_dedicated_node is True
+
+
+class TestNodesInfraAllocation:
+    """Tests for Nodes infra node allocation."""
+
+    def test_nodes_default_infra_equals_head(self):
+        """Test that infra node equals head node by default."""
+        from unittest.mock import patch
+
+        from srtctl.core.runtime import Nodes
+
+        with patch("srtctl.core.runtime.get_slurm_nodelist", return_value=["node0", "node1", "node2"]):
+            nodes = Nodes.from_slurm(etcd_nats_dedicated_node=False)
+
+        assert nodes.head == "node0"
+        assert nodes.infra == "node0"  # Same as head
+        assert nodes.worker == ("node0", "node1", "node2")
+
+    def test_nodes_dedicated_infra_node(self):
+        """Test that infra node is separate when dedicated node is enabled."""
+        from unittest.mock import patch
+
+        from srtctl.core.runtime import Nodes
+
+        with patch("srtctl.core.runtime.get_slurm_nodelist", return_value=["node0", "node1", "node2"]):
+            nodes = Nodes.from_slurm(etcd_nats_dedicated_node=True)
+
+        assert nodes.infra == "node0"  # First node is infra-only
+        assert nodes.head == "node1"  # Second node is head
+        assert nodes.worker == ("node1", "node2")  # Infra node not in workers
+
+    def test_nodes_dedicated_infra_requires_two_nodes(self):
+        """Test that dedicated infra node requires at least 2 nodes."""
+        from unittest.mock import patch
+
+        import pytest
+
+        from srtctl.core.runtime import Nodes
+
+        with patch("srtctl.core.runtime.get_slurm_nodelist", return_value=["node0"]):
+            with pytest.raises(ValueError, match="at least 2 nodes"):
+                Nodes.from_slurm(etcd_nats_dedicated_node=True)
+
+
+class TestSbatchNodeCount:
+    """Tests for sbatch node count calculation with infra config."""
+
+    def test_sbatch_adds_node_for_dedicated_infra(self):
+        """Test that sbatch script requests extra node when etcd_nats_dedicated_node is enabled."""
+        from pathlib import Path
+
+        from srtctl.cli.submit import generate_minimal_sbatch_script
+        from srtctl.core.schema import InfraConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        # Config with 2 worker nodes
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(
+                gpu_type="h100",
+                gpus_per_node=8,
+                prefill_nodes=1,
+                decode_nodes=1,
+                prefill_workers=1,
+                decode_workers=1,
+            ),
+            infra=InfraConfig(etcd_nats_dedicated_node=True),
+        )
+
+        script = generate_minimal_sbatch_script(config, Path("/tmp/test.yaml"))
+
+        # Should request 3 nodes: 2 workers + 1 infra
+        assert "#SBATCH --nodes=3" in script
+
+    def test_sbatch_normal_node_count_without_dedicated_infra(self):
+        """Test that sbatch script uses normal node count when etcd_nats_dedicated_node is disabled."""
+        from pathlib import Path
+
+        from srtctl.cli.submit import generate_minimal_sbatch_script
+        from srtctl.core.schema import InfraConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        # Config with 2 worker nodes, no dedicated infra
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(
+                gpu_type="h100",
+                gpus_per_node=8,
+                prefill_nodes=1,
+                decode_nodes=1,
+                prefill_workers=1,
+                decode_workers=1,
+            ),
+            infra=InfraConfig(etcd_nats_dedicated_node=False),
+        )
+
+        script = generate_minimal_sbatch_script(config, Path("/tmp/test.yaml"))
+
+        # Should request 2 nodes: just the workers
+        assert "#SBATCH --nodes=2" in script

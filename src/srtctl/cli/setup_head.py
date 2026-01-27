@@ -135,8 +135,6 @@ def start_nats(binary_path: str = "/configs/nats-server") -> subprocess.Popen:
 
     proc = subprocess.Popen(
         cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
     )
 
     logger.info("NATS server started (PID: %d)", proc.pid)
@@ -185,15 +183,13 @@ def start_etcd(
 
     proc = subprocess.Popen(
         cmd,
-        stdout=stdout or subprocess.PIPE,
-        stderr=subprocess.STDOUT,
     )
 
     logger.info("etcd server started (PID: %d)", proc.pid)
     return proc
 
 
-def wait_for_service(host: str, port: int, name: str, timeout: float = 60.0) -> bool:
+def wait_for_service(host: str, port: int, name: str, timeout: float = 300.0) -> bool:
     """Wait for a service to become available on a port.
 
     Args:

@@ -2,7 +2,7 @@ name: "ctx13_gen1_dep16_batch64_eplb256_mtp3"
 
 model:
   path: "dsr1"
-  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.0"
+  container: "dynamo-trtllm"
   precision: "fp4"
 
 resources:
@@ -20,12 +20,14 @@ backend:
   type: trtllm
 
   prefill_environment:
+    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_SERVER_DISABLE_GC: "1"
     TRTLLM_WORKER_DISABLE_GC: "1"
     NCCL_GRAPH_MIXING_SUPPORT: "0"
     TRTLLM_ENABLE_PDL: "1"
 
   decode_environment:
+    TLLM_OVERRIDE_LAYER_NUM: "61"
     TRTLLM_SERVER_DISABLE_GC: "1"
     TRTLLM_WORKER_DISABLE_GC: "1"
     NCCL_GRAPH_MIXING_SUPPORT: "0"
@@ -124,3 +126,6 @@ frontend:
 
 dynamo:
   install: false
+
+infra:
+  etcd_nats_dedicated_node: true

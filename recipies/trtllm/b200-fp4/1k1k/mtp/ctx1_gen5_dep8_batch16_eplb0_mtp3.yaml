@@ -2,7 +2,7 @@ name: "ctx1_gen5_dep8_batch16_eplb0_mtp3"
 
 model:
   path: "dsr1"
-  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.0"
+  container: "dynamo-trtllm"
   precision: "fp4"
 
 resources:
@@ -110,6 +110,7 @@ benchmark:
   req_rate: "inf"
 
 frontend:
+  nginx_container: "nginx-sqsh"
   type: "dynamo"
 
 dynamo:

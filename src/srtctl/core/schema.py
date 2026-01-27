@@ -649,6 +649,7 @@ class FrontendConfig:
         type: Frontend type - "dynamo" (default) or "sglang"
         enable_multiple_frontends: Scale with nginx + multiple routers
         num_additional_frontends: Additional routers beyond master (default: 9)
+        nginx_container: Custom nginx container image (default: nginx:1.27.4)
         args: CLI arguments passed to the frontend/router process
         env: Environment variables for frontend processes
     """
@@ -656,6 +657,7 @@ class FrontendConfig:
     type: str = "dynamo"
     enable_multiple_frontends: bool = True
     num_additional_frontends: int = 9
+    nginx_container: str = "nginx:1.27.4"
     args: dict[str, Any] | None = None
     env: dict[str, str] | None = None
 
@@ -679,6 +681,21 @@ class HealthCheckConfig:
 
     max_attempts: int = 180  # 30 minutes default (large models take time to load)
     interval_seconds: int = 10
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+@dataclass(frozen=True)
+class InfraConfig:
+    """Infrastructure configuration for etcd/nats placement.
+
+    Attributes:
+        etcd_nats_dedicated_node: If True, run etcd and nats on a dedicated node
+            instead of the head node. This reserves the first node exclusively
+            for infrastructure services. Default: False.
+    """
+
+    etcd_nats_dedicated_node: bool = False
 
     Schema: ClassVar[type[Schema]] = Schema
 
@@ -710,6 +727,7 @@ class SrtConfig:
     profiling: ProfilingConfig = field(default_factory=ProfilingConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     health_check: HealthCheckConfig = field(default_factory=HealthCheckConfig)
+    infra: InfraConfig = field(default_factory=InfraConfig)
 
     environment: dict[str, str] = field(default_factory=dict)
     container_mounts: dict[
