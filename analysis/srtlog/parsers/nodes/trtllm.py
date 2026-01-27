@@ -301,18 +301,18 @@ class TRTLLMNodeParser:
 
             dp, tp, ep = self._parse_parallelism_tags(full_line)
 
-            iteration = int(match.group(1))
+            # iteration = int(match.group(1))  # Not used currently
             num_scheduled = int(match.group(2))
             states_str = match.group(3)
 
             # Parse states dict
-            ctx_requests = 0
             ctx_tokens = 0
             gen_tokens = 0
 
-            ctx_req_match = re.search(r"'num_ctx_requests':\s*(\d+)", states_str)
-            if ctx_req_match:
-                ctx_requests = int(ctx_req_match.group(1))
+            # Skip ctx_requests as it's not used
+            # ctx_req_match = re.search(r"'num_ctx_requests':\s*(\d+)", states_str)
+            # if ctx_req_match:
+            #     ctx_requests = int(ctx_req_match.group(1))
 
             ctx_tok_match = re.search(r"'num_ctx_tokens':\s*(\d+)", states_str)
             if ctx_tok_match:
