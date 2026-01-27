@@ -198,7 +198,10 @@ class PostProcessStageMixin:
         script = f"""
 set -e
 
-# Install srtlog from source and awscli
+# Install uv, srtlog, and awscli
+echo "Installing uv..."
+pip install uv
+
 echo "Installing srtlog and awscli..."
 cd /tmp
 git clone --depth 1 https://github.com/ishandhanani/srtlog.git
@@ -238,10 +241,9 @@ echo "files total"
                 command=["bash", "-c", script],
                 nodelist=[self.runtime.nodes.head],
                 output=str(self.runtime.log_dir / "postprocess.log"),
-                container_image="ghcr.io/astral-sh/uv:latest",
+                container_image="python:3.11",
                 container_mounts={str(self.runtime.log_dir): "/logs"},
                 env_to_set=env,
-                srun_options={"container-remap-root": ""},  # Required for uv container
             )
             proc.wait(timeout=600)  # 10 min timeout for install + parse + full sync
 
@@ -303,7 +305,7 @@ echo "files total"
         """Run AI analysis using Claude Code CLI via OpenRouter.
 
         Uses OpenRouter for authentication which works well in headless environments.
-        Installs claude CLI and gh CLI in a uv container before running analysis.
+        Installs claude CLI and gh CLI in a python container before running analysis.
         See: https://openrouter.ai/docs/guides/claude-code-integration
 
         Args:
@@ -343,6 +345,9 @@ echo "files total"
         script = f"""
 set -e
 
+echo "Installing uv..."
+pip install uv
+
 echo "Installing Claude Code CLI..."
 curl -fsSL https://claude.ai/install.sh | bash
 export PATH="$HOME/.claude/bin:$PATH"
@@ -370,10 +375,9 @@ echo "AI analysis complete."
                 command=["bash", "-c", script],
                 nodelist=[self.runtime.nodes.head],
                 output=str(analysis_log),
-                container_image="ghcr.io/astral-sh/uv:latest",
+                container_image="python:3.11",
                 container_mounts={str(self.runtime.log_dir): "/logs"},
                 env_to_set=env_to_set,
-                srun_options={"container-remap-root": ""},  # Required for uv container
             )
 
             # Wait for completion with timeout (15 minutes for install + analysis)
