@@ -1,8 +1,16 @@
 name: "gb200-fp4-max-tpt"
 
+dynamo:
+  version: 0.7.0
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  num_additional_frontends: 9
+
 model:
   path: "dsr1"
-  container: "lmsysorg/sglang:nightly-dev-cu13-20260121-1e309030"
+  container: "lmsysorg/sglang:v0.5.5.post2"
   precision: "fp4"
 
 resources:
@@ -54,13 +62,13 @@ backend:
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
     SGLANG_MOE_NVFP4_DISPATCH: "1"
     SGLANG_CUTEDSL_MOE_NVFP4_DISPATCH: "1" # Used in older sglang versions
+    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
 
   sglang_config:
     prefill:
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
       trust-remote-code: true
-      disaggregation-transfer-backend: nixl
 
       # KV cache and attention
       kv-cache-dtype: "fp8_e4m3"
@@ -110,7 +118,6 @@ backend:
       # Model configuration
       served-model-name: "deepseek-ai/DeepSeek-R1"
       trust-remote-code: true
-      disaggregation-transfer-backend: nixl
 
       # KV cache and attention
       kv-cache-dtype: "fp8_e4m3"
@@ -226,7 +233,6 @@ backend:
       enable-dp-lm-head: true
       prefill-round-robin-balance: true
       enable-dp-attention: true
-      fp4-gemm-backend: "flashinfer_cutlass"
 
       # Parallelism
       tp-size: 48
@@ -237,5 +243,5 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 8192
-  concurrencies: "256x512x1024x2048"
+  concurrencies: "256x512x1024x2048x8192"
   req_rate: "inf"
