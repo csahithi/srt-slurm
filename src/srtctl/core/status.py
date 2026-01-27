@@ -267,6 +267,7 @@ def create_job_record(
     reporting: "ReportingConfig | None",
     job_id: str,
     job_name: str,
+    cluster: str | None = None,
     recipe: str | None = None,
     metadata: dict | None = None,
 ) -> bool:
@@ -278,6 +279,7 @@ def create_job_record(
         reporting: ReportingConfig from srtslurm.yaml or recipe
         job_id: SLURM job ID
         job_name: Job/config name
+        cluster: Cluster name (optional)
         recipe: Path to recipe file (optional)
         metadata: Job metadata dict (optional)
 
@@ -295,6 +297,8 @@ def create_job_record(
             "job_name": job_name,
             "submitted_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }
+        if cluster:
+            payload["cluster"] = cluster
         if recipe:
             payload["recipe"] = recipe
         if metadata:

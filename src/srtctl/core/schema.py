@@ -79,6 +79,7 @@ class ReportingConfig:
 class ClusterConfig:
     """Cluster configuration from srtslurm.yaml."""
 
+    cluster: str | None = None  # Cluster name for status reporting
     default_account: str | None = None
     default_partition: str | None = None
     default_time_limit: str | None = None

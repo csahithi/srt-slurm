@@ -248,6 +248,7 @@ def submit_with_orchestrator(
             reporting=config.reporting,
             job_id=job_id,
             job_name=config.name,
+            cluster=get_srtslurm_setting("cluster"),
             recipe=str(config_path),
             metadata=metadata,
         )
