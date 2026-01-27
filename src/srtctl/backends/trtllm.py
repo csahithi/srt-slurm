@@ -1,11 +1,11 @@
 import builtins
+import uuid
 from collections.abc import Sequence
 from dataclasses import field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 import yaml
-import uuid
 from marshmallow import Schema
 from marshmallow_dataclass import dataclass
 
@@ -90,7 +90,6 @@ class TRTLLMProtocol:
         return {}
 
     def get_environment_for_mode(self, mode: WorkerMode) -> dict[str, str]:
-
         eplb_prefix = f"moe_shared_{uuid.uuid4().hex}"
 
         if mode == "prefill":
