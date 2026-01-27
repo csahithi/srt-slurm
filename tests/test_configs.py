@@ -294,6 +294,65 @@ class TestFrontendConfig:
         assert frontend.args == {"policy": "round_robin", "verbose": True}
         assert frontend.env == {"MY_VAR": "value"}
 
+    def test_nginx_container_alias_resolution(self):
+        """Test that nginx_container can be resolved from cluster containers."""
+        from srtctl.core.config import resolve_config_with_defaults
+
+        user_config = {
+            "name": "test",
+            "model": {"path": "/model", "container": "sglang", "precision": "fp8"},
+            "resources": {"gpu_type": "h100", "gpus_per_node": 8, "agg_nodes": 1},
+            "frontend": {"nginx_container": "nginx"},
+        }
+
+        cluster_config = {
+            "containers": {
+                "sglang": "/path/to/sglang.sqsh",
+                "nginx": "/path/to/nginx.sqsh",
+            }
+        }
+
+        resolved = resolve_config_with_defaults(user_config, cluster_config)
+
+        assert resolved["frontend"]["nginx_container"] == "/path/to/nginx.sqsh"
+
+    def test_nginx_container_no_alias_when_path(self):
+        """Test that nginx_container path is kept when not an alias."""
+        from srtctl.core.config import resolve_config_with_defaults
+
+        user_config = {
+            "name": "test",
+            "model": {"path": "/model", "container": "/direct/container.sqsh", "precision": "fp8"},
+            "resources": {"gpu_type": "h100", "gpus_per_node": 8, "agg_nodes": 1},
+            "frontend": {"nginx_container": "/direct/nginx.sqsh"},
+        }
+
+        cluster_config = {
+            "containers": {
+                "nginx": "/path/to/nginx.sqsh",
+            }
+        }
+
+        resolved = resolve_config_with_defaults(user_config, cluster_config)
+
+        # Should keep the original path since it's not an alias
+        assert resolved["frontend"]["nginx_container"] == "/direct/nginx.sqsh"
+
+    def test_nginx_container_no_cluster_config(self):
+        """Test that nginx_container is kept when no cluster config."""
+        from srtctl.core.config import resolve_config_with_defaults
+
+        user_config = {
+            "name": "test",
+            "model": {"path": "/model", "container": "/container.sqsh", "precision": "fp8"},
+            "resources": {"gpu_type": "h100", "gpus_per_node": 8, "agg_nodes": 1},
+            "frontend": {"nginx_container": "nginx"},
+        }
+
+        resolved = resolve_config_with_defaults(user_config, None)
+
+        assert resolved["frontend"]["nginx_container"] == "nginx"
+
 
 class TestSetupScript:
     """Tests for setup_script functionality."""

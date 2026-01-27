@@ -138,6 +138,17 @@ def resolve_config_with_defaults(user_config: dict[str, Any], cluster_config: di
         config["reporting"] = cluster_config["reporting"]
         logger.debug("Applied cluster reporting config")
 
+    # Resolve frontend nginx_container alias
+    frontend = config.get("frontend", {})
+    nginx_container = frontend.get("nginx_container", "")
+
+    if containers and nginx_container in containers:
+        resolved_nginx = containers[nginx_container]
+        frontend["nginx_container"] = resolved_nginx
+        config["frontend"] = frontend
+        logger.debug(f"Resolved nginx_container alias '{nginx_container}' -> '{resolved_nginx}'")
+
+
     return config
 
 
