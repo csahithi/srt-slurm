@@ -157,6 +157,7 @@ class S3Config:
         bucket: S3 bucket name
         prefix: Optional prefix/path within bucket (e.g., "srtslurm/logs")
         region: AWS region (e.g., "us-west-2")
+        endpoint_url: Custom S3-compatible endpoint URL (optional)
         access_key_id: AWS access key ID (falls back to AWS_ACCESS_KEY_ID env var)
         secret_access_key: AWS secret access key (falls back to AWS_SECRET_ACCESS_KEY env var)
     """
@@ -164,6 +165,7 @@ class S3Config:
     bucket: str
     prefix: str | None = None
     region: str | None = None
+    endpoint_url: str | None = None
     access_key_id: str | None = None
     secret_access_key: str | None = None
 

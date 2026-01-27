@@ -189,6 +189,9 @@ class PostProcessStageMixin:
         s3_prefix = f"{s3_config.prefix or 'srtslurm'}/{self.runtime.job_id}"
         s3_url = f"s3://{s3_config.bucket}/{s3_prefix}/"
 
+        # Build endpoint flag if custom endpoint provided
+        endpoint_flag = f"--endpoint-url {s3_config.endpoint_url}" if s3_config.endpoint_url else ""
+
         # Build the post-processing script
         script = f"""
 set -e
@@ -206,7 +209,7 @@ srtlog parse .
 
 # Upload entire log directory to S3
 echo "Uploading entire log directory to S3..."
-aws s3 sync /logs {s3_url} --quiet
+aws s3 sync /logs {s3_url} {endpoint_flag}
 echo "Upload complete: {s3_url}"
 
 # Report what was uploaded
