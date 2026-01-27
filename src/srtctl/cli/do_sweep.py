@@ -199,29 +199,26 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
         exit_code = 1
 
         try:
-            # Stage 1: Head infrastructure
-            reporter.report(JobStatus.STARTING, JobStage.HEAD_INFRASTRUCTURE)
+            # Stage 1: Head infrastructure (NATS, etcd)
+            reporter.report(JobStatus.STARTING, JobStage.HEAD_INFRASTRUCTURE, "Starting head infrastructure")
             head_proc = self.start_head_infrastructure(registry)
             registry.add_process(head_proc)
-            reporter.report(JobStatus.HEAD_INFRA_READY, JobStage.HEAD_INFRASTRUCTURE, "NATS and etcd ready")
 
             # Stage 2: Workers
-            reporter.report(JobStatus.WORKERS_STARTING, JobStage.WORKERS)
+            reporter.report(JobStatus.WORKERS, JobStage.WORKERS, "Starting workers")
             worker_procs = self.start_all_workers()
             registry.add_processes(worker_procs)
-            reporter.report(JobStatus.WORKERS_READY, JobStage.WORKERS, "All workers started")
 
             # Stage 3: Frontend
-            reporter.report(JobStatus.FRONTEND_STARTING, JobStage.FRONTEND)
+            reporter.report(JobStatus.FRONTEND, JobStage.FRONTEND, "Starting frontend")
             frontend_procs = self.start_frontend(registry)
             for proc in frontend_procs:
                 registry.add_process(proc)
-            reporter.report(JobStatus.FRONTEND_READY, JobStage.FRONTEND, "Frontend ready")
 
             self._print_connection_info()
 
             # Stage 4: Benchmark
-            reporter.report(JobStatus.BENCHMARK_RUNNING, JobStage.BENCHMARK)
+            reporter.report(JobStatus.BENCHMARK, JobStage.BENCHMARK, "Running benchmark")
             exit_code = self.run_benchmark(registry, stop_event)
 
         except Exception as e:

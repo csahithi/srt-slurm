@@ -41,9 +41,9 @@ Update job status. Called during execution.
 **Request:**
 ```json
 {
-  "status": "workers_ready",
+  "status": "workers",
   "stage": "workers",
-  "message": "All workers healthy",
+  "message": "Starting workers",
   "updated_at": "2025-01-26T10:35:00Z"
 }
 ```
@@ -53,9 +53,10 @@ Update job status. Called during execution.
 ## Status Values
 
 ```text
-submitted → starting → head_ready → workers_starting → workers_ready
-         → frontend_starting → frontend_ready → benchmark → completed | failed
+submitted → starting → workers → frontend → benchmark → completed | failed
 ```
+
+Status reflects which stage is currently executing, not readiness.
 
 ## Behavior
 

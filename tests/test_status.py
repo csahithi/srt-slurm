@@ -90,7 +90,7 @@ class TestStatusReporterReport:
         mock_put.return_value = MagicMock(status_code=200)
         reporter = StatusReporter(job_id="12345", api_endpoint="https://status.example.com")
 
-        reporter.report(JobStatus.WORKERS_READY, stage=JobStage.WORKERS)
+        reporter.report(JobStatus.WORKERS, stage=JobStage.WORKERS)
 
         mock_put.assert_called_once()
         call_args = mock_put.call_args
@@ -361,13 +361,12 @@ class TestJobStatusEnum:
         """Status values match API spec."""
         assert JobStatus.SUBMITTED.value == "submitted"
         assert JobStatus.STARTING.value == "starting"
-        assert JobStatus.HEAD_INFRA_READY.value == "head_ready"
-        assert JobStatus.WORKERS_STARTING.value == "workers_starting"
-        assert JobStatus.WORKERS_READY.value == "workers_ready"
-        assert JobStatus.FRONTEND_READY.value == "frontend_ready"
-        assert JobStatus.BENCHMARK_RUNNING.value == "benchmark"
+        assert JobStatus.WORKERS.value == "workers"
+        assert JobStatus.FRONTEND.value == "frontend"
+        assert JobStatus.BENCHMARK.value == "benchmark"
         assert JobStatus.COMPLETED.value == "completed"
         assert JobStatus.FAILED.value == "failed"
+        assert JobStatus.TIMEOUT.value == "timeout"
 
 
 class TestJobStageEnum:

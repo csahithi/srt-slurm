@@ -80,19 +80,20 @@ class JobStage(str, Enum):
 
 
 class JobStatus(str, Enum):
-    """Job status values."""
+    """Job status values.
 
-    SUBMITTED = "submitted"
-    STARTING = "starting"
-    HEAD_INFRA_READY = "head_ready"
-    WORKERS_STARTING = "workers_starting"
-    WORKERS_READY = "workers_ready"
-    FRONTEND_STARTING = "frontend_starting"
-    FRONTEND_READY = "frontend_ready"
-    BENCHMARK_RUNNING = "benchmark"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    TIMEOUT = "timeout"
+    These represent the current stage of execution, not readiness.
+    We report when ENTERING a stage, not when it's complete.
+    """
+
+    SUBMITTED = "submitted"  # Job submitted to SLURM
+    STARTING = "starting"  # Job started, setting up head infrastructure
+    WORKERS = "workers"  # Starting worker processes
+    FRONTEND = "frontend"  # Starting frontend/router
+    BENCHMARK = "benchmark"  # Running benchmark
+    COMPLETED = "completed"  # Finished successfully
+    FAILED = "failed"  # Failed with error
+    TIMEOUT = "timeout"  # Timed out
 
 
 @dataclass(frozen=True)
