@@ -212,7 +212,7 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
             reporter.report(JobStatus.WORKERS_READY, JobStage.WORKERS, "All workers started")
 
             # Stage 3: Frontend
-            reporter.report(JobStatus.WORKERS_READY, JobStage.FRONTEND)
+            reporter.report(JobStatus.FRONTEND_STARTING, JobStage.FRONTEND)
             frontend_procs = self.start_frontend(registry)
             for proc in frontend_procs:
                 registry.add_process(proc)

@@ -52,9 +52,9 @@ Update job status. Called during execution.
 
 ## Status Values
 
-```
+```text
 submitted → starting → head_ready → workers_starting → workers_ready
-         → frontend_ready → benchmark → completed | failed
+         → frontend_starting → frontend_ready → benchmark → completed | failed
 ```
 
 ## Behavior

@@ -87,6 +87,7 @@ class JobStatus(str, Enum):
     HEAD_INFRA_READY = "head_ready"
     WORKERS_STARTING = "workers_starting"
     WORKERS_READY = "workers_ready"
+    FRONTEND_STARTING = "frontend_starting"
     FRONTEND_READY = "frontend_ready"
     BENCHMARK_RUNNING = "benchmark"
     COMPLETED = "completed"
