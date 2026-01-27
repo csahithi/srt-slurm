@@ -135,8 +135,6 @@ def start_nats(binary_path: str = "/configs/nats-server") -> subprocess.Popen:
 
     proc = subprocess.Popen(
         cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
     )
 
     logger.info("NATS server started (PID: %d)", proc.pid)
@@ -185,8 +183,6 @@ def start_etcd(
 
     proc = subprocess.Popen(
         cmd,
-        stdout=stdout or subprocess.PIPE,
-        stderr=subprocess.STDOUT,
     )
 
     logger.info("etcd server started (PID: %d)", proc.pid)
