@@ -64,6 +64,7 @@ class ClusterConfig:
     use_segment_sbatch_directive: bool = True
     use_exclusive_sbatch_directive: bool = False
     srtctl_root: str | None = None
+    output_dir: str | None = None  # Custom output directory for job logs
     model_paths: dict[str, str] | None = None
     containers: dict[str, str] | None = None
     cloud: dict[str, str] | None = None
