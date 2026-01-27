@@ -26,19 +26,19 @@ check: lint test
 
 # Runners
 gb200-fp8:
-	srtctl apply -f recipies/gb200-fp8/1k1k/low-latency.yaml
-	srtctl apply -f recipies/gb200-fp8/1k1k/max-tpt-2p1d.yaml
-	srtctl apply -f recipies/gb200-fp8/1k1k/mid-curve-3p1d.yaml
-	srtctl apply -f recipies/gb200-fp8/8k1k/low-latency.yaml
-	srtctl apply -f recipies/gb200-fp8/8k1k/mid-curve-5p1d.yaml
+	srtctl apply -f recipes/gb200-fp8/1k1k/low-latency.yaml
+	srtctl apply -f recipes/gb200-fp8/1k1k/max-tpt-2p1d.yaml
+	srtctl apply -f recipes/gb200-fp8/1k1k/mid-curve-3p1d.yaml
+	srtctl apply -f recipes/gb200-fp8/8k1k/low-latency.yaml
+	srtctl apply -f recipes/gb200-fp8/8k1k/mid-curve-5p1d.yaml
 
 gb200-fp4:
-	srtctl apply -f recipies/gb200-fp4/1k1k/low-latency.yaml
-	srtctl apply -f recipies/gb200-fp4/1k1k/max-tpt.yaml
-	srtctl apply -f recipies/gb200-fp4/1k1k/mid-curve.yaml
-	srtctl apply -f recipies/gb200-fp4/8k1k/low-latency.yaml
-	srtctl apply -f recipies/gb200-fp4/8k1k/max-tpt.yaml
-	srtctl apply -f recipies/gb200-fp4/8k1k/mid-curve.yaml
+	srtctl apply -f recipes/gb200-fp4/1k1k/low-latency.yaml
+	srtctl apply -f recipes/gb200-fp4/1k1k/max-tpt.yaml
+	srtctl apply -f recipes/gb200-fp4/1k1k/mid-curve.yaml
+	srtctl apply -f recipes/gb200-fp4/8k1k/low-latency.yaml
+	srtctl apply -f recipes/gb200-fp4/8k1k/max-tpt.yaml
+	srtctl apply -f recipes/gb200-fp4/8k1k/mid-curve.yaml
 
 setup:
 	@echo "📦 Setting up configs and logs directories..."
@@ -49,7 +49,7 @@ setup:
 		aarch64) ARCH_SHORT="arm64" ;; \
 		*) echo "❌ Unsupported architecture: $(ARCH)"; exit 1 ;; \
 	esac; \
-	echo "ℹ️  Dynamo 0.7.0 will be installed from PyPI when workers start"; \
+	echo "ℹ️  Dynamo 0.8.0 will be installed from PyPI when workers start"; \
 	echo "⬇️  Downloading NATS ($(NATS_VERSION)) for $$ARCH_SHORT..."; \
 	NATS_DEB="nats-server-$(NATS_VERSION)-$$ARCH_SHORT.deb"; \
 	NATS_URL="https://github.com/nats-io/nats-server/releases/download/$(NATS_VERSION)/$$NATS_DEB"; \

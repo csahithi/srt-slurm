@@ -23,6 +23,7 @@ from marshmallow import Schema
 from marshmallow_dataclass import dataclass
 
 if TYPE_CHECKING:
+    from srtctl.backends.base import SrunConfig
     from srtctl.core.runtime import RuntimeContext
     from srtctl.core.topology import Endpoint, Process
 
@@ -87,6 +88,12 @@ class SGLangProtocol:
     # BackendProtocol Implementation
     # =========================================================================
 
+    def get_srun_config(self) -> "SrunConfig":
+        """SGLang uses per-process launching (one srun per node)."""
+        from srtctl.backends.base import SrunConfig
+
+        return SrunConfig(mpi=None, oversubscribe=False, launch_per_endpoint=False)
+
     def get_config_for_mode(self, mode: WorkerMode) -> dict[str, Any]:
         """Get merged config dict for a worker mode."""
         if not self.sglang_config:
@@ -131,7 +138,9 @@ class SGLangProtocol:
 
         # Per-mode config dict
         if isinstance(self.kv_events_config, dict):
-            mode_cfg = self.kv_events_config.get(mode)
+            # Normalize mode key: use "aggregated" for aggregated mode
+            mode_cfg = self.kv_events_config.get("aggregated") if mode == "agg" else self.kv_events_config.get(mode)
+
             if mode_cfg is None:
                 return None
             if mode_cfg is True:
@@ -229,13 +238,15 @@ class SGLangProtocol:
         # Start with nsys prefix if provided
         cmd: list[str] = list(nsys_prefix) if nsys_prefix else []
 
+        # Use container path /model since model is mounted there (see runtime.py)
+        # Note: runtime.model_path is the HOST path, not usable inside container
         cmd.extend(
             [
                 "python3",
                 "-m",
                 python_module,
                 "--model-path",
-                str(runtime.model_path),
+                "/model",
                 "--served-model-name",
                 served_model_name,
                 "--host",

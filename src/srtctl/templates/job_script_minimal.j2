@@ -1,17 +1,25 @@
 #!/bin/bash
 #SBATCH --job-name={{ job_name }}
 #SBATCH --nodes={{ total_nodes }}
+{% if backend_type == "trtllm" %}
+#SBATCH --ntasks={{ gpus_per_node * total_nodes }}
+#SBATCH --ntasks-per-node={{ gpus_per_node }}
+{% else %}
 #SBATCH --ntasks={{ total_nodes }}
 #SBATCH --ntasks-per-node=1
+{% endif %}
 {% if use_gpus_per_node_directive %}
 #SBATCH --gpus-per-node={{ gpus_per_node }}
 {% endif %}
 {% if use_segment_sbatch_directive %}
 #SBATCH --segment={{ total_nodes }}
 {% endif %}
+{% if use_exclusive_sbatch_directive %}
+#SBATCH --exclusive
+{% endif %}
 #SBATCH --account={{ account }}
 #SBATCH --time={{ time_limit }}
-#SBATCH --output={{ srtctl_source }}/outputs/%j/logs/sweep_%j.log
+#SBATCH --output={{ output_base }}/%j/logs/sweep_%j.log
 #SBATCH --partition={{ partition }}
 {% for key, value in sbatch_directives.items() %}
 {% if value %}
@@ -30,9 +38,10 @@
 
 set -e
 
-# Setup directories - use project root for consistent output location
+# Setup directories
 SRTCTL_SOURCE="{{ srtctl_source }}"
-OUTPUT_DIR="${SRTCTL_SOURCE}/outputs/${SLURM_JOB_ID}"
+OUTPUT_BASE="{{ output_base }}"
+OUTPUT_DIR="${OUTPUT_BASE}/${SLURM_JOB_ID}"
 LOG_DIR="${OUTPUT_DIR}/logs"
 mkdir -p "${LOG_DIR}"
 

@@ -5,6 +5,7 @@ Complete reference for job configuration YAML files.
 ## Table of Contents
 
 - [Overview](#overview)
+- [Cluster Config Discovery](#cluster-config-discovery)
 - [name](#name)
 - [model](#model)
 - [resources](#resources)
@@ -16,6 +17,7 @@ Complete reference for job configuration YAML files.
 - [profiling](#profiling)
 - [output](#output)
 - [health_check](#health_check)
+- [infra](#infra)
 - [sweep](#sweep)
 - [FormattablePath Template System](#formattablepath-template-system)
 - [container_mounts](#container_mounts)
@@ -62,7 +64,7 @@ benchmark:                     # Optional: benchmark config
   osl: 1024
 
 dynamo:                        # Optional: dynamo version
-  version: "0.7.0"
+  version: "0.8.0"
 
 profiling:                     # Optional: profiling config
   type: "none"
@@ -76,6 +78,45 @@ health_check:                  # Optional: health check settings
 
 setup_script: "my-setup.sh"    # Optional: custom setup script
 ```
+
+---
+
+## Cluster Config Discovery
+
+srtctl looks for `srtslurm.yaml` (cluster-wide settings) in this order:
+
+1. **`SRTSLURM_CONFIG` environment variable** (if set) - explicit path to config file
+2. Current working directory
+3. Parent directory (1 level up)
+4. Grandparent directory (2 levels up)
+
+For users working in deep directory structures (e.g., study directories), set `SRTSLURM_CONFIG` in your shell profile:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export SRTSLURM_CONFIG="/path/to/srt-slurm/srtslurm.yaml"
+```
+
+This allows you to run `srtctl apply -f config.yaml` from anywhere without needing `srtslurm.yaml` nearby.
+
+### Cluster Config Fields
+
+The `srtslurm.yaml` file can contain the following fields:
+
+| Field                           | Type   | Description                                           |
+| ------------------------------- | ------ | ----------------------------------------------------- |
+| `default_account`               | string | Default SLURM account                                 |
+| `default_partition`             | string | Default SLURM partition                               |
+| `default_time_limit`            | string | Default job time limit                                |
+| `gpus_per_node`                 | int    | Default GPUs per node                                 |
+| `network_interface`             | string | Network interface for NCCL                            |
+| `srtctl_root`                   | string | Root directory for srtctl                             |
+| `output_dir`                    | string | Custom output directory (overrides srtctl_root/outputs) |
+| `model_paths`                   | dict   | Model path aliases                                    |
+| `containers`                    | dict   | Container image aliases                               |
+| `default_mounts`                | dict   | Cluster-wide container mounts                         |
+
+**output_dir**: When set, job logs are written to `output_dir/{job_id}/logs` instead of `srtctl_root/outputs/{job_id}/logs`. Useful for CI/CD and ephemeral environments.
 
 ---
 
@@ -148,12 +189,16 @@ resources:
 | `decode_workers`  | int    | null               | Number of decode workers              |
 | `agg_nodes`       | int    | null               | Nodes for aggregated mode             |
 | `agg_workers`     | int    | null               | Number of aggregated workers          |
+| `gpus_per_prefill`| int    | computed           | Explicit GPUs per prefill worker      |
+| `gpus_per_decode` | int    | computed           | Explicit GPUs per decode worker       |
+| `gpus_per_agg`    | int    | computed           | Explicit GPUs per aggregated worker   |
 
 **Notes**:
 
 - Set `decode_nodes: 0` to have decode workers share nodes with prefill workers.
 - Either use disaggregated mode (prefill_nodes/decode_nodes) OR aggregated mode (agg_nodes), not both.
 - GPUs per worker are computed automatically: `(nodes * gpus_per_node) / workers`
+- Use `gpus_per_prefill`, `gpus_per_decode`, `gpus_per_agg` to explicitly override the computed values
 
 ### Computed Properties
 
@@ -210,13 +255,14 @@ frontend:
     MY_VAR: "value"
 ```
 
-| Field                       | Type | Default | Description                         |
-| --------------------------- | ---- | ------- | ----------------------------------- |
-| `type`                      | str  | dynamo  | Frontend type: "dynamo" or "sglang" |
-| `enable_multiple_frontends` | bool | true    | Scale with nginx + multiple routers |
-| `num_additional_frontends`  | int  | 9       | Additional routers beyond master    |
-| `args`                      | dict | null    | CLI args for the frontend           |
-| `env`                       | dict | null    | Env vars for frontend processes     |
+| Field                       | Type | Default       | Description                         |
+| --------------------------- | ---- | ------------- | ----------------------------------- |
+| `type`                      | str  | dynamo        | Frontend type: "dynamo" or "sglang" |
+| `enable_multiple_frontends` | bool | true          | Scale with nginx + multiple routers |
+| `num_additional_frontends`  | int  | 9             | Additional routers beyond master    |
+| `nginx_container`           | str  | nginx:1.27.4  | Custom nginx container image        |
+| `args`                      | dict | null          | CLI args for the frontend           |
+| `env`                       | dict | null          | Env vars for frontend processes     |
 
 See [SGLang Router](sglang-router.md) for detailed architecture.
 
@@ -261,7 +307,7 @@ backend:
 
 | Field                     | Type        | Default | Description                             |
 | ------------------------- | ----------- | ------- | --------------------------------------- |
-| `type`                    | string      | sglang  | Backend type (currently only "sglang")  |
+| `type`                    | string      | sglang  | Backend type: "sglang" or "trtllm"      |
 | `gpu_type`                | string      | null    | GPU type override                       |
 | `prefill_environment`     | dict        | {}      | Environment variables for prefill       |
 | `decode_environment`      | dict        | {}      | Environment variables for decode        |
@@ -302,7 +348,7 @@ kv_events_config: true         # prefill+decode with publisher=zmq, topic=kv-eve
 kv_events_config:
   prefill: true
   decode: true
-  # agg: omitted = disabled
+  aggregated: true              # Enable for aggregated workers
 
 # Custom settings
 kv_events_config:
@@ -311,6 +357,7 @@ kv_events_config:
     topic: "prefill-events"
   decode:
     topic: "decode-events"     # publisher defaults to "zmq"
+  aggregated: true             # Enable for aggregated mode
 ```
 
 Each worker leader gets a globally unique port starting at 5550:
@@ -321,6 +368,42 @@ Each worker leader gets a globally unique port starting at 5550:
 | prefill_1 | 5551 |
 | decode_0  | 5552 |
 | decode_1  | 5553 |
+
+### TRTLLM Backend
+
+When using `type: trtllm`, the backend uses TRTLLM with MPI-style launching:
+
+```yaml
+backend:
+  type: trtllm
+
+  # Per-mode environment variables
+  prefill_environment:
+    CUDA_LAUNCH_BLOCKING: "1"
+  decode_environment:
+    CUDA_LAUNCH_BLOCKING: "1"
+
+  # TRTLLM CLI config per mode
+  trtllm_config:
+    prefill:
+      mem-fraction-static: 0.8
+      chunked-prefill-size: 8192
+    decode:
+      mem-fraction-static: 0.9
+```
+
+| Field                 | Type   | Default | Description                             |
+| --------------------- | ------ | ------- | --------------------------------------- |
+| `type`                | string | -       | Must be "trtllm"                        |
+| `prefill_environment` | dict   | {}      | Environment variables for prefill       |
+| `decode_environment`  | dict   | {}      | Environment variables for decode        |
+| `trtllm_config`       | object | null    | TRTLLM CLI configuration per mode       |
+
+**Key differences from SGLang backend**:
+- No aggregated mode support (prefill/decode only)
+- Uses MPI-style launching (one srun per endpoint with all nodes)
+- Uses `trtllm-llmapi-launch` for distributed launching
+- Automatically sets `TRTLLM_EPLB_SHM_NAME` with unique UUID per endpoint
 
 ---
 
@@ -501,21 +584,23 @@ Dynamo installation configuration.
 
 ```yaml
 dynamo:
-  version: "0.7.0"            # Install from PyPI
+  version: "0.8.0"            # Install from PyPI
   # OR
   hash: "abc123"              # Install from git commit
   # OR
   top_of_tree: true           # Install from main branch
 ```
 
-| Field         | Type   | Default | Description                      |
-| ------------- | ------ | ------- | -------------------------------- |
-| `version`     | string | "0.7.0" | PyPI version                     |
-| `hash`        | string | null    | Git commit hash (source install) |
-| `top_of_tree` | bool   | false   | Install from main branch         |
+| Field         | Type   | Default | Description                                            |
+| ------------- | ------ | ------- | ------------------------------------------------------ |
+| `install`     | bool   | true    | Whether to install dynamo (set false if pre-installed) |
+| `version`     | string | "0.8.0" | PyPI version                                           |
+| `hash`        | string | null    | Git commit hash (source install)                       |
+| `top_of_tree` | bool   | false   | Install from main branch                               |
 
 **Notes**:
 
+- Set `install: false` if your container already has dynamo pre-installed.
 - Only one of `version`, `hash`, or `top_of_tree` should be specified.
 - `hash` and `top_of_tree` are mutually exclusive.
 - When `hash` or `top_of_tree` is set, `version` is automatically cleared.
@@ -658,6 +743,27 @@ health_check:
 - Default of 180 attempts at 10 second intervals = 30 minutes total wait time.
 - Large models (e.g., 70B+ parameters) may require the full 30 minutes to load.
 - Reduce `max_attempts` for smaller models or faster testing.
+
+---
+
+## infra
+
+Infrastructure configuration for etcd/nats placement.
+
+```yaml
+infra:
+  etcd_nats_dedicated_node: true
+```
+
+| Field                    | Type | Default | Description                                        |
+| ------------------------ | ---- | ------- | -------------------------------------------------- |
+| `etcd_nats_dedicated_node` | bool | false   | Reserve first node for infrastructure services     |
+
+**Notes**:
+
+- When `etcd_nats_dedicated_node: true`, the first allocated node is reserved exclusively for etcd and nats services.
+- This can improve stability for large-scale deployments by isolating infrastructure services.
+- The reserved node is not used for worker processes.
 
 ---
 
@@ -817,6 +923,30 @@ The following mounts are always added automatically:
 | `configs/` directory   | `/configs`           | NATS, etcd binaries          |
 | Benchmark scripts      | `/srtctl-benchmarks` | Bundled benchmark scripts    |
 
+### Cluster-Level Mounts
+
+You can also define cluster-wide mounts in `srtslurm.yaml` using the `default_mounts` field. These are applied to all jobs on the cluster, after the built-in defaults but before job-level mounts.
+
+```yaml
+# In srtslurm.yaml
+default_mounts:
+  "/cluster/special/libs": "/opt/libs"
+  "$SCRATCH": "/scratch"
+```
+
+Environment variables (e.g., `$SCRATCH`, `$HOME`) are expanded. This is useful for mounting cluster-specific paths that are required by certain images without adding them to every job config.
+
+### Mount Priority
+
+Mounts have the following priority (highest to lowest):
+
+1. **Job-level `container_mounts`** - FormattablePath dict (highest priority)
+2. **Job-level `extra_mount`** - simple `host:container` strings
+3. **Cluster-level** - `default_mounts` from `srtslurm.yaml`
+4. **Built-in defaults** - model, logs, configs, benchmark scripts (lowest priority)
+
+Job-level mounts always take precedence over cluster-level and built-in defaults.
+
 ---
 
 ## environment
@@ -833,6 +963,15 @@ environment:
 | Key    | Value  | Description                      |
 | ------ | ------ | -------------------------------- |
 | string | string | Environment variable name=value  |
+
+### Per-Worker Template Variables
+
+Environment variable values support per-worker templating with these placeholders:
+
+| Placeholder | Description                                    | Example      |
+| ----------- | ---------------------------------------------- | ------------ |
+| `{node}`    | Hostname of the node where the worker runs     | `"gpu-01"`   |
+| `{node_id}` | Numeric index of the node in worker list (0-based) | `0`, `1`, `2` |
 
 **Note**: For per-worker-mode environment variables, use `backend.prefill_environment`, `backend.decode_environment`, or `backend.aggregated_environment`.
 
@@ -1018,7 +1157,7 @@ health_check:
   interval_seconds: 10
 
 dynamo:
-  version: "0.7.0"
+  version: "0.8.0"
 ```
 
 ### Aggregated Mode with SGLang Router

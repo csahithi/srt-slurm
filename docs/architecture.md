@@ -1,7 +1,7 @@
 # srtctl Architecture Documentation
 
-**Version**: 1.0
-**Last Updated**: 2025-12-30
+**Version**: 1.1
+**Last Updated**: 2026-01-27
 
 ---
 
@@ -27,7 +27,7 @@
 srtctl (SLURM Runtime Control) is a Python-first orchestration framework for LLM inference benchmarks on SLURM clusters. It provides:
 
 - **Configuration-driven deployment**: YAML configs define model, resources, backends, and benchmarks
-- **Multi-backend support**: Currently SGLang with prefill/decode disaggregation
+- **Multi-backend support**: SGLang and TRTLLM with prefill/decode disaggregation
 - **Automated orchestration**: Handles infrastructure setup, worker spawning, health checks, and benchmarking
 - **Container-based execution**: Workers run inside containers with proper mounts and environment
 
@@ -278,6 +278,7 @@ src/srtctl/backends/
 |-- __init__.py     # Exports BackendConfig, protocols
 |-- base.py         # BackendProtocol definition
 |-- sglang.py       # SGLangProtocol implementation
+|-- trtllm.py       # TRTLLMProtocol implementation
 ```
 
 #### BackendProtocol
@@ -319,6 +320,33 @@ class SGLangProtocol:
     # KV events config
     kv_events_config: bool | dict[str, Any] | None = None
 ```
+
+**Launch strategy**: Per-process srun launching (one srun per worker process).
+
+#### TRTLLMProtocol
+
+Implements BackendProtocol for TRTLLM with MPI-style launching:
+
+```python
+@dataclass(frozen=True)
+class TRTLLMProtocol:
+    type: Literal["trtllm"] = "trtllm"
+
+    # Per-mode environment
+    prefill_environment: dict[str, str]
+    decode_environment: dict[str, str]
+
+    # TRTLLM CLI config per mode
+    trtllm_config: TRTLLMServerConfig | None = None
+```
+
+**Launch strategy**: MPI-style launching (one srun per endpoint with all nodes together). Uses `trtllm-llmapi-launch` for distributed launching.
+
+**Key differences from SGLang**:
+- No aggregated mode support
+- Uses UUID-based EPLB shared memory naming (`TRTLLM_EPLB_SHM_NAME`)
+- MPI launch with `--mpi=pmix` and `--cpu-bind=verbose,none`
+- Configuration written to YAML file and passed via `--extra-engine-args`
 
 ### Frontend Layer
 
@@ -408,10 +436,11 @@ src/srtctl/core/
 +------------------------------------------------------------------+
 |                        BACKEND LAYER                              |
 +------------------------------------------------------------------+
-| BackendProtocol                    | SGLangProtocol               |
-| - allocate_endpoints()             | - build_worker_command()     |
-| - endpoints_to_processes()         | - Mode-specific config       |
-| - build_worker_command()           | - KV events support          |
+| BackendProtocol                    | Implementations:             |
+| - get_srun_config()                | - SGLangProtocol             |
+| - allocate_endpoints()             |   (per-process srun)         |
+| - endpoints_to_processes()         | - TRTLLMProtocol             |
+| - build_worker_command()           |   (MPI-style srun)           |
 +------------------------------------------------------------------+
                                 |
                                 v
@@ -1034,6 +1063,7 @@ src/srtctl/
 |   |-- __init__.py          # Exports BackendConfig, protocols
 |   |-- base.py              # BackendProtocol definition
 |   |-- sglang.py            # SGLangProtocol implementation
+|   |-- trtllm.py            # TRTLLMProtocol implementation
 |
 |-- frontends/               # Frontend implementations
 |   |-- __init__.py          # Exports FrontendProtocol

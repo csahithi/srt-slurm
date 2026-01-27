@@ -78,8 +78,8 @@ class DynamoFrontend:
             cmd.extend(self.get_frontend_args_list(config.frontend.args))
 
             env_to_set = {
-                "ETCD_ENDPOINTS": f"http://{runtime.nodes.head}:2379",
-                "NATS_SERVER": f"nats://{runtime.nodes.head}:4222",
+                "ETCD_ENDPOINTS": f"http://{runtime.nodes.infra}:2379",
+                "NATS_SERVER": f"nats://{runtime.nodes.infra}:4222",
                 "DYN_REQUEST_PLANE": "nats",
             }
 
@@ -98,6 +98,9 @@ class DynamoFrontend:
                 container_mounts=runtime.container_mounts,
                 env_to_set=env_to_set,
                 bash_preamble=bash_preamble,
+                # TODO(jthomson): I don't have the faintest clue of
+                # why this is needed in later versions of Dynamo, but it is.
+                mpi="pmix",
             )
 
             processes.append(
@@ -125,7 +128,8 @@ class DynamoFrontend:
             )
 
         # Dynamo installation (required for dynamo frontend)
-        if not config.profiling.enabled:
+        # Skip if dynamo.install is False (container already has dynamo installed)
+        if not config.profiling.enabled and config.dynamo.install:
             parts.append(config.dynamo.get_install_commands())
 
         if not parts:

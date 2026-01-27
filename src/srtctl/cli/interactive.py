@@ -50,7 +50,7 @@ def find_recipes(root: Path | None = None) -> list[Path]:
     if root is None:
         root = Path.cwd()
 
-    recipes_dir = root / "recipies"  # Note: typo in original dir name
+    recipes_dir = root / "recipes"  # Note: typo in original dir name
     if not recipes_dir.exists():
         recipes_dir = root / "recipes"
 
@@ -144,7 +144,7 @@ def select_recipe() -> Path | None:
                 choices.append(questionary.Choice(str(rel.name), value=r))
 
     if not choices:
-        console.print("[yellow]No recipes found in recipies/[/]")
+        console.print("[yellow]No recipes found in recipes/[/]")
         custom = questionary.path(
             "Enter path to config file:",
             style=STYLE,
