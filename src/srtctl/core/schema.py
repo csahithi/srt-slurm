@@ -47,6 +47,30 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# Reporting Configuration
+# ============================================================================
+
+
+@dataclass(frozen=True)
+class ReportingStatusConfig:
+    """Status reporting configuration."""
+
+    endpoint: str | None = None
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+@dataclass(frozen=True)
+class ReportingConfig:
+    """Reporting configuration for status updates and log exports."""
+
+    status: ReportingStatusConfig | None = None
+    # Future: logs, metrics, etc.
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+# ============================================================================
 # Cluster Configuration (srtslurm.yaml)
 # ============================================================================
 
@@ -71,6 +95,9 @@ class ClusterConfig:
     # Cluster-level container mounts (host_path -> container_path)
     # Applied to all jobs on this cluster, useful for cluster-specific paths
     default_mounts: dict[str, str] | None = None
+
+    # Reporting configuration (status API, future: logs to S3, etc.)
+    reporting: ReportingConfig | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 
@@ -696,6 +723,9 @@ class SrtConfig:
     # Custom setup script (runs before dynamo install and worker startup)
     # e.g. "custom-setup.sh" -> runs /configs/custom-setup.sh
     setup_script: str | None = None
+
+    # Reporting configuration (status API, future: logs to S3, etc.)
+    reporting: ReportingConfig | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 

@@ -245,6 +245,7 @@ def submit_with_orchestrator(
 
         # Report to status API (fire-and-forget, silent on failure)
         create_job_record(
+            reporting=config.reporting,
             job_id=job_id,
             job_name=config.name,
             recipe=str(config_path),

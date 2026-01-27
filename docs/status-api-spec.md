@@ -4,10 +4,15 @@ srtslurm can optionally report job status to an external HTTP API via fire-and-f
 
 ## Configuration
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `JOB_STATUS_REPORT_ENDPOINT` | Yes | Base URL of the status API |
-| `JOB_STATUS_REPORT_CLUSTER` | No | Cluster name for job metadata |
+In `srtslurm.yaml` or recipe YAML:
+
+```yaml
+reporting:
+  status:
+    endpoint: "https://status.example.com"
+```
+
+If not configured, status reporting is disabled and jobs run normally.
 
 ## Endpoints
 

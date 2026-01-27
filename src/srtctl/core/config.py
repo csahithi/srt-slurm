@@ -133,6 +133,11 @@ def resolve_config_with_defaults(user_config: dict[str, Any], cluster_config: di
         model["container"] = resolved_container
         logger.debug(f"Resolved container alias '{container}' -> '{resolved_container}'")
 
+    # Apply reporting defaults (if not specified in user config)
+    if "reporting" not in config and cluster_config.get("reporting"):
+        config["reporting"] = cluster_config["reporting"]
+        logger.debug("Applied cluster reporting config")
+
     return config
 
 

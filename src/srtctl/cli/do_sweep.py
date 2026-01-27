@@ -173,7 +173,7 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
     def run(self) -> int:
         """Run the complete sweep."""
         # Create status reporter (fire-and-forget, no-op if not configured)
-        reporter = StatusReporter.from_env(self.runtime.job_id)
+        reporter = StatusReporter.from_config(self.config.reporting, self.runtime.job_id)
         reporter.report_started(self.config, self.runtime)
 
         logger.info("Sweep Orchestrator")

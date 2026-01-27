@@ -8,14 +8,14 @@ This module provides optional status reporting to an external API endpoint.
 If the endpoint is not configured or unreachable, operations silently continue.
 The API contract is defined in docs/status-api-spec.md.
 
-Environment Variables:
-    JOB_STATUS_REPORT_ENDPOINT: Base URL of status API (e.g., https://status.example.com)
-    JOB_STATUS_REPORT_CLUSTER: Cluster name for job metadata
+Configuration (in srtslurm.yaml or recipe YAML):
+    reporting:
+      status:
+        endpoint: "https://status.example.com"
 """
 
 import logging
-import os
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -24,13 +24,48 @@ import requests
 
 if TYPE_CHECKING:
     from srtctl.core.runtime import RuntimeContext
-    from srtctl.core.schema import SrtConfig
+    from srtctl.core.schema import ReportingConfig, SrtConfig
 
 logger = logging.getLogger(__name__)
 
-# Environment variable names
-STATUS_API_ENV = "JOB_STATUS_REPORT_ENDPOINT"
-CLUSTER_ENV = "JOB_STATUS_REPORT_CLUSTER"
+
+# ============================================================================
+# API Payload Dataclasses (matches docs/status-api-spec.md)
+# ============================================================================
+
+
+@dataclass
+class JobCreatePayload:
+    """Payload for POST /api/jobs."""
+
+    job_id: str
+    job_name: str
+    submitted_at: str
+    cluster: str | None = None
+    recipe: str | None = None
+    metadata: dict | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dict, excluding None values."""
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+@dataclass
+class JobUpdatePayload:
+    """Payload for PUT /api/jobs/{job_id}."""
+
+    status: str
+    updated_at: str
+    stage: str | None = None
+    message: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    exit_code: int | None = None
+    metadata: dict | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dict, excluding None values."""
+        return {k: v for k, v in asdict(self).items() if v is not None}
 
 
 class JobStage(str, Enum):
@@ -63,31 +98,35 @@ class JobStatus(str, Enum):
 class StatusReporter:
     """Fire-and-forget status reporter.
 
-    Reports job status to an external API if JOB_STATUS_REPORT_ENDPOINT is set.
+    Reports job status to an external API if reporting.status.endpoint is configured.
     All operations are non-blocking and failures are silently logged.
 
     Usage:
-        reporter = StatusReporter.from_env(job_id="12345")
+        reporter = StatusReporter.from_config(config.reporting, job_id="12345")
         reporter.report(JobStatus.WORKERS_READY, stage=JobStage.WORKERS)
     """
 
     job_id: str
     api_endpoint: str | None = None
-    cluster: str | None = None
     timeout: float = 5.0
 
     @classmethod
-    def from_env(cls, job_id: str) -> "StatusReporter":
-        """Create reporter from environment variables."""
-        endpoint = os.environ.get(STATUS_API_ENV)
-        cluster = os.environ.get(CLUSTER_ENV)
+    def from_config(cls, reporting: "ReportingConfig | None", job_id: str) -> "StatusReporter":
+        """Create reporter from reporting config.
 
-        if endpoint:
-            # Strip trailing slash for consistency
-            endpoint = endpoint.rstrip("/")
+        Args:
+            reporting: ReportingConfig from srtslurm.yaml or recipe
+            job_id: SLURM job ID
+
+        Returns:
+            StatusReporter instance (disabled if no endpoint configured)
+        """
+        endpoint = None
+        if reporting and reporting.status and reporting.status.endpoint:
+            endpoint = reporting.status.endpoint.rstrip("/")
             logger.info("Status reporting enabled: %s", endpoint)
 
-        return cls(job_id=job_id, api_endpoint=endpoint, cluster=cluster)
+        return cls(job_id=job_id, api_endpoint=endpoint)
 
     @property
     def enabled(self) -> bool:
@@ -118,17 +157,15 @@ class StatusReporter:
             return False
 
         try:
-            payload: dict = {
-                "status": status.value,
-                "updated_at": self._now_iso(),
-            }
-            if stage:
-                payload["stage"] = stage.value
-            if message:
-                payload["message"] = message
+            payload = JobUpdatePayload(
+                status=status.value,
+                updated_at=self._now_iso(),
+                stage=stage.value if stage else None,
+                message=message,
+            )
 
             url = f"{self.api_endpoint}/api/jobs/{self.job_id}"
-            response = requests.put(url, json=payload, timeout=self.timeout)
+            response = requests.put(url, json=payload.to_dict(), timeout=self.timeout)
 
             if response.status_code == 200:
                 logger.debug("Status reported: %s", status.value)
@@ -227,6 +264,7 @@ class StatusReporter:
 
 
 def create_job_record(
+    reporting: "ReportingConfig | None",
     job_id: str,
     job_name: str,
     recipe: str | None = None,
@@ -237,6 +275,7 @@ def create_job_record(
     This is a standalone function used by submit.py before the job starts.
 
     Args:
+        reporting: ReportingConfig from srtslurm.yaml or recipe
         job_id: SLURM job ID
         job_name: Job/config name
         recipe: Path to recipe file (optional)
@@ -245,12 +284,10 @@ def create_job_record(
     Returns:
         True if created successfully, False otherwise
     """
-    api_endpoint = os.environ.get(STATUS_API_ENV)
-    if not api_endpoint:
+    if not reporting or not reporting.status or not reporting.status.endpoint:
         return False
 
-    api_endpoint = api_endpoint.rstrip("/")
-    cluster = os.environ.get(CLUSTER_ENV)
+    api_endpoint = reporting.status.endpoint.rstrip("/")
 
     try:
         payload: dict = {
@@ -258,8 +295,6 @@ def create_job_record(
             "job_name": job_name,
             "submitted_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }
-        if cluster:
-            payload["cluster"] = cluster
         if recipe:
             payload["recipe"] = recipe
         if metadata:
