@@ -23,12 +23,14 @@ backend:
     TRTLLM_WORKER_DISABLE_GC: "1"
     NCCL_GRAPH_MIXING_SUPPORT: "0"
     TRTLLM_ENABLE_PDL: "1"
+    TRTLLM_UCX_INTERFACE: "mlx5_0:1,mlx5_1:1,mlx5_2:1,mlx5_3:1,enP22s22f0np0"
 
   decode_environment:
     TRTLLM_SERVER_DISABLE_GC: "1"
     TRTLLM_WORKER_DISABLE_GC: "1"
     NCCL_GRAPH_MIXING_SUPPORT: "0"
     TRTLLM_ENABLE_PDL: "1"
+    TRTLLM_UCX_INTERFACE: "mlx5_0:1,mlx5_1:1,mlx5_2:1,mlx5_3:1,enP22s22f0np0"
 
   trtllm_config:
     prefill:
