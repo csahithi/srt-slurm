@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 # Type alias for worker modes
 WorkerMode = Literal["prefill", "decode", "agg"]
 
+
 @dataclass(frozen=True)
 class TRTLLMServerConfig:
     """SGLang server CLI configuration per mode (prefill/decode/aggregated).
@@ -29,6 +30,7 @@ class TRTLLMServerConfig:
     aggregated: dict[str, Any] | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
+
 
 @dataclass(frozen=True)
 class TRTLLMProtocol:
@@ -169,7 +171,7 @@ class TRTLLMProtocol:
             "--extra-engine-args",
             str(container_config_path),
             "--request-plane",
-            "nats"
+            "nats",
         ]
 
         return cmd
