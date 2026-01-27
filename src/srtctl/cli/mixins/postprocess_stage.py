@@ -297,6 +297,7 @@ echo "files total"
         """Run AI analysis using Claude Code CLI via OpenRouter.
 
         Uses OpenRouter for authentication which works well in headless environments.
+        Installs claude CLI and gh CLI in a uv container before running analysis.
         See: https://openrouter.ai/docs/guides/claude-code-integration
 
         Args:
@@ -313,9 +314,10 @@ echo "files total"
         if not gh_token:
             logger.warning("GH_TOKEN not set - GitHub PR search will not work")
 
-        # Build the prompt
+        # Build the prompt - escape for shell
         log_dir = str(self.runtime.log_dir)
         prompt = config.get_prompt(log_dir)
+        escaped_prompt = shlex.quote(prompt)
 
         logger.info("Log directory: %s", log_dir)
         logger.info("Repos to search: %s", ", ".join(config.repos_to_search))
@@ -330,35 +332,49 @@ echo "files total"
         if gh_token:
             env_to_set["GH_TOKEN"] = gh_token
 
-        # Build the Claude Code command
-        # Use -p for headless mode and --allowedTools for explicit tool permissions
-        # Only grant tools needed for log analysis: Read files, Bash for gh CLI, Write for output
-        claude_cmd = [
-            "claude",
-            "-p",
-            prompt,
-            "--allowedTools",
-            "Read,Bash(gh *),Bash(ls *),Bash(cat *),Bash(grep *),Write(**/ai_analysis.md)",
-        ]
+        # Build the analysis script that installs tools and runs claude
+        # Uses uv container with node for npm packages
+        script = f"""
+set -e
 
-        # Wrap in bash to cd to log directory first
-        bash_cmd = f"cd {shlex.quote(log_dir)} && {shlex.join(claude_cmd)}"
+echo "Installing dependencies..."
+
+# Install Node.js (required for claude CLI)
+apt-get update -qq && apt-get install -y -qq nodejs npm curl > /dev/null 2>&1
+
+# Install GitHub CLI
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+apt-get update -qq && apt-get install -y -qq gh > /dev/null 2>&1
+
+# Install Claude Code CLI
+npm install -g @anthropic-ai/claude-code > /dev/null 2>&1
+
+echo "Dependencies installed. Running AI analysis..."
+
+# Run claude with explicit tool permissions
+cd /logs
+claude -p {escaped_prompt} \\
+    --allowedTools "Read,Bash(gh *),Bash(ls *),Bash(cat *),Bash(grep *),Write(**/ai_analysis.md)"
+
+echo "AI analysis complete."
+"""
 
         analysis_log = self.runtime.log_dir / "ai_analysis.log"
         logger.info("Starting Claude Code analysis (log: %s)", analysis_log)
 
         try:
             proc = start_srun_process(
-                command=["bash", "-c", bash_cmd],
+                command=["bash", "-c", script],
                 nodelist=[self.runtime.nodes.head],
                 output=str(analysis_log),
-                container_image=str(self.runtime.container_image),
-                container_mounts=self.runtime.container_mounts,
+                container_image="ghcr.io/astral-sh/uv:latest",
+                container_mounts={str(self.runtime.log_dir): "/logs"},
                 env_to_set=env_to_set,
             )
 
-            # Wait for completion with timeout (10 minutes max)
-            timeout = 600
+            # Wait for completion with timeout (15 minutes for install + analysis)
+            timeout = 900
             start_time = time.time()
 
             while proc.poll() is None:
