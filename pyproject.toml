@@ -38,7 +38,7 @@ packages = ["src/srtctl"]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0",
-    "pytest-typeguard>=4.0.0",
+    "typeguard>=4.0.0",  # Includes pytest integration
     "ruff>=0.8.0",
     "ty",  # Astral's fast type checker (replaces mypy)
     # Analysis dependencies needed for tests
