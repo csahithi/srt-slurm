@@ -110,7 +110,7 @@ class AIAnalysisConfig:
 
     Uses OpenRouter for Claude Code authentication, which provides a simple API key
     approach that works well in headless/automated environments.
-    See: https://openrouter.ai/docs/guides/guides/claude-code-integration
+    See: https://openrouter.ai/docs/guides/claude-code-integration
 
     Attributes:
         enabled: Whether to run AI analysis on benchmark failures

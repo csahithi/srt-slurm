@@ -9,8 +9,8 @@ Handles:
 - srtlog parsing and S3 upload
 - AI-powered failure analysis using Claude Code CLI
 
-Uses OpenRouter for authentication (simple API key, works in headless environments).
-See: https://openrouter.ai/docs/guides/guides/claude-code-integration
+AI analysis uses Claude Code in headless mode (-p flag) with OpenRouter for authentication.
+See: https://openrouter.ai/docs/guides/claude-code-integration
 """
 
 import json
@@ -297,7 +297,7 @@ echo "files total"
         """Run AI analysis using Claude Code CLI via OpenRouter.
 
         Uses OpenRouter for authentication which works well in headless environments.
-        See: https://openrouter.ai/docs/guides/guides/claude-code-integration
+        See: https://openrouter.ai/docs/guides/claude-code-integration
 
         Args:
             config: AI analysis configuration
@@ -321,22 +321,24 @@ echo "files total"
         logger.info("Repos to search: %s", ", ".join(config.repos_to_search))
 
         # Build environment variables for OpenRouter integration
-        # Per https://openrouter.ai/docs/guides/guides/claude-code-integration
+        # See: https://openrouter.ai/docs/guides/claude-code-integration
         env_to_set = {
             "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
             "ANTHROPIC_AUTH_TOKEN": openrouter_key,
-            "ANTHROPIC_API_KEY": "",  # Must be explicitly empty to prevent conflicts
+            "ANTHROPIC_API_KEY": "",  # Must be explicitly empty to route through OpenRouter
         }
         if gh_token:
             env_to_set["GH_TOKEN"] = gh_token
 
         # Build the Claude Code command
-        # Use -p for headless mode and --dangerously-skip-permissions for full tool access
+        # Use -p for headless mode and --allowedTools for explicit tool permissions
+        # Only grant tools needed for log analysis: Read files, Bash for gh CLI, Write for output
         claude_cmd = [
             "claude",
             "-p",
             prompt,
-            "--dangerously-skip-permissions",
+            "--allowedTools",
+            "Read,Bash(gh *),Bash(ls *),Bash(cat *),Bash(grep *),Write(**/ai_analysis.md)",
         ]
 
         # Wrap in bash to cd to log directory first
