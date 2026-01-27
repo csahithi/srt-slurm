@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -33,11 +34,33 @@ class SGLangNodeParser:
     """Parser for SGLang node logs.
     Handles SGLang structured logging with ISO 8601 timestamps.
     May contain ANSI color codes which are stripped during parsing.
+    
+    Timestamp format: YYYY-MM-DDTHH:MM:SS.microsZ (e.g., 2025-12-30T15:52:38.206058Z)
     """
 
     @property
     def backend_type(self) -> str:
         return "sglang"
+    
+    @staticmethod
+    def parse_timestamp(timestamp: str) -> datetime:
+        """Parse SGLang timestamp format to datetime object.
+        
+        Args:
+            timestamp: Timestamp string in ISO 8601 format (e.g., 2025-12-30T15:52:38.206058Z)
+            
+        Returns:
+            datetime object
+            
+        Raises:
+            ValueError: If timestamp format is invalid
+        """
+        # Handle both with and without microseconds and timezone
+        timestamp = timestamp.rstrip('Z')
+        if '.' in timestamp:
+            return datetime.fromisoformat(timestamp)
+        else:
+            return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S")
 
     def parse_logs(self, log_dir: Path) -> list[NodeInfo]:
         """Parse all prefill/decode/agg log files in a directory.
@@ -210,6 +233,7 @@ class SGLangNodeParser:
     def _parse_timestamp(self, line: str) -> str | None:
         """Extract ISO 8601 timestamp from log line.
         Example: 2025-12-30T15:52:38.206058Z
+        Returns the timestamp string as-is without conversion.
         """
         match = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z?)", line)
         if match:

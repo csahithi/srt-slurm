@@ -10,6 +10,48 @@ import streamlit as st
 from analysis.dashboard.components import load_node_metrics
 
 
+def _parse_timestamp(timestamp: str) -> datetime:
+    """Parse timestamp from multiple possible formats.
+    
+    Supports:
+    - ISO 8601: 2025-12-30T15:52:38.206058Z
+    - YYYY-MM-DD HH:MM:SS
+    - MM/DD/YYYY-HH:MM:SS (TRTLLM format)
+    
+    Args:
+        timestamp: Timestamp string in one of the supported formats
+        
+    Returns:
+        datetime object
+        
+    Raises:
+        ValueError: If timestamp format is not recognized
+    """
+    # Try YYYY-MM-DD HH:MM:SS format first (most common)
+    try:
+        return datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        pass
+    
+    # Try ISO 8601 format (SGLang)
+    try:
+        ts = timestamp.rstrip('Z')
+        if '.' in ts:
+            return datetime.fromisoformat(ts)
+        else:
+            return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        pass
+    
+    # Try MM/DD/YYYY-HH:MM:SS format (TRTLLM)
+    try:
+        return datetime.strptime(timestamp, "%m/%d/%Y-%H:%M:%S")
+    except ValueError:
+        pass
+    
+    raise ValueError(f"Unable to parse timestamp: {timestamp}")
+
+
 def render(filtered_runs: list, logs_dir: str):
     """Render rate match analysis.
 
@@ -139,8 +181,8 @@ def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id="", show_reques
             avg_input_tps.append(avg / prefill_divisor)
 
         if timestamps:
-            first_time = datetime.strptime(timestamps[0], "%Y-%m-%d %H:%M:%S")
-            elapsed = [(datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") - first_time).total_seconds() for ts in timestamps]
+            first_time = _parse_timestamp(timestamps[0])
+            elapsed = [(_parse_timestamp(ts) - first_time).total_seconds() for ts in timestamps]
 
             unit = "req/s" if show_request_rate else "tok/s"
             rate_fig.add_trace(
@@ -175,8 +217,8 @@ def _create_rate_match_graph(prefill_nodes, decode_nodes, job_id="", show_reques
             avg_gen_tps.append(avg / decode_divisor)
 
         if timestamps:
-            first_time = datetime.strptime(timestamps[0], "%Y-%m-%d %H:%M:%S")
-            elapsed = [(datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") - first_time).total_seconds() for ts in timestamps]
+            first_time = _parse_timestamp(timestamps[0])
+            elapsed = [(_parse_timestamp(ts) - first_time).total_seconds() for ts in timestamps]
 
             unit = "req/s" if show_request_rate else "tok/s"
             rate_fig.add_trace(

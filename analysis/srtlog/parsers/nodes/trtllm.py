@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -35,11 +36,28 @@ class TRTLLMNodeParser:
     - Launch command from dynamo.trtllm
     - Worker configuration from Config() dump
     - MPI rank and world size information
+    
+    Timestamp format: MM/DD/YYYY-HH:MM:SS (e.g., 01/23/2026-08:04:38)
     """
 
     @property
     def backend_type(self) -> str:
         return "trtllm"
+    
+    @staticmethod
+    def parse_timestamp(timestamp: str) -> datetime:
+        """Parse TRTLLM timestamp format to datetime object.
+        
+        Args:
+            timestamp: Timestamp string in format MM/DD/YYYY-HH:MM:SS
+            
+        Returns:
+            datetime object
+            
+        Raises:
+            ValueError: If timestamp format is invalid
+        """
+        return datetime.strptime(timestamp, "%m/%d/%Y-%H:%M:%S")
 
     def parse_logs(self, log_dir: Path) -> list[NodeInfo]:
         """Parse all TRTLLM node logs in a directory.
