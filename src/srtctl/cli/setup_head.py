@@ -193,7 +193,7 @@ def start_etcd(
     return proc
 
 
-def wait_for_service(host: str, port: int, name: str, timeout: float = 60.0) -> bool:
+def wait_for_service(host: str, port: int, name: str, timeout: float = 300.0) -> bool:
     """Wait for a service to become available on a port.
 
     Args:
