@@ -269,7 +269,6 @@ def create_job_record(
     job_name: str,
     cluster: str | None = None,
     recipe: str | None = None,
-    tags: list[str] | None = None,
     metadata: dict | None = None,
 ) -> bool:
     """Create initial job record in status API (called at submission time).
@@ -282,8 +281,7 @@ def create_job_record(
         job_name: Job/config name
         cluster: Cluster name (optional)
         recipe: Path to recipe file (optional)
-        tags: List of tags (optional) - merged into metadata["tags"]
-        metadata: Job metadata dict (optional)
+        metadata: Job metadata dict (may include "tags" list)
 
     Returns:
         True if created successfully, False otherwise
@@ -294,11 +292,6 @@ def create_job_record(
     api_endpoint = reporting.status.endpoint.rstrip("/")
 
     try:
-        # Build metadata dict, merging tags into it
-        final_metadata = metadata.copy() if metadata else {}
-        if tags:
-            final_metadata["tags"] = tags
-
         payload: dict = {
             "job_id": job_id,
             "job_name": job_name,
@@ -308,8 +301,8 @@ def create_job_record(
             payload["cluster"] = cluster
         if recipe:
             payload["recipe"] = recipe
-        if final_metadata:
-            payload["metadata"] = final_metadata
+        if metadata:
+            payload["metadata"] = metadata
 
         url = f"{api_endpoint}/api/jobs"
         response = requests.post(url, json=payload, timeout=5.0)

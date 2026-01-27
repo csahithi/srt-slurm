@@ -244,13 +244,13 @@ def submit_with_orchestrator(
             json.dump(metadata, f, indent=2)
 
         # Report to status API (fire-and-forget, silent on failure)
+        # Note: tags are already included in metadata dict above
         create_job_record(
             reporting=config.reporting,
             job_id=job_id,
             job_name=config.name,
             cluster=get_srtslurm_setting("cluster"),
             recipe=str(config_path),
-            tags=tags,
             metadata=metadata,
         )
 
