@@ -111,6 +111,7 @@ benchmark:
   req_rate: "inf"
 
 frontend:
+  nginx_container: "nginx-sqsh"
   type: "dynamo"
 
 dynamo:
