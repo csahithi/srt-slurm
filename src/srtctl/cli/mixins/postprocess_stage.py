@@ -333,22 +333,18 @@ echo "files total"
             env_to_set["GH_TOKEN"] = gh_token
 
         # Build the analysis script that installs tools and runs claude
-        # Uses uv container with node for npm packages
+        # Uses curl to install claude CLI and gh CLI without requiring apt/root
         script = f"""
 set -e
 
-echo "Installing dependencies..."
+echo "Installing Claude Code CLI..."
+curl -fsSL https://claude.ai/install.sh | bash
+export PATH="$HOME/.claude/bin:$PATH"
 
-# Install Node.js (required for claude CLI)
-apt-get update -qq && apt-get install -y -qq nodejs npm curl > /dev/null 2>&1
-
-# Install GitHub CLI
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-apt-get update -qq && apt-get install -y -qq gh > /dev/null 2>&1
-
-# Install Claude Code CLI
-npm install -g @anthropic-ai/claude-code > /dev/null 2>&1
+echo "Installing GitHub CLI..."
+GH_VERSION=$(curl -s https://api.github.com/repos/cli/cli/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | sed 's/v//')
+curl -fsSL "https://github.com/cli/cli/releases/download/v${{GH_VERSION}}/gh_${{GH_VERSION}}_linux_amd64.tar.gz" | tar xz -C /tmp
+export PATH="/tmp/gh_${{GH_VERSION}}_linux_amd64/bin:$PATH"
 
 echo "Dependencies installed. Running AI analysis..."
 
