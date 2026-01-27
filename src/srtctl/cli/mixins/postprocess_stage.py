@@ -241,6 +241,7 @@ echo "files total"
                 container_image="ghcr.io/astral-sh/uv:latest",
                 container_mounts={str(self.runtime.log_dir): "/logs"},
                 env_to_set=env,
+                srun_options={"container-remap-root": ""},  # Required for uv container
             )
             proc.wait(timeout=600)  # 10 min timeout for install + parse + full sync
 
@@ -372,6 +373,7 @@ echo "AI analysis complete."
                 container_image="ghcr.io/astral-sh/uv:latest",
                 container_mounts={str(self.runtime.log_dir): "/logs"},
                 env_to_set=env_to_set,
+                srun_options={"container-remap-root": ""},  # Required for uv container
             )
 
             # Wait for completion with timeout (15 minutes for install + analysis)
