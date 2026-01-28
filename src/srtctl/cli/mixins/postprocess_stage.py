@@ -293,9 +293,7 @@ echo "files total"
             logger.warning("Post-processing container failed: %s", e)
             return None, None
 
-    def _report_metrics(
-        self, benchmark_results: dict[str, Any] | None, s3_url: str | None, exit_code: int
-    ) -> None:
+    def _report_metrics(self, benchmark_results: dict[str, Any] | None, s3_url: str | None, exit_code: int) -> None:
         """Report metrics to dashboard via status API.
 
         Args:
