@@ -375,3 +375,264 @@ class TestReportingStatusConfig:
         schema = ReportingStatusConfig.Schema()
         config = schema.load({"endpoint": "https://dashboard.example.com"})
         assert config.endpoint == "https://dashboard.example.com"
+
+
+class TestRollupFaultTolerance:
+    """Tests for rollup generation fault tolerance.
+
+    These tests verify that failures in rollup generation never crash the benchmark.
+    """
+
+    def _create_mixin_with_runtime(self, tmp_path, benchmark_type="sa-bench"):
+        """Create a mixin instance with real runtime and config mocks."""
+        from srtctl.cli.mixins.postprocess_stage import PostProcessStageMixin
+
+        mixin = PostProcessStageMixin()
+
+        # Mock config
+        mixin.config = MagicMock()
+        mixin.config.benchmark.type = benchmark_type
+
+        # Mock runtime with real tmp_path for log_dir
+        mixin.runtime = MagicMock()
+        mixin.runtime.log_dir = tmp_path
+        mixin.runtime.job_id = "12345"
+
+        return mixin
+
+    def test_generate_rollup_no_script_does_not_raise(self, tmp_path):
+        """Test _generate_rollup returns silently when no rollup script exists."""
+        mixin = self._create_mixin_with_runtime(tmp_path, benchmark_type="nonexistent-benchmark")
+
+        # Should not raise - just returns silently
+        mixin._generate_rollup()
+
+    def test_generate_rollup_script_failure_does_not_raise(self, tmp_path):
+        """Test _generate_rollup handles script failures gracefully."""
+        mixin = self._create_mixin_with_runtime(tmp_path, benchmark_type="sa-bench")
+
+        # No sa-bench results exist, so rollup.py will fail
+        # But it should not raise
+        mixin._generate_rollup()
+
+    def test_generate_rollup_timeout_does_not_raise(self, tmp_path):
+        """Test _generate_rollup handles timeout gracefully."""
+        from srtctl.cli.mixins.postprocess_stage import PostProcessStageMixin
+        import subprocess
+
+        mixin = self._create_mixin_with_runtime(tmp_path, benchmark_type="sa-bench")
+
+        # Mock subprocess.run to raise TimeoutExpired
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired(cmd="test", timeout=30)
+
+            # Should not raise
+            mixin._generate_rollup()
+
+    def test_generate_rollup_exception_does_not_raise(self, tmp_path):
+        """Test _generate_rollup handles unexpected exceptions gracefully."""
+        mixin = self._create_mixin_with_runtime(tmp_path, benchmark_type="sa-bench")
+
+        # Mock subprocess.run to raise generic exception
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = Exception("Unexpected error")
+
+            # Should not raise
+            mixin._generate_rollup()
+
+    def test_extract_results_fallback_to_raw_output(self, tmp_path):
+        """Test _extract_benchmark_results falls back to benchmark.out when no rollup."""
+        mixin = self._create_mixin_with_runtime(tmp_path)
+
+        # Create benchmark.out but no rollup.json
+        benchmark_out = tmp_path / "benchmark.out"
+        benchmark_out.write_text("Raw benchmark output here")
+
+        result = mixin._extract_benchmark_results()
+
+        assert result is not None
+        assert result["benchmark_type"] == "unknown"
+        assert result["raw_output"] == "Raw benchmark output here"
+
+    def test_extract_results_corrupted_rollup_fallback(self, tmp_path):
+        """Test _extract_benchmark_results falls back when rollup.json is corrupted."""
+        mixin = self._create_mixin_with_runtime(tmp_path)
+
+        # Create corrupted rollup.json
+        rollup = tmp_path / "benchmark-rollup.json"
+        rollup.write_text("not valid json {{{")
+
+        # Create backup benchmark.out
+        benchmark_out = tmp_path / "benchmark.out"
+        benchmark_out.write_text("Fallback output")
+
+        result = mixin._extract_benchmark_results()
+
+        assert result is not None
+        assert result["benchmark_type"] == "unknown"
+        assert result["raw_output"] == "Fallback output"
+
+    def test_extract_results_no_files_returns_none(self, tmp_path):
+        """Test _extract_benchmark_results returns None when no files exist."""
+        mixin = self._create_mixin_with_runtime(tmp_path)
+
+        result = mixin._extract_benchmark_results()
+
+        assert result is None
+
+    def test_extract_results_valid_rollup(self, tmp_path):
+        """Test _extract_benchmark_results reads valid rollup.json."""
+        import json
+
+        mixin = self._create_mixin_with_runtime(tmp_path)
+
+        # Create valid rollup.json
+        rollup_data = {
+            "benchmark_type": "sa-bench",
+            "timestamp": "2026-01-27T00:00:00Z",
+            "config": {"model": "test-model", "isl": 100, "osl": 100},
+            "runs": [{"concurrency": 4, "throughput_toks": 100.0}]
+        }
+        rollup = tmp_path / "benchmark-rollup.json"
+        rollup.write_text(json.dumps(rollup_data))
+
+        result = mixin._extract_benchmark_results()
+
+        assert result is not None
+        assert result["benchmark_type"] == "sa-bench"
+        assert result["config"]["model"] == "test-model"
+        assert len(result["runs"]) == 1
+
+    def test_run_postprocess_completes_with_rollup_failure(self, tmp_path):
+        """Test run_postprocess completes even when rollup fails entirely."""
+        mixin = self._create_mixin_with_runtime(tmp_path, benchmark_type="sa-bench")
+
+        # Mock all the other methods to isolate rollup behavior
+        mixin._run_postprocess_container = MagicMock(return_value=(None, None))
+        mixin._report_metrics = MagicMock()
+        mixin._get_ai_analysis_config = MagicMock(return_value=None)
+
+        # Mock _generate_rollup to raise (simulating worst case)
+        # But actually, _generate_rollup should never raise - let's verify that
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = Exception("Catastrophic failure")
+
+            # Should complete without raising
+            mixin.run_postprocess(exit_code=0)
+
+        # Verify other methods were still called
+        mixin._run_postprocess_container.assert_called_once()
+        mixin._report_metrics.assert_called_once()
+
+
+class TestS3UploadFaultTolerance:
+    """Tests for S3 upload fault tolerance.
+
+    These tests verify that failures in S3 upload never crash the benchmark.
+    """
+
+    def _create_mixin_with_runtime(self, tmp_path):
+        """Create a mixin instance with runtime mocks."""
+        from srtctl.cli.mixins.postprocess_stage import PostProcessStageMixin
+
+        mixin = PostProcessStageMixin()
+
+        # Mock config
+        mixin.config = MagicMock()
+        mixin.config.benchmark.type = "sa-bench"
+
+        # Mock runtime
+        mixin.runtime = MagicMock()
+        mixin.runtime.log_dir = tmp_path
+        mixin.runtime.job_id = "12345"
+        mixin.runtime.nodes.head = "node001"
+
+        return mixin
+
+    def test_no_s3_config_returns_none(self, tmp_path):
+        """Test _run_postprocess_container returns None when S3 not configured."""
+        mixin = self._create_mixin_with_runtime(tmp_path)
+
+        # Mock _get_s3_config to return None
+        mixin._get_s3_config = MagicMock(return_value=None)
+
+        result = mixin._run_postprocess_container()
+
+        assert result == (None, None)
+
+    def test_srun_failure_does_not_raise(self, tmp_path):
+        """Test _run_postprocess_container handles srun failure gracefully."""
+        mixin = self._create_mixin_with_runtime(tmp_path)
+
+        # Mock S3 config
+        mixin._get_s3_config = MagicMock(return_value=S3Config(bucket="test-bucket"))
+
+        # Mock start_srun_process to raise
+        with patch("srtctl.cli.mixins.postprocess_stage.start_srun_process") as mock_srun:
+            mock_srun.side_effect = Exception("SLURM is down")
+
+            result = mixin._run_postprocess_container()
+
+        assert result == (None, None)
+
+    def test_srun_timeout_does_not_raise(self, tmp_path):
+        """Test _run_postprocess_container handles timeout gracefully."""
+        import subprocess
+
+        mixin = self._create_mixin_with_runtime(tmp_path)
+
+        # Mock S3 config
+        mixin._get_s3_config = MagicMock(return_value=S3Config(bucket="test-bucket"))
+
+        # Mock start_srun_process to return a process that times out
+        mock_proc = MagicMock()
+        mock_proc.wait.side_effect = subprocess.TimeoutExpired(cmd="test", timeout=600)
+        mock_proc.kill = MagicMock()
+
+        with patch("srtctl.cli.mixins.postprocess_stage.start_srun_process") as mock_srun:
+            mock_srun.return_value = mock_proc
+
+            result = mixin._run_postprocess_container()
+
+        assert result == (None, None)
+        mock_proc.kill.assert_called_once()
+
+    def test_srun_nonzero_exit_does_not_raise(self, tmp_path):
+        """Test _run_postprocess_container handles non-zero exit gracefully."""
+        mixin = self._create_mixin_with_runtime(tmp_path)
+
+        # Mock S3 config
+        mixin._get_s3_config = MagicMock(return_value=S3Config(bucket="test-bucket"))
+
+        # Mock start_srun_process to return a process that fails
+        mock_proc = MagicMock()
+        mock_proc.wait.return_value = None
+        mock_proc.returncode = 1  # Non-zero exit
+
+        with patch("srtctl.cli.mixins.postprocess_stage.start_srun_process") as mock_srun:
+            mock_srun.return_value = mock_proc
+
+            parquet_path, s3_url = mixin._run_postprocess_container()
+
+        # Should return None for s3_url on failure
+        assert s3_url is None
+
+    def test_run_postprocess_completes_with_s3_failure(self, tmp_path):
+        """Test run_postprocess completes even when S3 upload fails entirely."""
+        mixin = self._create_mixin_with_runtime(tmp_path)
+
+        # Mock _generate_rollup
+        mixin._generate_rollup = MagicMock()
+
+        # Mock _run_postprocess_container to simulate S3 failure
+        mixin._run_postprocess_container = MagicMock(return_value=(None, None))
+
+        # Mock other methods
+        mixin._report_metrics = MagicMock()
+        mixin._get_ai_analysis_config = MagicMock(return_value=None)
+
+        # Should complete without raising
+        mixin.run_postprocess(exit_code=0)
+
+        # Verify _report_metrics was still called (with None for s3_url)
+        mixin._report_metrics.assert_called_once_with(None, None)
