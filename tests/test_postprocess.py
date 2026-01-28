@@ -152,6 +152,7 @@ class TestPostProcessStageMixin:
         from srtctl.cli.mixins.postprocess_stage import PostProcessStageMixin
 
         mixin = PostProcessStageMixin()
+        mixin._generate_rollup = MagicMock()
         mixin._extract_benchmark_results = MagicMock(return_value=None)
         mixin._run_postprocess_container = MagicMock(return_value=(None, None))
         mixin._report_metrics = MagicMock()
