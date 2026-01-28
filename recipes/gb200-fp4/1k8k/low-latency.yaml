@@ -7,10 +7,11 @@ frontend:
   type: dynamo
   enable_multiple_frontends: true
   num_additional_frontends: 4
+  nginx_container: "nginx-sqsh"
 
 model:
   path: "dsr1"
-  container: "lmsysorg/sglang:v0.5.5.post2"
+  container: "dynamo-sglang"
   precision: "fp4"
 
 resources:
