@@ -139,7 +139,7 @@ class PostProcessStageMixin:
         parquet_path, s3_url = self._run_postprocess_container()
 
         # Report metrics to dashboard
-        self._report_metrics(benchmark_results, s3_url)
+        self._report_metrics(benchmark_results, s3_url, exit_code)
 
         # AI analysis only on failures
         if exit_code != 0:
@@ -293,12 +293,15 @@ echo "files total"
             logger.warning("Post-processing container failed: %s", e)
             return None, None
 
-    def _report_metrics(self, benchmark_results: dict[str, Any] | None, s3_url: str | None) -> None:
+    def _report_metrics(
+        self, benchmark_results: dict[str, Any] | None, s3_url: str | None, exit_code: int
+    ) -> None:
         """Report metrics to dashboard via status API.
 
         Args:
             benchmark_results: Extracted benchmark results
             s3_url: S3 URL where logs were uploaded
+            exit_code: Exit code from the benchmark run
         """
         cluster_config = load_cluster_config()
         if not cluster_config:
@@ -323,10 +326,12 @@ echo "files total"
         if not metadata:
             return
 
+        # Use "failed" status when exit code is non-zero
+        status = "failed" if exit_code != 0 else "completed"
+
         try:
             url = f"{endpoint}/api/jobs/{self.runtime.job_id}"
-            # Dashboard API requires status field in PUT request
-            response = requests.put(url, json={"status": "completed", "metadata": metadata}, timeout=5)
+            response = requests.put(url, json={"status": status, "metadata": metadata}, timeout=5)
             if response.ok:
                 logger.info("Reported metrics to dashboard: %s", url)
             else:

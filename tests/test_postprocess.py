@@ -635,5 +635,5 @@ class TestS3UploadFaultTolerance:
         # Should complete without raising
         mixin.run_postprocess(exit_code=0)
 
-        # Verify _report_metrics was still called (with None for s3_url)
-        mixin._report_metrics.assert_called_once_with(None, None)
+        # Verify _report_metrics was still called (with None for s3_url, exit_code=0)
+        mixin._report_metrics.assert_called_once_with(None, None, 0)
