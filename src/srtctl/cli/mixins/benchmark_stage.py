@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from srtctl.core.health import wait_for_model
+from srtctl.core.health import wait_for_model, wait_for_port
 from srtctl.core.slurm import get_hostname_ip, start_srun_process
 
 if TYPE_CHECKING:
@@ -56,6 +56,14 @@ class BenchmarkStageMixin:
         worker_desc = f"{r.num_agg} agg" if r.num_agg > 0 else f"{r.num_prefill}P + {r.num_decode}D"
 
         logger.info("Waiting for server health (expecting %d workers: %s)...", num_workers, worker_desc)
+
+        # Wait for frontend port to be available (nginx or direct frontend)
+        # This ensures nginx has finished installing and started before we poll /health
+        logger.info("Waiting for frontend port 8000 on %s...", self.runtime.nodes.head)
+        if not wait_for_port(self.runtime.nodes.head, 8000, timeout=300.0, interval=5.0):
+            logger.error("Frontend port 8000 not available after 5 minutes - nginx may have failed to start")
+            return 1
+        logger.info("Frontend port is ready")
 
         # For aggregated mode: expect 0 prefill, N decode (backend workers count as decode)
         # For disaggregated mode: expect N prefill, M decode

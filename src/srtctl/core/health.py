@@ -420,13 +420,21 @@ def wait_for_model(
                 if time.time() - last_report_time >= report_every:
                     logger.info(result.message)
                     last_report_time = time.time()
+            else:
+                # Log non-200 responses periodically (e.g., 502 Bad Gateway from nginx)
+                if time.time() - last_report_time >= report_every:
+                    logger.info(
+                        "Health endpoint returned HTTP %d, waiting for backends to be ready...",
+                        response.status_code,
+                    )
+                    last_report_time = time.time()
 
         except requests.exceptions.RequestException as e:
             # Report connection errors periodically
             if time.time() - last_report_time >= report_every:
-                logger.debug("Health check failed: %s", e)
+                logger.info("Health check connection failed: %s", e)
                 last_report_time = time.time()
         except Exception as e:
-            logger.debug("Unexpected error during health check: %s", e)
+            logger.warning("Unexpected error during health check: %s", e)
 
         time.sleep(poll_interval)

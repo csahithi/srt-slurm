@@ -132,11 +132,12 @@ class FrontendStageMixin:
 
         # Install nginx and run it (daemon off keeps nginx in foreground so srun can manage it)
         # Use container path (/logs) since log_dir is mounted there
+        # Note: Use -q (not -qq) to still show errors if apt-get fails
         container_config_path = "/logs/nginx.conf"
         cmd = [
             "bash",
             "-c",
-            f"apt-get update -qq && apt-get install -y -qq nginx && nginx -c {container_config_path} -g 'daemon off;'",
+            f"apt-get update -q && apt-get install -y -q nginx && echo 'Starting nginx...' && nginx -c {container_config_path} -g 'daemon off;'",
         ]
 
         proc = start_srun_process(
