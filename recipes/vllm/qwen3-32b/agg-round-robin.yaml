@@ -4,10 +4,13 @@
 
 name: "qwen3-32b-vllm-agg-rr"
 
+slurm:
+  time_limit: "01:15:00"  # 1 hour 15 minutes
+
 model:
-  path: "Qwen/Qwen3-32B"
-  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.8.0"
-  precision: "bf16"
+  path: "qwen3-32b-fp8"
+  container: "/lustre/fsw/coreai_ai-foundation-models_dev/aflowers/containers/nvidia+ai-dynamo+vllm-runtime+0.8.0.sqsh"
+  precision: "fp8"
 
 resources:
   gpu_type: "h100"

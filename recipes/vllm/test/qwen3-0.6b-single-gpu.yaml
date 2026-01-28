@@ -1,15 +1,15 @@
-# OPT-125M Single GPU Test Config
+# Qwen3-0.6B Single GPU Test Config
 # Minimal configuration for quick iteration and testing
-# Model: facebook/opt-125m (~250MB, loads in seconds)
+# Model: Qwen/Qwen3-0.6B (~1.2GB, loads quickly)
 
-name: "opt-125m-vllm-test"
+name: "qwen3-0.6b-vllm-test"
 
 slurm:
   time_limit: "00:30:00"  # 30 minutes
 
 model:
   # Use hf: prefix to download from HuggingFace at runtime
-  path: "hf:facebook/opt-125m"
+  path: "hf:Qwen/Qwen3-0.6B"
   container: "/lustre/fsw/coreai_ai-foundation-models_dev/aflowers/containers/nvidia+ai-dynamo+vllm-runtime+0.8.0.sqsh"
   precision: "fp16"
 
@@ -37,11 +37,11 @@ backend:
 
   vllm_config:
     aggregated:
-      served-model-name: "facebook/opt-125m"
+      served-model-name: "Qwen/Qwen3-0.6B"
       tensor-parallel-size: 1
       gpu-memory-utilization: 0.90
       disable-log-requests: true
-      max-model-len: 2048
+      max-model-len: 4096
 
 benchmark:
   type: "mooncake-router"
