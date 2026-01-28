@@ -23,6 +23,10 @@ ARTIFACT_DIR="${BASE_DIR}/artifacts"
 mkdir -p "${TRACE_DIR}"
 mkdir -p "${ARTIFACT_DIR}"
 
+# Increase aiperf HTTP timeout to avoid ReadTimeout during tokenizer downloads
+# Default is 30s which can fail with large workloads under system load
+export AIPERF_HTTP_SO_RCVTIMEO=120
+
 echo "=============================================="
 echo "Mooncake Router Benchmark (aiperf)"
 echo "=============================================="
