@@ -296,10 +296,14 @@ echo "files total"
 
         try:
             url = f"{endpoint}/api/jobs/{self.runtime.job_id}"
-            requests.put(url, json={"metadata": metadata}, timeout=5)
-            logger.debug("Reported metrics to dashboard: %s", url)
+            # Dashboard API requires status field in PUT request
+            response = requests.put(url, json={"status": "completed", "metadata": metadata}, timeout=5)
+            if response.ok:
+                logger.info("Reported metrics to dashboard: %s", url)
+            else:
+                logger.warning("Dashboard metrics report failed: %s %s", response.status_code, response.text)
         except Exception as e:
-            logger.debug("Metrics report failed: %s", e)
+            logger.warning("Dashboard metrics report failed: %s", e)
 
     def _run_ai_analysis(self, config: AIAnalysisConfig) -> None:
         """Run AI analysis using Claude Code CLI via OpenRouter.
