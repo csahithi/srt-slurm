@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any
 
 import requests
 
+from srtctl.benchmarks.base import SCRIPTS_DIR
 from srtctl.core.config import load_cluster_config
 from srtctl.core.schema import AIAnalysisConfig, S3Config
 from srtctl.core.slurm import start_srun_process
@@ -119,15 +120,19 @@ class PostProcessStageMixin:
         """Run post-processing after benchmark completion.
 
         Handles:
-        1. Benchmark result extraction (always)
-        2. srtlog parsing + S3 upload (if S3 configured)
-        3. Metrics reporting to dashboard (if status endpoint configured)
-        4. AI-powered failure analysis (only on failures, if enabled)
+        1. Rollup generation (benchmark-specific normalization)
+        2. Benchmark result extraction (reads rollup or falls back to raw)
+        3. srtlog parsing + S3 upload (if S3 configured)
+        4. Metrics reporting to dashboard (if status endpoint configured)
+        5. AI-powered failure analysis (only on failures, if enabled)
 
         Args:
             exit_code: Exit code from the benchmark run
         """
-        # Extract benchmark results (always)
+        # Generate rollup first (benchmark-specific normalization)
+        self._generate_rollup()
+
+        # Extract benchmark results (reads rollup if available)
         benchmark_results = self._extract_benchmark_results()
 
         # Run srtlog + S3 upload in single container (if S3 configured)
@@ -143,29 +148,53 @@ class PostProcessStageMixin:
                 logger.info("Running AI-powered failure analysis...")
                 self._run_ai_analysis(ai_config)
 
+    def _generate_rollup(self) -> None:
+        """Run benchmark-specific rollup script to generate benchmark-rollup.json.
+
+        Each benchmark type can have a rollup.py script that normalizes its output
+        into a standardized format for historical tracking.
+        """
+        benchmark_type = self.config.benchmark.type
+        rollup_script = SCRIPTS_DIR / benchmark_type / "rollup.py"
+
+        if not rollup_script.exists():
+            logger.debug("No rollup script for %s", benchmark_type)
+            return
+
+        try:
+            result = subprocess.run(
+                ["python3", str(rollup_script), str(self.runtime.log_dir)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                logger.warning("Rollup failed: %s", result.stderr)
+            elif result.stdout:
+                logger.info(result.stdout.strip())
+        except subprocess.TimeoutExpired:
+            logger.warning("Rollup script timed out")
+        except Exception as e:
+            logger.warning("Rollup error: %s", e)
+
     def _extract_benchmark_results(self) -> dict[str, Any] | None:
-        """Extract benchmark results based on benchmark type.
+        """Read benchmark-rollup.json if it exists, otherwise fall back to raw output.
 
         Returns:
             Dictionary with benchmark results, or None if not found
         """
-        benchmark_type = self.config.benchmark.type
+        # Try to read the standardized rollup first
+        rollup_file = self.runtime.log_dir / "benchmark-rollup.json"
+        if rollup_file.exists():
+            try:
+                return json.loads(rollup_file.read_text())
+            except json.JSONDecodeError as e:
+                logger.warning("Failed to parse rollup: %s", e)
 
-        if benchmark_type == "sa-bench":
-            benchmark_out = self.runtime.log_dir / "benchmark.out"
-            if benchmark_out.exists():
-                return {"type": "sa-bench", "raw_output": benchmark_out.read_text()}
-
-        elif benchmark_type == "mooncake-router":
-            artifacts_dir = self.runtime.log_dir / "artifacts"
-            if artifacts_dir.exists():
-                aiperf_files = list(artifacts_dir.glob("*/profile_export_aiperf.json"))
-                if aiperf_files:
-                    latest = max(aiperf_files, key=lambda p: p.stat().st_mtime)
-                    try:
-                        return {"type": "mooncake-router", "data": json.loads(latest.read_text())}
-                    except json.JSONDecodeError as e:
-                        logger.warning("Failed to parse aiperf JSON: %s", e)
+        # Fallback to raw output for legacy/failed rollups
+        benchmark_out = self.runtime.log_dir / "benchmark.out"
+        if benchmark_out.exists():
+            return {"benchmark_type": "unknown", "raw_output": benchmark_out.read_text()}
 
         return None
 
