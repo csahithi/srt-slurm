@@ -21,7 +21,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-from srtctl.cli.mixins import BenchmarkStageMixin, FrontendStageMixin, WorkerStageMixin
+from srtctl.cli.mixins import BenchmarkStageMixin, FrontendStageMixin, PostProcessStageMixin, WorkerStageMixin
 from srtctl.core.config import load_config
 from srtctl.core.health import wait_for_port
 from srtctl.core.processes import (
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixin):
+class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixin, PostProcessStageMixin):
     """Main orchestrator for benchmark sweeps.
 
     Usage:
@@ -238,6 +238,8 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
             registry.cleanup()
             if exit_code != 0:
                 registry.print_failure_details()
+            # Run post-processing (AI analysis if enabled)
+            self.run_postprocess(exit_code)
 
         return exit_code
 
