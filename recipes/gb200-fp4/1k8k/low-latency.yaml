@@ -6,11 +6,11 @@ dynamo:
 frontend:
   type: dynamo
   enable_multiple_frontends: true
-  num_additional_frontends: 3
-  nginx_container: nginx-sqsh
+  num_additional_frontends: 4
+  nginx_container: "nginx-sqsh"
 
 model:
-  path: "dsr1-fp4"
+  path: "dsr1"
   container: "dynamo-sglang"
   precision: "fp4"
 
