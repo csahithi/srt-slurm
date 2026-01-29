@@ -1,15 +1,12 @@
 name: "gb200-fp8-1k8k-max-tpt"
 
-extra_mount: # add this if you need to mount extra directories to the container
-  - "/lustre:/lustre"
-
 dynamo:
   version: 0.7.0
 
 frontend:
   type: dynamo
-  enable_multiple_frontends: true     # Enable nginx + multiple routers  
-  num_additional_frontends: 9         # Additional routers (total = 1 + t
+  enable_multiple_frontends: true
+  num_additional_frontends: 9
 
 model:
   path: "dsfp8"
@@ -29,7 +26,7 @@ backend:
   # Prefill-specific environment variables
   prefill_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
-    SGLANG_DG_CACHE_DIR: "/configs/dg-0.5.5.post2"
+    SGLANG_DG_CACHE_DIR: "/configs/dg-10212025"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
     MC_TE_METRIC: "true"
     SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
@@ -46,7 +43,7 @@ backend:
   # Decode-specific environment variables
   decode_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
-    SGLANG_DG_CACHE_DIR: "/configs/dg-0.5.5.post2"
+    SGLANG_DG_CACHE_DIR: "/configs/dg-10212025"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "768"
     MC_TE_METRIC: "true"
