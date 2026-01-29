@@ -10,7 +10,7 @@ slurm:
 model:
   # Use hf: prefix to download from HuggingFace at runtime
   path: "hf:Qwen/Qwen3-0.6B"
-  container: "/lustre/fsw/coreai_ai-foundation-models_dev/aflowers/containers/nvidia+ai-dynamo+vllm-runtime+0.8.0.sqsh"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.8.0"
   precision: "fp16"
 
 resources:

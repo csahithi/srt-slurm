@@ -14,7 +14,7 @@ name: "deepseek-r1-vllm-disagg-h100-16gpu"
 
 model:
   path: "deepseek-r1-fp8"
-  container: "vllm-0.8.0"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.8.0"
   precision: "fp8"
 
 resources:
