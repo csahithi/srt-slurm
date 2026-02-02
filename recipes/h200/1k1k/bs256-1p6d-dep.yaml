@@ -1,9 +1,12 @@
 name: "bs256-1p6d-h200-fp8"
 
 model:
-  path: "dsfp8"
+  path: "dsr1"
   container: "lmsysorg/sglang:v0.5.8-cu130-runtime"
   precision: "fp8"
+
+frontend:
+  nginx_container: nginx
 
 resources:
   gpu_type: "h200"
