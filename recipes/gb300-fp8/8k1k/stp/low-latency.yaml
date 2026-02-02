@@ -8,9 +8,6 @@ model:
 frontend:
   nginx_container: nginx
 
-extra_mount: # add this if you need to mount extra directories to the container
-  - "/lustre:/lustre"
-
 resources:
   gpu_type: "gb300"
   prefill_nodes: 1
