@@ -12,6 +12,8 @@ git checkout origin/${BRANCH}
 # Increase device timeout from 100s -> 1000s
 # This script adds in a target for 9.0 so we can also compile on Hopper
 cd /sgl-workspace/DeepEP
+# libibverbs-dev is required for deepep build but not present in runtime container
+apt-get update && apt-get install -y --no-install-recommends libibverbs-dev && rm -rf /var/lib/apt/lists/*
 sed -i 's/#define NUM_TIMEOUT_CYCLES 200000000000ull/#define NUM_TIMEOUT_CYCLES 2000000000000ull/' csrc/kernels/configs.cuh
 TORCH_CUDA_ARCH_LIST="9.0,10.0;10.3" MAX_JOBS=$(nproc) pip install --break-system-packages --force-reinstall --no-build-isolation .
 
