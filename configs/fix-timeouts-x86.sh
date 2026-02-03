@@ -1,17 +1,7 @@
 #!/bin/bash
 BRANCH="fastdg"
 
-apt-get update && apt-get install -y --no-install-recommends \
-    libibverbs-dev \
-    libnl-3-dev \
-    libnl-route-3-dev \
-    libnuma-dev \
-    libgoogle-glog-dev \
-    libunwind-dev \
-    libfabric-dev \
-    cmake \
-    patchelf \
-    git
+apt-get update && apt-get install -y --no-install-recommends libibverbs-dev
 
 # v0.5.8 + cherry-pick https://github.com/sgl-project/sglang/pull/18111
 # Make sure to set SGLANG_JIT_DEEPGEMM_FAST_WARMUP=1
