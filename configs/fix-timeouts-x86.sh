@@ -1,13 +1,6 @@
 #!/bin/bash
 BRANCH="fastdg"
 
-# Install libibverbs-dev (needed for DeepEP build)
-if [ "$(id -u)" -eq 0 ]; then
-    apt-get update && apt-get install -y --no-install-recommends libibverbs-dev && rm -rf /var/lib/apt/lists/*
-else
-    sudo apt-get update && sudo apt-get install -y --no-install-recommends libibverbs-dev && sudo rm -rf /var/lib/apt/lists/*
-fi
-
 # v0.5.8 + cherry-pick https://github.com/sgl-project/sglang/pull/18111
 # Make sure to set SGLANG_JIT_DEEPGEMM_FAST_WARMUP=1
 cd /sgl-workspace/sglang
