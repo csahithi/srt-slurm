@@ -1,7 +1,7 @@
 #!/bin/bash
 BRANCH="fastdg"
 
-apt-get update && apt-get install -y --no-install-recommends libibverbs-dev
+apt-get update && apt-get install -y --no-install-recommends libibverbs-dev && rm -rf /var/lib/apt/lists/*
 
 # v0.5.8 + cherry-pick https://github.com/sgl-project/sglang/pull/18111
 # Make sure to set SGLANG_JIT_DEEPGEMM_FAST_WARMUP=1
