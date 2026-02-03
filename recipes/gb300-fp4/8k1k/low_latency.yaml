@@ -5,8 +5,9 @@ dynamo:
 
 frontend:  
   type: dynamo  
-  enable_multiple_frontends: true     # Enable nginx + multiple routers  
-  num_additional_frontends: 3         # Additional routers (total = 1 + t
+  enable_multiple_frontends: true
+  num_additional_frontends: 3
+  nginx_container: nginx
 
 model:
   path: "dsfp4"
