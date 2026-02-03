@@ -7,6 +7,7 @@ frontend:
   type: dynamo
   enable_multiple_frontends: true
   num_additional_frontends: 9
+  nginx_container: nginx
 
 model:
   path: "dsr1-fp8"
@@ -168,6 +169,6 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 8192
-  concurrencies: "1024x2048x4096"
+  concurrencies: "1024x2048x4096x6144"
   req_rate: "inf"
 

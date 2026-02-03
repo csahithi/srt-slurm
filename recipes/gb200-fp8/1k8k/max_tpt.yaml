@@ -1,22 +1,17 @@
 name: "gb200-fp8-1k1k-max-tpt"
 
-extra_mount: # add this if you need to mount extra directories to the container
-  - "/lustre:/lustre"
-
 dynamo:
   version: 0.8.1
 
 frontend:
   type: dynamo
-  enable_multiple_frontends: true     # Enable nginx + multiple routers  
-  num_additional_frontends: 9         # Additional routers (total = 1 + t
+  enable_multiple_frontends: true
+  num_additional_frontends: 9
+  nginx_container: nginx
 
 model:
-  path: "dsfp8"
-#  container: "sglang0p5p5ppost2"
-#  container: "sglang0p5p7"
-#  container: "sglang0p5p8"
-  container: "sglang0p5p8_cu13"
+  path: "dsr1-fp8"
+  container: "lmsysorg/sglang:v0.5.8-cu130-runtime"
   precision: "fp8"
 
 resources:
@@ -177,6 +172,6 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 8192
-  concurrencies: "1024x2048x4096"
+  concurrencies: "1024x2048x4096x6144"
   req_rate: "inf"
 
