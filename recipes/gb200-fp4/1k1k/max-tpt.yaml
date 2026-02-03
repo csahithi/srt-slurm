@@ -7,6 +7,7 @@ frontend:
   type: dynamo
   enable_multiple_frontends: true
   num_additional_frontends: 9
+  nginx_container: nginx
 
 model:
   path: "dsfp4"
@@ -178,5 +179,5 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: "1x128x512x2048x4096x8192x12000x15000"
+  concurrencies: "512x2048x4096"
   req_rate: "inf"
