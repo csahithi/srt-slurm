@@ -2,7 +2,7 @@ name: "gb200-fp8-1p-2d-low-latency-mtp"
 
 model:
   path: "dsfp8"
-  container: "lmsysorg/sglang:v0.5.8-cu130-runtime"
+  container: "lmsysorg/sglang:v0.5.8-cu130"
   precision: "fp8"
 
 resources:
