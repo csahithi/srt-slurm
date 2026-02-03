@@ -85,7 +85,7 @@ backend:
       tensor-parallel-size: 4
       data-parallel-size: 1
       expert-parallel-size: 1
- 
+      disaggregation-bootstrap-port: 30001
       disaggregation-transfer-backend: nixl
 
     decode:
@@ -112,7 +112,7 @@ backend:
       data-parallel-size: 1
       expert-parallel-size: 1
       fp8-gemm-backend: "flashinfer_trtllm"
-
+      disaggregation-bootstrap-port: 30001
       disaggregation-transfer-backend: nixl
 
 benchmark:
