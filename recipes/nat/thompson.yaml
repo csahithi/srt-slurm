@@ -16,7 +16,7 @@ resources:
   gpu_type: "gb200"
   gpus_per_node: 4
   agg_nodes: 1
-  agg_workers: 1
+  agg_workers: 4
 
 # Setup script clones NAT repo and links custom Dynamo components
 # Override repo/branch via NAT_REPO and NAT_BRANCH env vars
@@ -54,7 +54,7 @@ backend:
   type: sglang
   sglang_config:
     aggregated:
-      tp: 4
+      tp: 1
       served-model-name: "qwen32b"
       trust-remote-code: true
       json-model-override-args: '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768},"max_position_embeddings":131072}'
@@ -65,7 +65,17 @@ backend:
 
 benchmark:
   type: custom
-  # NAT is installed by the benchmark command itself (no separate container needed)
+  # NAT is cloned and installed in a venv using uv (avoids system package conflicts)
   command: |
-    pip install --quiet --root-user-action=ignore -e /workspace/NeMo-Agent-Toolkit/packages/nvidia_nat_core &&
-    nat eval --config_file /workspace/NeMo-Agent-Toolkit/examples/dynamo_integration/react_benchmark_agent/configs/eval_config_no_rethinking_minimal_test_srtslurm.yml
+    pip install uv &&
+    git clone --depth 1 https://github.com/NVIDIA/NeMo-Agent-Toolkit.git /workspace/NeMo-Agent-Toolkit &&
+    uv venv --clear /workspace/nat-venv &&
+    source /workspace/nat-venv/bin/activate &&
+    uv pip install /workspace/NeMo-Agent-Toolkit/packages/nvidia_nat_core &&
+    uv pip install /workspace/NeMo-Agent-Toolkit/packages/nvidia_nat_langchain &&
+    uv pip install /workspace/NeMo-Agent-Toolkit &&
+    uv pip install /workspace/NeMo-Agent-Toolkit/examples/dynamo_integration/react_benchmark_agent &&
+    python3 /workspace/NeMo-Agent-Toolkit/examples/dynamo_integration/scripts/download_agent_leaderboard_v2.py &&
+    python3 /workspace/NeMo-Agent-Toolkit/examples/dynamo_integration/scripts/create_test_subset.py &&
+    cd /workspace/NeMo-Agent-Toolkit &&
+    nat eval --config_file examples/dynamo_integration/react_benchmark_agent/src/react_benchmark_agent/configs/eval_config_no_rethinking_minimal_test.yml
