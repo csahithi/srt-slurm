@@ -18,6 +18,7 @@ Complete reference for job configuration YAML files.
 - [output](#output)
 - [health_check](#health_check)
 - [infra](#infra)
+- [debug](#debug)
 - [sweep](#sweep)
 - [FormattablePath Template System](#formattablepath-template-system)
 - [container_mounts](#container_mounts)
@@ -75,6 +76,10 @@ output:                        # Optional: output paths
 health_check:                  # Optional: health check settings
   max_attempts: 180
   interval_seconds: 10
+
+debug:                         # Optional: hang debugging
+  enabled: false
+  wait_seconds: 600
 
 setup_script: "my-setup.sh"    # Optional: custom setup script
 ```
@@ -764,6 +769,41 @@ infra:
 - When `etcd_nats_dedicated_node: true`, the first allocated node is reserved exclusively for etcd and nats services.
 - This can improve stability for large-scale deployments by isolating infrastructure services.
 - The reserved node is not used for worker processes.
+
+---
+
+## debug
+
+Configuration for automated hang debugging with cuda-gdb backtrace collection.
+
+```yaml
+debug:
+  enabled: true
+  wait_seconds: 1800
+  output_dir: /custom/path/backtraces
+```
+
+| Field          | Type   | Default                  | Description                                      |
+| -------------- | ------ | ------------------------ | ------------------------------------------------ |
+| `enabled`      | bool   | `false`                  | Enable hang debugging                            |
+| `wait_seconds` | int    | `600`                    | Time to wait before collecting backtraces        |
+| `output_dir`   | string | `{log_dir}/backtraces`   | Directory for backtrace output files             |
+
+**How it works**:
+
+1. After workers start, a background script launches on each worker node
+2. The script waits for `wait_seconds`
+3. Attaches `cuda-gdb` to each SGLang TP worker process (`sglang::scheduler*`)
+4. Collects CUDA kernel info and full thread backtraces
+5. Saves to `{output_dir}/backtrace_{hostname}_{pid}.txt`
+
+**Use cases**:
+
+- Debugging NCCL collective hangs
+- Investigating stuck CUDA kernels
+- Diagnosing synchronization deadlocks
+
+See [Debugging Hangs](debugging.md) for detailed usage guide.
 
 ---
 

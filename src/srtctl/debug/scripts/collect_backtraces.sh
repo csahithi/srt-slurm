@@ -61,7 +61,7 @@ done
 
 # Collect backtrace from each process
 for PID in ${PIDS}; do
-    echo "[$(date)] Collecting backtrace from PID ${PID}..."
+    echo "[$(date)] Collecting backtraces from PID ${PID}..."
 
     # Check if process still exists
     if ! kill -0 "${PID}" 2>/dev/null; then
@@ -71,27 +71,43 @@ for PID in ${PIDS}; do
 
     # Get hostname for output filename
     HOSTNAME=$(hostname)
-    BACKTRACE_FILE="${OUTPUT_DIR}/backtrace_${HOSTNAME}_${PID}.txt"
+    PYSPY_FILE="${OUTPUT_DIR}/pyspy_${HOSTNAME}_${PID}.txt"
+    CUDAGDB_FILE="${OUTPUT_DIR}/cudagdb_${HOSTNAME}_${PID}.txt"
 
-    # Collect backtrace using cuda-gdb
-    # Use timeout to prevent hanging if gdb gets stuck
-    timeout 60 cuda-gdb \
-        -batch \
-        -ex "set logging redirect on" \
-        -ex "set logging file ${BACKTRACE_FILE}" \
-        -ex "set logging enabled on" \
-        -ex "info cuda kernels" \
-        -ex "thread apply all bt" \
-        -ex quit \
-        -p "${PID}" 2>&1 || {
-            echo "[$(date)] ERROR: Failed to collect backtrace from PID ${PID}"
-            echo "ERROR: cuda-gdb failed or timed out" >> "${BACKTRACE_FILE}"
+    # 1. Collect Python stack trace using py-spy (non-invasive, doesn't pause process)
+    echo "[$(date)] Collecting py-spy dump for PID ${PID}..."
+    if command -v py-spy &> /dev/null; then
+        timeout 30 py-spy dump --pid "${PID}" > "${PYSPY_FILE}" 2>&1 || {
+            echo "[$(date)] WARNING: py-spy failed for PID ${PID}"
+            echo "ERROR: py-spy failed or timed out" >> "${PYSPY_FILE}"
         }
-
-    if [ -f "${BACKTRACE_FILE}" ]; then
-        echo "[$(date)] Backtrace saved to ${BACKTRACE_FILE}"
+        if [ -f "${PYSPY_FILE}" ] && [ -s "${PYSPY_FILE}" ]; then
+            echo "[$(date)] py-spy output saved to ${PYSPY_FILE}"
+        fi
     else
-        echo "[$(date)] WARNING: Backtrace file not created for PID ${PID}"
+        echo "[$(date)] WARNING: py-spy not found, skipping Python stack trace"
+    fi
+
+    # 2. Collect CUDA backtrace using cuda-gdb (more invasive, pauses process briefly)
+    echo "[$(date)] Collecting cuda-gdb backtrace for PID ${PID}..."
+    if command -v cuda-gdb &> /dev/null; then
+        cuda-gdb \
+            -batch \
+            -ex "set logging redirect on" \
+            -ex "set logging file ${CUDAGDB_FILE}" \
+            -ex "set logging enabled on" \
+            -ex "info cuda kernels" \
+            -ex "thread apply all bt" \
+            -ex quit \
+            -p "${PID}" 2>&1 || {
+                echo "[$(date)] WARNING: cuda-gdb failed for PID ${PID}"
+                echo "ERROR: cuda-gdb failed or timed out" >> "${CUDAGDB_FILE}"
+            }
+        if [ -f "${CUDAGDB_FILE}" ] && [ -s "${CUDAGDB_FILE}" ]; then
+            echo "[$(date)] cuda-gdb output saved to ${CUDAGDB_FILE}"
+        fi
+    else
+        echo "[$(date)] WARNING: cuda-gdb not found, skipping CUDA backtrace"
     fi
 done
 
