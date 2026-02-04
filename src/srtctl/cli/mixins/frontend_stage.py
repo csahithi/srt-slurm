@@ -236,9 +236,6 @@ class FrontendStageMixin:
         # Command is required for custom frontend (validated in schema)
         assert fe_config.command is not None, "Custom frontend requires 'command' field"
 
-        # Build command with optional setup script
-        cmd = self._build_custom_frontend_command(fe_config.command)
-
         # Build environment variables
         env_to_set = {
             "ETCD_ENDPOINTS": f"http://{self.runtime.nodes.infra}:2379",
@@ -250,6 +247,14 @@ class FrontendStageMixin:
         if fe_config.env:
             env_to_set.update(fe_config.env)
 
+        # Build bash preamble (setup script + dynamo install) - same pattern as workers
+        bash_preamble = self._build_custom_frontend_preamble()
+
+        # Parse user command into list
+        import shlex
+
+        cmd = shlex.split(fe_config.command)
+
         logger.info("Custom frontend container: %s", container_image)
         logger.info("Custom frontend log: %s", frontend_log)
 
@@ -260,7 +265,7 @@ class FrontendStageMixin:
             container_image=container_image,
             container_mounts=self.runtime.container_mounts,
             env_to_set=env_to_set,
-            use_bash_wrapper=False,  # We handle bash wrapping ourselves
+            bash_preamble=bash_preamble,
         )
 
         return ManagedProcess(
@@ -271,19 +276,15 @@ class FrontendStageMixin:
             critical=True,
         )
 
-    def _build_custom_frontend_command(self, user_command: str) -> list[str]:
-        """Build custom frontend command with preamble (setup script, dynamo install).
+    def _build_custom_frontend_preamble(self) -> str | None:
+        """Build bash preamble for custom frontend (same pattern as workers).
 
         Runs (in order):
         1. Custom setup script from /configs/ (if config.setup_script set)
         2. Dynamo installation (if dynamo.install is True)
-        3. User command
-
-        Args:
-            user_command: The user-provided command string
 
         Returns:
-            Command list to execute
+            Preamble string to run before main command, or None if no preamble needed.
         """
         parts = []
 
@@ -299,9 +300,7 @@ class FrontendStageMixin:
         if self.config.dynamo.install:
             parts.append(self.config.dynamo.get_install_commands())
 
-        # 3. Add the actual command
-        parts.append(user_command)
+        if not parts:
+            return None
 
-        # Join with && and wrap in bash -c
-        full_command = " && ".join(parts)
-        return ["bash", "-c", full_command]
+        return " && ".join(parts)

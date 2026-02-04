@@ -78,9 +78,6 @@ class SidecarStageMixin:
         # Determine container image (sidecar-specific > model.container)
         container_image = config.container or str(self.runtime.container_image)
 
-        # Build command with optional setup script
-        cmd = self._build_sidecar_command(config.command)
-
         # Build environment variables
         env_to_set = {
             "ETCD_ENDPOINTS": f"http://{self.runtime.nodes.infra}:2379",
@@ -88,6 +85,14 @@ class SidecarStageMixin:
             "DYN_REQUEST_PLANE": "nats",
         }
         env_to_set.update(config.env)
+
+        # Build bash preamble (setup script + dynamo install) - same pattern as workers
+        bash_preamble = self._build_sidecar_preamble()
+
+        # Parse user command into list
+        import shlex
+
+        cmd = shlex.split(config.command)
 
         logger.info("Sidecar '%s' command: %s", name, config.command)
         logger.info("Sidecar '%s' container: %s", name, container_image)
@@ -100,7 +105,7 @@ class SidecarStageMixin:
             container_image=container_image,
             container_mounts=self.runtime.container_mounts,
             env_to_set=env_to_set,
-            use_bash_wrapper=False,  # We handle bash wrapping ourselves
+            bash_preamble=bash_preamble,
         )
 
         return ManagedProcess(
@@ -111,19 +116,15 @@ class SidecarStageMixin:
             critical=True,
         )
 
-    def _build_sidecar_command(self, user_command: str) -> list[str]:
-        """Build sidecar command with preamble (setup script, dynamo install).
+    def _build_sidecar_preamble(self) -> str | None:
+        """Build bash preamble for sidecar processes (same pattern as workers).
 
         Runs (in order):
         1. Custom setup script from /configs/ (if config.setup_script set)
         2. Dynamo installation (if dynamo.install is True)
-        3. User command
-
-        Args:
-            user_command: The user-provided command string
 
         Returns:
-            Command list to execute
+            Preamble string to run before main command, or None if no preamble needed.
         """
         parts = []
 
@@ -139,9 +140,7 @@ class SidecarStageMixin:
         if self.config.dynamo.install:
             parts.append(self.config.dynamo.get_install_commands())
 
-        # 3. Add the actual command
-        parts.append(user_command)
+        if not parts:
+            return None
 
-        # Join with && and wrap in bash -c
-        full_command = " && ".join(parts)
-        return ["bash", "-c", full_command]
+        return " && ".join(parts)
