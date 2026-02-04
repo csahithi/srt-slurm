@@ -14,6 +14,9 @@ make lint
 # Just tests
 make test
 
+# Type check
+uvx ty check src/
+
 # Run single test file
 uv run pytest tests/test_e2e.py -v
 
