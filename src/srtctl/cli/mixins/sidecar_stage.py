@@ -9,7 +9,6 @@ Sidecars run on the head node after infrastructure (ETCD/NATS) and before the fr
 """
 
 import logging
-import shlex
 from typing import TYPE_CHECKING
 
 from srtctl.core.processes import ManagedProcess
@@ -79,8 +78,8 @@ class SidecarStageMixin:
         # Determine container image (sidecar-specific > model.container)
         container_image = config.container or str(self.runtime.container_image)
 
-        # Parse command string into list
-        cmd = shlex.split(config.command)
+        # Build command with optional setup script
+        cmd = self._build_sidecar_command(config.command)
 
         # Build environment variables
         env_to_set = {
@@ -100,6 +99,7 @@ class SidecarStageMixin:
             container_image=container_image,
             container_mounts=self.runtime.container_mounts,
             env_to_set=env_to_set,
+            use_bash_wrapper=False,  # We handle bash wrapping ourselves
         )
 
         return ManagedProcess(
@@ -109,3 +109,31 @@ class SidecarStageMixin:
             node=head_node,
             critical=True,
         )
+
+    def _build_sidecar_command(self, user_command: str) -> list[str]:
+        """Build sidecar command with optional setup script prefix.
+
+        If config.setup_script is set, runs that first before the user command.
+
+        Args:
+            user_command: The user-provided command string
+
+        Returns:
+            Command list to execute
+        """
+        parts = []
+
+        # Run setup script if configured
+        if self.config.setup_script:
+            script_path = f"/configs/{self.config.setup_script}"
+            parts.append(
+                f"echo 'Running setup script: {script_path}' && "
+                f"if [ -f '{script_path}' ]; then bash '{script_path}'; else echo 'WARNING: {script_path} not found'; fi"
+            )
+
+        # Add the actual command
+        parts.append(user_command)
+
+        # Join with && and wrap in bash -c
+        full_command = " && ".join(parts)
+        return ["bash", "-c", full_command]
