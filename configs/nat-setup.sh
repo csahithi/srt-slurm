@@ -31,6 +31,12 @@ else
     echo "Custom Dynamo components already linked at $CUSTOM_DYNAMO_DIR"
 fi
 
+# Fix Dynamo 0.8.0 API compatibility (static= parameter was removed)
+echo "Patching Dynamo API compatibility..."
+sed -i 's/@dynamo_worker(static=False)/@dynamo_worker()/g' "$NAT_DIR/external/dynamo/generalized/router.py"
+sed -i 's/@dynamo_worker(static=False)/@dynamo_worker()/g' "$NAT_DIR/external/dynamo/generalized/processor.py"
+sed -i 's/@dynamo_worker(static=False)/@dynamo_worker()/g' "$NAT_DIR/external/dynamo/generalized/frontend.py"
+
 # Download agent leaderboard data if not present
 DATA_DIR="$NAT_DIR/examples/dynamo_integration/data"
 if [ ! -f "$DATA_DIR/agent_leaderboard_v2_test_subset.json" ]; then
