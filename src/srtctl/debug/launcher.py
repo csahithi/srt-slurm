@@ -6,7 +6,6 @@
 
 import logging
 import subprocess
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from srtctl.core.processes import ManagedProcess
@@ -25,6 +24,10 @@ def launch_hang_debugger(
 ) -> list[ManagedProcess]:
     """Launch hang debugging script on all worker nodes.
 
+    The script attaches to the existing worker container on each node using
+    --container-name, so it shares the same namespace as the worker processes
+    and can access py-spy and cuda-gdb to collect backtraces.
+
     Args:
         debug_config: Debug configuration
         runtime: Runtime context with paths and node info
@@ -38,38 +41,50 @@ def launch_hang_debugger(
 
     logger.info("Launching hang debugger (wait=%ds)", debug_config.wait_seconds)
 
-    # Determine output directory
-    output_dir = Path(debug_config.output_dir) if debug_config.output_dir else runtime.log_dir / "backtraces"
+    # Output directory - use /logs/backtraces inside container since /logs is already mounted
+    # The worker container mounts runtime.log_dir -> /logs
+    output_dir_host = runtime.log_dir / "backtraces"
+    output_dir_container = "/logs/backtraces"
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("Backtrace output directory: %s", output_dir)
+    output_dir_host.mkdir(parents=True, exist_ok=True)
+    logger.info("Backtrace output directory: %s (container: %s)", output_dir_host, output_dir_container)
 
-    # Get script path
-    script_path = Path(__file__).parent / "scripts" / "collect_backtraces.sh"
-    if not script_path.exists():
-        logger.error("Hang debug script not found: %s", script_path)
-        return []
+    # The debug script is in benchmarks/scripts/debug/, which is mounted at /srtctl-benchmarks/
+    container_script_path = "/srtctl-benchmarks/debug/collect_backtraces.sh"
 
     processes = []
 
-    # Launch script on each worker node
+    # Launch script on each worker node, attaching to the existing worker container
     for node in worker_nodes:
         log_file = runtime.log_dir / f"hang_debug_{node}.out"
-        logger.info("Starting hang debugger on %s (log: %s)", node, log_file)
 
-        # Build srun command to run script on specific node
+        # Use the same container name as the worker to attach to it
+        # This must match the name used in worker_stage.py
+        container_name = f"sglang_{runtime.job_id}_{node}"
+
+        logger.info("Starting hang debugger on %s (attaching to container %s)", node, container_name)
+
+        # Build srun command to attach to the existing worker container
+        # No additional mounts needed - we use paths already mounted by the worker
         cmd = [
             "srun",
+            "--overlap",
             "--nodes=1",
             f"--nodelist={node}",
             "--ntasks=1",
             f"--output={log_file}",
             "--open-mode=append",
-            str(script_path),
+            # Attach to the existing worker container by name
+            f"--container-name={container_name}",
+            # Run the script inside the existing container
+            "bash",
+            container_script_path,
             str(debug_config.wait_seconds),
-            str(output_dir),
+            output_dir_container,
             str(runtime.job_id),
         ]
+
+        logger.debug("Hang debugger command: %s", " ".join(cmd))
 
         # Launch in background
         proc = subprocess.Popen(
