@@ -66,8 +66,8 @@ class FrontendStageMixin:
         return self.config.backend
 
     @property
-    def backend_processes(self) -> list["Process"]:
-        """Compute physical process topology from endpoints (cached)."""
+    def backend_processes(self) -> list["Process"]:  # type: ignore[empty-body]
+        """Compute physical process topology from endpoints (provided by main class)."""
         ...
 
     def _compute_frontend_topology(self) -> FrontendTopology:

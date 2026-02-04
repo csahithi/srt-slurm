@@ -42,22 +42,22 @@ class SidecarStageMixin:
     config: "SrtConfig"
     runtime: "RuntimeContext"
 
-    def start_sidecars(self) -> list[ManagedProcess]:
+    def start_sidecars(self) -> dict[str, ManagedProcess]:
         """Start all configured sidecar processes.
 
         Returns:
-            List of ManagedProcess instances for all sidecars.
+            Dict mapping sidecar names to ManagedProcess instances.
         """
         if not self.config.sidecars:
             logger.debug("No sidecars configured")
-            return []
+            return {}
 
         logger.info("Starting %d sidecar(s)", len(self.config.sidecars))
-        processes: list[ManagedProcess] = []
+        processes: dict[str, ManagedProcess] = {}
 
         for name, sidecar_config in self.config.sidecars.items():
             proc = self._start_sidecar(name, sidecar_config)
-            processes.append(proc)
+            processes[proc.name] = proc
 
         return processes
 

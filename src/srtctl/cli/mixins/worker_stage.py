@@ -43,13 +43,13 @@ class WorkerStageMixin:
         return self.config.backend
 
     @property
-    def backend_processes(self) -> list["Process"]:
-        """Compute physical process topology from endpoints (cached)."""
+    def backend_processes(self) -> list["Process"]:  # type: ignore[empty-body]
+        """Compute physical process topology from endpoints (provided by main class)."""
         ...
 
     @property
-    def endpoints(self) -> list["Endpoint"]:
-        """Endpoint allocation topology."""
+    def endpoints(self) -> list["Endpoint"]:  # type: ignore[empty-body]
+        """Endpoint allocation topology (provided by main class)."""
         ...
 
     def _build_worker_preamble(self) -> str | None:

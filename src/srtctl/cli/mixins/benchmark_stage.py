@@ -43,13 +43,13 @@ class BenchmarkStageMixin:
     runtime: "RuntimeContext"
 
     @property
-    def endpoints(self) -> list["Endpoint"]:
-        """Endpoint allocation topology."""
+    def endpoints(self) -> list["Endpoint"]:  # type: ignore[empty-body]
+        """Endpoint allocation topology (provided by main class)."""
         ...
 
     @property
-    def backend_processes(self) -> list["Process"]:
-        """Backend worker processes."""
+    def backend_processes(self) -> list["Process"]:  # type: ignore[empty-body]
+        """Backend worker processes (provided by main class)."""
         ...
 
     def run_benchmark(
