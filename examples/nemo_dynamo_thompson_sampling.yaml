@@ -1,0 +1,79 @@
+# NeMo Agent Toolkit + Dynamo with Thompson Sampling Router (srtslurm)
+# Uses custom Dynamo frontend, router, and processor for KV-aware routing.
+name: "nemo-dynamo-thompson"
+
+model:
+  # Local model path or alias from srtslurm.yaml
+  path: "/path/to/models/Llama-3.3-70B-Instruct"
+  # Dynamo SGLang runtime container
+  container: "nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.7.1"
+  precision: "bf16"
+
+resources:
+  # Unified (aggregated) mode - 4 GPUs, TP=4
+  gpu_type: "h100"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+
+# Custom Dynamo components via sidecars
+sidecars:
+  router:
+    # Thompson Sampling router with KV overlap awareness
+    command: >
+      python3 /workspace/custom_dynamo/router.py
+      --block-size 64
+      --router-type kv
+      --affinity-base 0.30
+      --temp-base 1.0
+      --lints-lambda 1.0
+    env:
+      ROUTER_METRICS_CSV: "/logs/router_metrics.csv"
+
+  processor:
+    # Workload-aware processor
+    command: "python3 /workspace/custom_dynamo/processor.py --model /model --enable-router"
+    env:
+      PROCESSOR_METRICS_CSV: "/logs/processor_requests.csv"
+
+frontend:
+  # Custom frontend with prefix hints support
+  type: custom
+  command: "python3 /workspace/custom_dynamo/frontend.py"
+  env:
+    FRONTEND_MODEL_MAPPING: '{"llama-3.3-70b": "/model"}'
+    FRONTEND_TPS_INTERVAL: "5"
+    FRONTEND_TPS_CSV: "/logs/frontend_throughput.csv"
+
+backend:
+  type: sglang
+  sglang_config:
+    aggregated:
+      tp: 4
+      served-model-name: "llama-3.3-70b"
+      trust-remote-code: true
+      mem-fraction-static: 0.9
+      enable-metrics: true
+
+dynamo:
+  # Dynamo runtime is in the container
+  install: false
+
+infra:
+  etcd_nats_dedicated_node: false
+
+benchmark:
+  type: custom
+  # NAT container with nvidia-nat and react_benchmark_agent installed
+  container_image: "nemo-nat"
+  command: |
+    bash -lc '
+      cd /workspace/NeMo-Agent-Toolkit
+      nat eval --config_file examples/dynamo_integration/react_benchmark_agent/configs/eval_config_no_rethinking_minimal_test_srtslurm.yml
+    '
+
+container_mounts:
+  # NeMo-Agent-Toolkit for nat eval configs/data
+  "/path/to/NeMo-Agent-Toolkit": "/workspace/NeMo-Agent-Toolkit"
+  # Custom Dynamo components (router, processor, frontend)
+  "/path/to/NeMo-Agent-Toolkit/external/dynamo/generalized": "/workspace/custom_dynamo"

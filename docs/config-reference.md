@@ -18,6 +18,7 @@ Complete reference for job configuration YAML files.
 - [output](#output)
 - [health_check](#health_check)
 - [infra](#infra)
+- [sidecars](#sidecars)
 - [sweep](#sweep)
 - [FormattablePath Template System](#formattablepath-template-system)
 - [container_mounts](#container_mounts)
@@ -269,7 +270,7 @@ Frontend/router configuration.
 
 ```yaml
 frontend:
-  # Frontend type: "dynamo" (default) or "sglang"
+  # Frontend type: "dynamo" (default), "sglang", or "custom"
   type: dynamo
 
   # Scaling
@@ -287,14 +288,36 @@ frontend:
     MY_VAR: "value"
 ```
 
-| Field                       | Type | Default      | Description                         |
-| --------------------------- | ---- | ------------ | ----------------------------------- |
-| `type`                      | str  | dynamo       | Frontend type: "dynamo" or "sglang" |
-| `enable_multiple_frontends` | bool | true         | Scale with nginx + multiple routers |
-| `num_additional_frontends`  | int  | 9            | Additional routers beyond master    |
-| `nginx_container`           | str  | nginx:1.27.4 | Custom nginx container image        |
-| `args`                      | dict | null         | CLI args for the frontend           |
-| `env`                       | dict | null         | Env vars for frontend processes     |
+| Field                       | Type   | Default      | Description                                      |
+| --------------------------- | ------ | ------------ | ------------------------------------------------ |
+| `type`                      | string | dynamo       | Frontend type: "dynamo", "sglang", or "custom"   |
+| `command`                   | string | null         | Command to run (required when type="custom")     |
+| `container`                 | string | null         | Custom container image (defaults to model.container) |
+| `enable_multiple_frontends` | bool   | true         | Scale with nginx + multiple routers              |
+| `num_additional_frontends`  | int    | 9            | Additional routers beyond master                 |
+| `nginx_container`           | string | nginx:1.27.4 | Custom nginx container image                     |
+| `args`                      | dict   | null         | CLI args for the frontend                        |
+| `env`                       | dict   | null         | Env vars for frontend processes                  |
+
+### Custom Frontend
+
+For custom frontends (e.g., custom Dynamo router implementations):
+
+```yaml
+frontend:
+  type: custom
+  command: "python3 /workspace/custom_dynamo/frontend.py --http-port 8000"
+  container: "nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.7.1"
+  env:
+    FRONTEND_MODEL_MAPPING: '{"llama-3.3-70b": "/model"}'
+    FRONTEND_TPS_INTERVAL: "5"
+```
+
+When `type: custom` is set:
+- The `command` field is **required**
+- The command runs on the head node
+- Must listen on port 8000 (or the topology's frontend_port)
+- Environment variables `ETCD_ENDPOINTS` and `NATS_SERVER` are automatically set
 
 See [SGLang Router](sglang-router.md) for detailed architecture.
 
@@ -851,6 +874,64 @@ infra:
 - When `etcd_nats_dedicated_node: true`, the first allocated node is reserved exclusively for etcd and nats services.
 - This can improve stability for large-scale deployments by isolating infrastructure services.
 - The reserved node is not used for worker processes.
+
+---
+
+## sidecars
+
+Sidecar processes run on the head node after infrastructure (ETCD/NATS) and workers start, but before the frontend. They're useful for custom routing, metrics collection, or any auxiliary services that workers/frontend need to discover via ETCD.
+
+```yaml
+sidecars:
+  router:
+    command: "python3 /workspace/custom_dynamo/router.py --block-size 64"
+    container: "nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.7.1"
+    env:
+      ROUTER_METRICS_CSV: "/logs/router_metrics.csv"
+
+  processor:
+    command: "python3 /workspace/custom_dynamo/processor.py --enable-router"
+    env:
+      PROCESSOR_METRICS_CSV: "/logs/processor_requests.csv"
+```
+
+| Field       | Type   | Default           | Description                                     |
+| ----------- | ------ | ----------------- | ----------------------------------------------- |
+| `command`   | string | (required)        | Full command string to execute                  |
+| `container` | string | model.container   | Container image (defaults to model.container)   |
+| `env`       | dict   | {}                | Environment variables for the sidecar process   |
+
+**Notes**:
+
+- Sidecars run on the head node only
+- Environment variables `ETCD_ENDPOINTS` and `NATS_SERVER` are automatically set
+- Sidecars start after workers but before the frontend
+- Dynamo's ETCD discovery handles service coordination (no explicit dependency ordering needed)
+- The health check before benchmark ensures all services are ready
+
+### Use Cases
+
+**Custom Dynamo Router (Thompson Sampling)**:
+
+```yaml
+sidecars:
+  router:
+    command: "python3 /workspace/custom_dynamo/router.py --affinity-base 0.30 --temp-base 1.0"
+  processor:
+    command: "python3 /workspace/custom_dynamo/processor.py --enable-router"
+
+frontend:
+  type: custom
+  command: "python3 /workspace/custom_dynamo/frontend.py --http-port 8000"
+```
+
+**Metrics Collector**:
+
+```yaml
+sidecars:
+  metrics:
+    command: "python3 /workspace/metrics_collector.py --output /logs/metrics.csv"
+```
 
 ---
 

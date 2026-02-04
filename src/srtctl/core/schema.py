@@ -844,11 +844,39 @@ class DynamoConfig:
 
 
 @dataclass(frozen=True)
+class SidecarConfig:
+    """Sidecar process configuration.
+
+    Sidecars are auxiliary long-running processes that start after infrastructure
+    (ETCD/NATS) and before the frontend. They run on the head node.
+
+    Use cases:
+        - Custom Dynamo router (Thompson sampling)
+        - Custom Dynamo processor
+        - Metrics collectors
+        - Any service that workers/frontend need to discover via ETCD
+
+    Attributes:
+        command: Full command string to execute
+        container: Container image (defaults to model.container if not specified)
+        env: Environment variables for the sidecar process
+    """
+
+    command: str
+    container: str | None = None
+    env: dict[str, str] = field(default_factory=dict)
+
+    Schema: ClassVar[builtins.type[Schema]] = Schema
+
+
+@dataclass(frozen=True)
 class FrontendConfig:
     """Frontend/router configuration.
 
     Attributes:
-        type: Frontend type - "dynamo" (default) or "sglang"
+        type: Frontend type - "dynamo", "sglang", or "custom"
+        command: Command to run when type="custom" (required for custom type)
+        container: Custom container image for frontend (defaults to model.container)
         enable_multiple_frontends: Scale with nginx + multiple routers
         num_additional_frontends: Additional routers beyond master (default: 9)
         nginx_container: Custom nginx container image (default: nginx:1.27.4)
@@ -857,6 +885,8 @@ class FrontendConfig:
     """
 
     type: str = "dynamo"
+    command: str | None = None
+    container: str | None = None
     enable_multiple_frontends: bool = True
     num_additional_frontends: int = 9
     nginx_container: str = "nginx:1.27.4"
@@ -931,6 +961,9 @@ class SrtConfig:
     health_check: HealthCheckConfig = field(default_factory=HealthCheckConfig)
     infra: InfraConfig = field(default_factory=InfraConfig)
 
+    # Sidecar processes (run after infra, before frontend)
+    sidecars: dict[str, SidecarConfig] = field(default_factory=dict)
+
     environment: dict[str, str] = field(default_factory=dict)
     container_mounts: dict[
         Annotated[FormattablePath, FormattablePathField()],
@@ -953,6 +986,7 @@ class SrtConfig:
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._validate_profiling()
+        self._validate_frontend()
 
     def _validate_profiling(self):
         """Validate profiling configuration matches serving mode."""
@@ -1006,6 +1040,11 @@ class SrtConfig:
                 raise ValidationError(
                     f"Profiling mode requires exactly 1 aggregated worker. Got agg_workers={r.num_agg}"
                 )
+
+    def _validate_frontend(self):
+        """Validate frontend configuration."""
+        if self.frontend.type == "custom" and not self.frontend.command:
+            raise ValidationError("frontend.command is required when frontend.type is 'custom'")
 
     @classmethod
     def from_yaml(cls, yaml_path: Path) -> "SrtConfig":

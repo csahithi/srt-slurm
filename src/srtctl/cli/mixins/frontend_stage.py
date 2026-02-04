@@ -8,6 +8,7 @@ Handles frontend/router and nginx startup.
 """
 
 import logging
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -191,7 +192,13 @@ class FrontendStageMixin:
             nginx_proc = self._start_nginx(topology)
             processes.append(nginx_proc)
 
-        # Get frontend implementation based on config type
+        # Handle custom frontend type
+        if self.config.frontend.type == "custom":
+            custom_proc = self._start_custom_frontend(topology)
+            processes.append(custom_proc)
+            return processes
+
+        # Get frontend implementation based on config type (dynamo, sglang)
         frontend_impl = get_frontend(self.config.frontend.type)
         frontend_procs = frontend_impl.start_frontends(
             topology=topology,
@@ -203,3 +210,60 @@ class FrontendStageMixin:
 
         processes.extend(frontend_procs)
         return processes
+
+    def _start_custom_frontend(self, topology: "FrontendTopology") -> ManagedProcess:
+        """Start a custom frontend using user-provided command.
+
+        Custom frontends run on the head node and use a user-specified command.
+        They must listen on the topology's frontend_port for health checks.
+
+        Args:
+            topology: FrontendTopology describing port configuration
+
+        Returns:
+            ManagedProcess for the custom frontend
+        """
+        head_node = self.runtime.nodes.head
+        fe_config = self.config.frontend
+
+        logger.info("Starting custom frontend on %s", head_node)
+        logger.info("Custom frontend command: %s", fe_config.command)
+
+        frontend_log = self.runtime.log_dir / f"{head_node}_frontend_custom.out"
+
+        # Determine container image (frontend-specific > model.container)
+        container_image = fe_config.container or str(self.runtime.container_image)
+
+        # Parse command string into list
+        cmd = shlex.split(fe_config.command)
+
+        # Build environment variables
+        env_to_set = {
+            "ETCD_ENDPOINTS": f"http://{self.runtime.nodes.infra}:2379",
+            "NATS_SERVER": f"nats://{self.runtime.nodes.infra}:4222",
+            "DYN_REQUEST_PLANE": "nats",
+        }
+
+        # Add frontend env from config
+        if fe_config.env:
+            env_to_set.update(fe_config.env)
+
+        logger.info("Custom frontend container: %s", container_image)
+        logger.info("Custom frontend log: %s", frontend_log)
+
+        proc = start_srun_process(
+            command=cmd,
+            nodelist=[head_node],
+            output=str(frontend_log),
+            container_image=container_image,
+            container_mounts=self.runtime.container_mounts,
+            env_to_set=env_to_set,
+        )
+
+        return ManagedProcess(
+            name="frontend_custom",
+            popen=proc,
+            log_file=frontend_log,
+            node=head_node,
+            critical=True,
+        )
