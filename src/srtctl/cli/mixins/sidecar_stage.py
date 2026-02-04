@@ -111,9 +111,12 @@ class SidecarStageMixin:
         )
 
     def _build_sidecar_command(self, user_command: str) -> list[str]:
-        """Build sidecar command with optional setup script prefix.
+        """Build sidecar command with preamble (setup script, dynamo install).
 
-        If config.setup_script is set, runs that first before the user command.
+        Runs (in order):
+        1. Custom setup script from /configs/ (if config.setup_script set)
+        2. Dynamo installation (if dynamo.install is True)
+        3. User command
 
         Args:
             user_command: The user-provided command string
@@ -123,7 +126,7 @@ class SidecarStageMixin:
         """
         parts = []
 
-        # Run setup script if configured
+        # 1. Run setup script if configured
         if self.config.setup_script:
             script_path = f"/configs/{self.config.setup_script}"
             parts.append(
@@ -131,7 +134,11 @@ class SidecarStageMixin:
                 f"if [ -f '{script_path}' ]; then bash '{script_path}'; else echo 'WARNING: {script_path} not found'; fi"
             )
 
-        # Add the actual command
+        # 2. Dynamo installation (sidecars typically need dynamo for NATS/etcd communication)
+        if self.config.dynamo.install:
+            parts.append(self.config.dynamo.get_install_commands())
+
+        # 3. Add the actual command
         parts.append(user_command)
 
         # Join with && and wrap in bash -c
