@@ -85,6 +85,7 @@ class SidecarStageMixin:
         env_to_set = {
             "ETCD_ENDPOINTS": f"http://{self.runtime.nodes.infra}:2379",
             "NATS_SERVER": f"nats://{self.runtime.nodes.infra}:4222",
+            "DYN_REQUEST_PLANE": "nats",
         }
         env_to_set.update(config.env)
 
