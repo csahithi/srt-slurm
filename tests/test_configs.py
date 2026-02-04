@@ -614,11 +614,11 @@ class TestWorkerEnvironmentTemplating:
                     mock_backend = MagicMock()
                     mock_backend.get_environment_for_mode.side_effect = config.backend.get_environment_for_mode
                     mock_backend.build_worker_command.return_value = ["echo", "test"]
-                    
-                    with patch.object(worker_stage, 'config') as mock_config:
+
+                    with patch.object(worker_stage, "config") as mock_config:
                         mock_config.backend = mock_backend
                         mock_config.profiling = config.profiling
-                        
+
                         with patch("srtctl.cli.mixins.worker_stage.start_srun_process") as mock_srun:
                             mock_srun.return_value = MagicMock()
 
@@ -730,11 +730,11 @@ class TestWorkerEnvironmentTemplating:
                     mock_backend = MagicMock()
                     mock_backend.get_environment_for_mode.side_effect = config.backend.get_environment_for_mode
                     mock_backend.build_worker_command.return_value = ["echo", "test"]
-                    
-                    with patch.object(worker_stage, 'config') as mock_config:
+
+                    with patch.object(worker_stage, "config") as mock_config:
                         mock_config.backend = mock_backend
                         mock_config.profiling = config.profiling
-                        
+
                         with patch("srtctl.cli.mixins.worker_stage.start_srun_process") as mock_srun:
                             mock_srun.return_value = MagicMock()
 
@@ -751,6 +751,7 @@ class TestWorkerEnvironmentTemplating:
 
                             # Mixed case: supported replaced, unsupported kept
                             assert env_vars["MIXED"] == "gpu-01-{unsupported_var}-cache"
+
 
 class TestInfraConfig:
     """Tests for InfraConfig dataclass."""
@@ -987,12 +988,26 @@ class TestVLLMDataParallelMode:
 
         # Create endpoint_processes spanning 2 nodes
         endpoint_processes = [
-            Process(node="node0", gpu_indices=frozenset([i]), sys_port=8081 + i, http_port=0,
-                    endpoint_mode="prefill", endpoint_index=0, node_rank=i)
+            Process(
+                node="node0",
+                gpu_indices=frozenset([i]),
+                sys_port=8081 + i,
+                http_port=0,
+                endpoint_mode="prefill",
+                endpoint_index=0,
+                node_rank=i,
+            )
             for i in range(8)
         ] + [
-            Process(node="node1", gpu_indices=frozenset([i]), sys_port=8089 + i, http_port=0,
-                    endpoint_mode="prefill", endpoint_index=0, node_rank=8 + i)
+            Process(
+                node="node1",
+                gpu_indices=frozenset([i]),
+                sys_port=8089 + i,
+                http_port=0,
+                endpoint_mode="prefill",
+                endpoint_index=0,
+                node_rank=8 + i,
+            )
             for i in range(8)
         ]
 
@@ -1229,3 +1244,126 @@ class TestVLLMDataParallelMode:
         # But should still have multi-node flags
         assert "--master-addr" in cmd
         assert "--nnodes" in cmd
+
+
+class TestDebugConfig:
+    """Tests for DebugConfig hang debugging."""
+
+    def test_debug_config_defaults(self):
+        """Test DebugConfig has correct defaults."""
+        from srtctl.core.schema import DebugConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        # debug config should exist with default values
+        assert config.debug is not None
+        assert config.debug.enabled is False
+        assert config.debug.wait_seconds == 600
+        assert config.debug.output_dir is None
+
+    def test_debug_config_enabled(self):
+        """Test DebugConfig with hang debugging enabled."""
+        from srtctl.core.schema import DebugConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+            debug=DebugConfig(enabled=True, wait_seconds=300, output_dir="/custom/backtraces"),
+        )
+
+        assert config.debug.enabled is True
+        assert config.debug.wait_seconds == 300
+        assert config.debug.output_dir == "/custom/backtraces"
+
+    def test_debug_config_from_yaml(self):
+        """Test DebugConfig can be loaded from YAML."""
+        from pathlib import Path
+        from tempfile import NamedTemporaryFile
+
+        from srtctl.core.schema import SrtConfig
+
+        yaml_content = """
+name: debug-test
+model:
+  path: /model
+  container: /container.sqsh
+  precision: fp8
+resources:
+  gpu_type: h100
+  gpus_per_node: 8
+  agg_nodes: 1
+debug:
+  enabled: true
+  wait_seconds: 120
+  output_dir: /tmp/debug
+"""
+
+        with NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            f.flush()
+            config_path = Path(f.name)
+
+        try:
+            config = SrtConfig.from_yaml(config_path)
+
+            assert config.debug.enabled is True
+            assert config.debug.wait_seconds == 120
+            assert config.debug.output_dir == "/tmp/debug"
+        finally:
+            config_path.unlink()
+
+    def test_debug_launcher_integration(self, tmp_path):
+        """Test that debug launcher can be called when enabled."""
+        from unittest.mock import MagicMock, patch
+
+        from srtctl.core.schema import DebugConfig, ModelConfig, ResourceConfig, SrtConfig
+        from srtctl.debug import launch_hang_debugger
+
+        # Create temporary paths
+        log_dir = tmp_path / "logs"
+        log_dir.mkdir()
+
+        # Create config with debug enabled
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+            debug=DebugConfig(enabled=True, wait_seconds=60),
+        )
+
+        # Mock runtime context
+        mock_runtime = MagicMock()
+        mock_runtime.log_dir = log_dir
+        mock_runtime.job_id = "12345"
+
+        # Mock subprocess.Popen to avoid actually launching srun
+        with patch("srtctl.debug.launcher.subprocess.Popen") as mock_popen:
+            mock_popen.return_value = MagicMock()
+
+            worker_nodes = ["node0", "node1", "node2"]
+            processes = launch_hang_debugger(
+                debug_config=config.debug,
+                runtime=mock_runtime,
+                worker_nodes=worker_nodes,
+            )
+
+            # Should create one process per worker node
+            assert len(processes) == 3
+            assert mock_popen.call_count == 3
+
+            # Check that processes are marked as non-critical
+            for proc in processes:
+                assert proc.critical is False
+
+            # Verify srun command structure
+            for call in mock_popen.call_args_list:
+                args = call[0][0]  # First positional argument is the command list
+                assert args[0] == "srun"
+                assert "--nodes=1" in args
+                assert any("--nodelist=" in arg for arg in args)
+                assert str(config.debug.wait_seconds) in args

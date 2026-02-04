@@ -787,6 +787,27 @@ class HealthCheckConfig:
 
 
 @dataclass(frozen=True)
+class DebugConfig:
+    """Configuration for hang debugging with cuda-gdb backtrace collection.
+
+    When enabled, launches a background script that waits for a configurable
+    amount of time, then collects CUDA kernel info and backtraces from all
+    worker processes using cuda-gdb.
+
+    Attributes:
+        enabled: If True, enable hang debugging
+        wait_seconds: Time to wait before collecting backtraces (default: 600 = 10 minutes)
+        output_dir: Directory for backtrace output (default: {log_dir}/backtraces)
+    """
+
+    enabled: bool = False
+    wait_seconds: int = 600
+    output_dir: str | None = None
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+@dataclass(frozen=True)
 class InfraConfig:
     """Infrastructure configuration for etcd/nats placement.
 
@@ -829,6 +850,7 @@ class SrtConfig:
     output: OutputConfig = field(default_factory=OutputConfig)
     health_check: HealthCheckConfig = field(default_factory=HealthCheckConfig)
     infra: InfraConfig = field(default_factory=InfraConfig)
+    debug: DebugConfig = field(default_factory=DebugConfig)
 
     environment: dict[str, str] = field(default_factory=dict)
     container_mounts: dict[
