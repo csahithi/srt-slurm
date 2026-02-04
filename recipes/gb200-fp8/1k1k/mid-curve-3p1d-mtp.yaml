@@ -124,9 +124,9 @@ backend:
       trust-remote-code: true
 
       # Parallelism
-      tp-size: 32
-      dp-size: 32
-      ep-size: 32
+      tp-size: 48
+      dp-size: 48
+      ep-size: 48
       enable-dp-attention: true
 
       # KV cache and attention
