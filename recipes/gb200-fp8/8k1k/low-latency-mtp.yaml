@@ -1,5 +1,8 @@
 name: "gb200-fp8-8k1k-1p-1d-low-latency-mtp"
 
+frontend:
+  nginx_container: nginx
+
 model:
   path: "dsfp8"
   container: "lmsysorg/sglang:v0.5.8-cu130"

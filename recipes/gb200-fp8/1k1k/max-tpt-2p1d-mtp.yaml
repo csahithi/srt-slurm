@@ -2,6 +2,9 @@
 
 name: "gb200-fp8-max-tpt-2p1d-mtp"
 
+frontend:
+  nginx_container: nginx
+
 model:
   path: "dsfp8"
   container: "lmsysorg/sglang:v0.5.8-cu130"

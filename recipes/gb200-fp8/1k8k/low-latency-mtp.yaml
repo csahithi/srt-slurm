@@ -1,12 +1,7 @@
 name: "gb200-fp8-1k8k-low-latency-mtp"
 
-dynamo:
-  version: 0.7.0
-
-frontend:  
-  type: dynamo  
-  enable_multiple_frontends: true
-  num_additional_frontends: 2
+frontend:
+  nginx_container: nginx
 
 model:
   path: "dsfp8"
