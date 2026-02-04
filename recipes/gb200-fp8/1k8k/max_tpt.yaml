@@ -11,7 +11,7 @@ frontend:
 
 model:
   path: "dsr1-fp8"
-  container: "lmsysorg/sglang:v0.5.8-cu130-runtime"
+  container: "lmsysorg/sglang:v0.5.8-cu130"
   precision: "fp8"
 
 resources:
@@ -27,8 +27,7 @@ backend:
   # Prefill-specific environment variables
   prefill_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
-    SGLANG_DG_CACHE_DIR: "/configs/dg-0.5.8_cu13"
-#    SGLANG_DG_CACHE_DIR: "/configs/dg-0.5.5.post2"
+    SGLANG_JIT_DEEPGEMM_FAST_WARMUP: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
     MC_TE_METRIC: "true"
     SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
@@ -45,8 +44,7 @@ backend:
   # Decode-specific environment variables
   decode_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
-    SGLANG_DG_CACHE_DIR: "/configs/dg-0.5.8_cu13"
-#    SGLANG_DG_CACHE_DIR: "/configs/dg-0.5.5.post2"
+    SGLANG_JIT_DEEPGEMM_FAST_WARMUP: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "768"
     MC_TE_METRIC: "true"
