@@ -312,3 +312,160 @@ class TestCustomBenchmarkRunner:
         assert config.benchmark.container_image is not None
         assert config.benchmark.container_image.template == "/custom/container.sqsh"
 
+    def test_build_command_with_shell_operators_uses_bash(self):
+        """Commands with shell operators (&&, ||, |, etc.) use bash -c."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.custom import CustomBenchmarkRunner
+        from srtctl.core.formatting import FormattableString
+        from srtctl.core.schema import (
+            BenchmarkConfig,
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        runner = CustomBenchmarkRunner()
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/image", precision="fp4"),
+            resources=ResourceConfig(gpu_type="h100"),
+            benchmark=BenchmarkConfig(
+                type="custom",
+                command=FormattableString(template="pip install foo && python run.py"),
+            ),
+        )
+
+        mock_runtime = MagicMock()
+        mock_runtime.frontend_port = 8000
+        mock_runtime.format_string.return_value = "pip install foo && python run.py"
+
+        cmd = runner.build_command(config, mock_runtime)
+        # Should wrap in bash -c for proper shell interpretation
+        assert cmd == ["bash", "-c", "pip install foo && python run.py"]
+
+    def test_build_command_with_pipe_uses_bash(self):
+        """Commands with pipe operator use bash -c."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.custom import CustomBenchmarkRunner
+        from srtctl.core.formatting import FormattableString
+        from srtctl.core.schema import (
+            BenchmarkConfig,
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        runner = CustomBenchmarkRunner()
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/image", precision="fp4"),
+            resources=ResourceConfig(gpu_type="h100"),
+            benchmark=BenchmarkConfig(
+                type="custom",
+                command=FormattableString(template="cat file.txt | grep pattern"),
+            ),
+        )
+
+        mock_runtime = MagicMock()
+        mock_runtime.frontend_port = 8000
+        mock_runtime.format_string.return_value = "cat file.txt | grep pattern"
+
+        cmd = runner.build_command(config, mock_runtime)
+        assert cmd == ["bash", "-c", "cat file.txt | grep pattern"]
+
+    def test_build_command_with_semicolon_uses_bash(self):
+        """Commands with semicolon use bash -c."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.custom import CustomBenchmarkRunner
+        from srtctl.core.formatting import FormattableString
+        from srtctl.core.schema import (
+            BenchmarkConfig,
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        runner = CustomBenchmarkRunner()
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/image", precision="fp4"),
+            resources=ResourceConfig(gpu_type="h100"),
+            benchmark=BenchmarkConfig(
+                type="custom",
+                command=FormattableString(template="cd /app; python main.py"),
+            ),
+        )
+
+        mock_runtime = MagicMock()
+        mock_runtime.frontend_port = 8000
+        mock_runtime.format_string.return_value = "cd /app; python main.py"
+
+        cmd = runner.build_command(config, mock_runtime)
+        assert cmd == ["bash", "-c", "cd /app; python main.py"]
+
+    def test_build_command_with_command_substitution_uses_bash(self):
+        """Commands with $(...) substitution use bash -c."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.custom import CustomBenchmarkRunner
+        from srtctl.core.formatting import FormattableString
+        from srtctl.core.schema import (
+            BenchmarkConfig,
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        runner = CustomBenchmarkRunner()
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/image", precision="fp4"),
+            resources=ResourceConfig(gpu_type="h100"),
+            benchmark=BenchmarkConfig(
+                type="custom",
+                command=FormattableString(template="echo $(date)"),
+            ),
+        )
+
+        mock_runtime = MagicMock()
+        mock_runtime.frontend_port = 8000
+        mock_runtime.format_string.return_value = "echo $(date)"
+
+        cmd = runner.build_command(config, mock_runtime)
+        assert cmd == ["bash", "-c", "echo $(date)"]
+
+    def test_build_command_without_shell_operators_uses_shlex(self):
+        """Simple commands without shell operators use shlex parsing."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.custom import CustomBenchmarkRunner
+        from srtctl.core.formatting import FormattableString
+        from srtctl.core.schema import (
+            BenchmarkConfig,
+            ModelConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        runner = CustomBenchmarkRunner()
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/image", precision="fp4"),
+            resources=ResourceConfig(gpu_type="h100"),
+            benchmark=BenchmarkConfig(
+                type="custom",
+                command=FormattableString(template="python script.py --arg value"),
+            ),
+        )
+
+        mock_runtime = MagicMock()
+        mock_runtime.frontend_port = 8000
+        mock_runtime.format_string.return_value = "python script.py --arg value"
+
+        cmd = runner.build_command(config, mock_runtime)
+        # Should NOT wrap in bash -c, use shlex split
+        assert cmd == ["python", "script.py", "--arg", "value"]
+
