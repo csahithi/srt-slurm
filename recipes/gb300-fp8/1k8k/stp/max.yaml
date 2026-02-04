@@ -4,7 +4,7 @@ name: "gb300-1k8k-fp8-max"
 
 model:
   path: "dsr1-fp8"
-  container: "lmsysorg/sglang:v0.5.8-cu130-runtime"
+  container: "lmsysorg/sglang:v0.5.8-cu130"
   precision: "fp8"
 
 frontend:
@@ -169,6 +169,6 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 8192 
-  concurrencies: [8192]
+  concurrencies: [8192,10240]
   req_rate: "inf"
 

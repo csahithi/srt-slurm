@@ -6,7 +6,7 @@ name: "disagg-kv-sglang"
 
 model:
   path: "qwen3-32b"
-  container: "lmsysorg/sglang:v0.5.8-cu130-runtime"
+  container: "lmsysorg/sglang:v0.5.8-cu130"
   precision: "bf16"
 
 resources:

@@ -1,16 +1,17 @@
-name: "gb200-fp4-1p2d"
+name: "gb200-fp4-1k8k-low-latency"
 
 dynamo:
-  version: 0.7.0
+  version: 0.8.1
 
-frontend:
-  type: dynamo
+frontend:  
+  type: dynamo  
   enable_multiple_frontends: true
-  num_additional_frontends: 4
+  num_additional_frontends: 3
+  nginx_container: nginx
 
 model:
-  path: "dsr1"
-  container: "lmsysorg/sglang:v0.5.5.post2"
+  path: "dsfp4"
+  container: "lmsysorg/sglang:v0.5.8-cu130"
   precision: "fp4"
 
 resources:
@@ -37,7 +38,6 @@ backend:
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-    SGLANG_ENABLE_FLASHINFER_GEMM: "true"
 
   decode_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
@@ -54,12 +54,11 @@ backend:
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-    SGLANG_ENABLE_FLASHINFER_GEMM: "true"
 
   sglang_config:
     prefill:
-      disaggregation-mode: "prefill"
       served-model-name: "deepseek-ai/DeepSeek-R1"
+      disaggregation-mode: "prefill"
       trust-remote-code: true
       disable-radix-cache: true
       kv-cache-dtype: "fp8_e4m3"
@@ -81,10 +80,12 @@ backend:
       data-parallel-size: 1
       tensor-parallel-size: 4
       expert-parallel-size: 1
+      fp4-gemm-backend: "flashinfer_trtllm"
+      disaggregation-transfer-backend: nixl
 
     decode:
-      disaggregation-mode: "decode"
       served-model-name: "deepseek-ai/DeepSeek-R1"
+      disaggregation-mode: "decode"
       prefill-round-robin-balance: true
       trust-remote-code: true
       disable-radix-cache: true
@@ -103,6 +104,8 @@ backend:
       moe-dense-tp-size: 1
       tensor-parallel-size: 4
       expert-parallel-size: 1
+      fp4-gemm-backend: "flashinfer_trtllm"
+      disaggregation-transfer-backend: nixl
 
 benchmark:
   type: "sa-bench"

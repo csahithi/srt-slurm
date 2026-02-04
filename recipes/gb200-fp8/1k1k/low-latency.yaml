@@ -1,16 +1,25 @@
-name: "gb200-fp8-1p-4d-low-latency"
+name: "gb200-fp8-1k1k-low-latency"
+
+dynamo:
+  version: 0.8.1
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  num_additional_frontends: 2
+  nginx_container: nginx
 
 model:
-  path: "dsfp8"
-  container: "0.5.5.post2"
+  path: "dsr1-fp8"
+  container: "lmsysorg/sglang:v0.5.8-cu130"
   precision: "fp8"
 
 resources:
   gpu_type: "gb200"
   prefill_nodes: 1
-  decode_nodes: 4
+  decode_nodes: 1
   prefill_workers: 1
-  decode_workers: 4
+  decode_workers: 1
   gpus_per_node: 4
 
 backend:
@@ -18,9 +27,8 @@ backend:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
-    SGLANG_DG_CACHE_DIR: "/configs/dg-10212025"
+    SGLANG_JIT_DEEPGEMM_FAST_WARMUP: "1"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-    SGLANG_ENABLE_FLASHINFER_GEMM: "1"
     SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
     SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
@@ -36,14 +44,13 @@ backend:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
     PYTHONUNBUFFERED: "1"
     DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
-    SGLANG_DG_CACHE_DIR: "/configs/dg-10212025"
+    SGLANG_JIT_DEEPGEMM_FAST_WARMUP: "1"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
     SGLANG_ENABLE_FLASHINFER_GEMM: "1"
     SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
     SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
     SGLANG_DECODE_BOOTSTRAP_TIMEOUT: "1000"
-    SGLANG_HACK_SEQ_BOOTSTRAP_ROOM: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
     SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
@@ -72,12 +79,14 @@ backend:
       max-running-requests: 512
       load-balance-method: "round_robin"
       scheduler-recv-interval: 10
-      enable-flashinfer-allreduce-fusion: true
+      fp8-gemm-backend: "flashinfer_trtllm"
       enable-symm-mem: true
       moe-dense-tp-size: 1
       tensor-parallel-size: 4
       data-parallel-size: 1
       expert-parallel-size: 1
+      disaggregation-bootstrap-port: 30001
+      disaggregation-transfer-backend: nixl
 
     decode:
       served-model-name: "deepseek-ai/DeepSeek-R1"
@@ -94,19 +103,21 @@ backend:
       mem-fraction-static: 0.95
       chunked-prefill-size: 8192
       cuda-graph-max-bs: 128
-      max-running-requests: 512
+      max-running-requests: 128
       scheduler-recv-interval: 10
-      enable-flashinfer-allreduce-fusion: true
       enable-symm-mem: true
       moe-dense-tp-size: 1
       prefill-round-robin-balance: true
       tensor-parallel-size: 4
       data-parallel-size: 1
       expert-parallel-size: 1
+      fp8-gemm-backend: "flashinfer_trtllm"
+      disaggregation-bootstrap-port: 30001
+      disaggregation-transfer-backend: nixl
 
 benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: "4x8x32x64x80x96x112x128"
+  concurrencies: "4x8"
   req_rate: "inf"
