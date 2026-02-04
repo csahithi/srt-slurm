@@ -308,8 +308,10 @@ class TestContainerPullCommand:
             },
         }
         
+        # submit_container_pull_job returns (job_id, log_path) tuple
+        mock_result = ("12345", "/logs/container-pull-12345.log")
         with patch("srtctl.cli.container_pull.get_container_entries", return_value=mock_containers):
-            with patch("srtctl.cli.container_pull.submit_container_pull_job", return_value="12345") as mock_submit:
+            with patch("srtctl.cli.container_pull.submit_container_pull_job", return_value=mock_result) as mock_submit:
                 exit_code = container_pull(force=False, local=False)
         
         mock_submit.assert_called_once_with(mock_containers, force=False)

@@ -113,7 +113,8 @@ The `srtslurm.yaml` file can contain the following fields:
 | `network_interface`  | string | Network interface for NCCL                              |
 | `srtctl_root`        | string | Root directory for srtctl                               |
 | `output_dir`         | string | Custom output directory (overrides srtctl_root/outputs) |
-| `model_paths`        | dict   | Model path aliases                                      |
+| `models`             | dict   | Model path aliases (preferred)                          |
+| `model_paths`        | dict   | Model path aliases (alias for `models`)                 |
 | `containers`         | dict   | Container image aliases (string or {path, source})      |
 | `default_mounts`     | dict   | Cluster-wide container mounts                           |
 

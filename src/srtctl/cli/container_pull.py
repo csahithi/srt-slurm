@@ -57,7 +57,7 @@ def run_enroot_import(source: str, output_path: Path) -> bool:
         return False
 
 
-def submit_container_pull_job(containers: dict[str, dict], force: bool = False) -> str | None:
+def submit_container_pull_job(containers: dict[str, dict], force: bool = False) -> tuple[str, str] | None:
     """Submit a batch job to download containers.
 
     Uses SLURM settings from srtslurm.yaml (account, partition, etc.) to ensure
@@ -68,7 +68,7 @@ def submit_container_pull_job(containers: dict[str, dict], force: bool = False) 
         force: If True, re-download even if file already exists
 
     Returns:
-        Job ID if submitted successfully, None otherwise
+        Tuple of (job_id, log_path) if submitted successfully, None otherwise
     """
     # Build list of containers to download
     downloads = []
@@ -102,6 +102,11 @@ def submit_container_pull_job(containers: dict[str, dict], force: bool = False) 
         console.print("[dim]Set 'default_partition' in srtslurm.yaml or SLURM_PARTITION env var[/]")
         return None
 
+    # Get srtctl_root for log directory, fallback to cwd
+    srtctl_root = get_srtslurm_setting("srtctl_root") or os.getcwd()
+    log_dir = Path(srtctl_root) / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
     # Generate sbatch script with proper cluster settings
     script_lines = [
         "#!/bin/bash",
@@ -111,7 +116,7 @@ def submit_container_pull_job(containers: dict[str, dict], force: bool = False) 
         f"#SBATCH --account={account}",
         f"#SBATCH --partition={partition}",
         f"#SBATCH --time={time_limit}",
-        "#SBATCH --output=container-pull-%j.log",
+        f"#SBATCH --output={log_dir}/container-pull-%j.log",
     ]
 
     # Add optional directives based on cluster config
@@ -154,7 +159,8 @@ def submit_container_pull_job(containers: dict[str, dict], force: bool = False) 
         output = result.stdout.strip()
         if "Submitted batch job" in output:
             job_id = output.split()[-1]
-            return job_id
+            log_path = f"{log_dir}/container-pull-{job_id}.log"
+            return (job_id, log_path)
 
         console.print(f"[yellow]Unexpected sbatch output:[/] {output}")
         return None
@@ -213,11 +219,12 @@ def container_pull(force: bool = False, local: bool = False) -> int:
 
     # Default: submit as background batch job (unless --local)
     if not local:
-        job_id = submit_container_pull_job(containers, force=force)
-        if job_id:
+        result = submit_container_pull_job(containers, force=force)
+        if result:
+            job_id, log_path = result
             console.print(f"[green]Submitted batch job {job_id}[/]")
             console.print(f"[dim]Monitor with: squeue -j {job_id}[/]")
-            console.print(f"[dim]Logs will be in: container-pull-{job_id}.log[/]")
+            console.print(f"[dim]Logs: {log_path}[/]")
             return 0
         return 1
 
