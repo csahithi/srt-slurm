@@ -1,4 +1,4 @@
-name: ctx1dep16_gen3tep16_batch8_eplb0_mtp0
+name: h100_1k1k_ctx1dep16_gen3tep16_batch16_eplb0_mtp3
 model:
   path: DeepSeek-R1-0528
   container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post1"
@@ -51,13 +51,16 @@ backend:
       cache_transceiver_config:
         max_tokens_in_buffer: 8192
         backend: UCX
+      speculative_config:
+        decoding_type: MTP
+        num_nextn_predict_layers: 3
     decode:
       tensor_parallel_size: 16
       moe_expert_parallel_size: 16
       enable_attention_dp: false
       enable_lm_head_tp_in_adp: false
       pipeline_parallel_size: 1
-      max_batch_size: 8
+      max_batch_size: 16
       max_num_tokens: 256
       max_seq_len: 2088
       cuda_graph_config:
@@ -67,6 +70,7 @@ backend:
         - 2
         - 4
         - 8
+        - 16
       print_iter_log: true
       kv_cache_config:
         enable_block_reuse: false
@@ -80,11 +84,14 @@ backend:
         backend: UCX
       stream_interval: 100
       num_postprocess_workers: 4
+      speculative_config:
+        decoding_type: MTP
+        num_nextn_predict_layers: 3
 benchmark:
   type: sa-bench
   isl: 1024
   osl: 1024
-  concurrencies: '30'
+  concurrencies: '60'
   req_rate: inf
 frontend:
   type: dynamo
