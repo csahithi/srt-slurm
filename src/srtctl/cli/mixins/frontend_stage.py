@@ -8,6 +8,7 @@ Handles frontend/router and nginx startup.
 """
 
 import logging
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -251,8 +252,6 @@ class FrontendStageMixin:
         bash_preamble = self._build_custom_frontend_preamble()
 
         # Parse user command into list
-        import shlex
-
         cmd = shlex.split(fe_config.command)
 
         logger.info("Custom frontend container: %s", container_image)

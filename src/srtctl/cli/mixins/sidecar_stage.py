@@ -9,6 +9,7 @@ Sidecars run on the head node after infrastructure (ETCD/NATS) and before the fr
 """
 
 import logging
+import shlex
 from typing import TYPE_CHECKING
 
 from srtctl.core.processes import ManagedProcess
@@ -90,8 +91,6 @@ class SidecarStageMixin:
         bash_preamble = self._build_sidecar_preamble()
 
         # Parse user command into list
-        import shlex
-
         cmd = shlex.split(config.command)
 
         logger.info("Sidecar '%s' command: %s", name, config.command)
