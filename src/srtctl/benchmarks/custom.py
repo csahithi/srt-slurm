@@ -92,6 +92,12 @@ class CustomBenchmarkRunner(BenchmarkRunner):
         # Strip and handle multiline commands
         cmd_str = cmd_str.strip()
 
+        # If command contains shell operators (&&, ||, |, ;, etc.), use bash -c
+        # This ensures proper shell interpretation of these operators
+        shell_operators = ["&&", "||", "|", ";", ">", "<", "$(", "`"]
+        if any(op in cmd_str for op in shell_operators):
+            return ["bash", "-c", cmd_str]
+
         # Use shlex to properly parse the command into a list
         # This handles quoted strings, escapes, etc.
         try:

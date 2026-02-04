@@ -67,5 +67,5 @@ benchmark:
   type: custom
   # NAT is installed by the benchmark command itself (no separate container needed)
   command: |
-    pip install --root-user-action=ignore -e /workspace/NeMo-Agent-Toolkit/packages/nvidia_nat_core && \
+    pip install --quiet --root-user-action=ignore -e /workspace/NeMo-Agent-Toolkit/packages/nvidia_nat_core &&
     nat eval --config_file /workspace/NeMo-Agent-Toolkit/examples/dynamo_integration/react_benchmark_agent/configs/eval_config_no_rethinking_minimal_test_srtslurm.yml
