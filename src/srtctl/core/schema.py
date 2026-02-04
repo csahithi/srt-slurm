@@ -269,6 +269,7 @@ class ClusterConfig:
     srtctl_root: str | None = None
     output_dir: str | None = None  # Custom output directory for job logs
     model_paths: dict[str, str] | None = None
+    models: dict[str, str] | None = None  # Alias for model_paths
     # Containers mapping: name -> path (string) or {path, source} (dict)
     # Both formats supported for backwards compatibility
     containers: Annotated[dict[str, ContainerEntry], ContainersField()] | None = None
@@ -279,6 +280,10 @@ class ClusterConfig:
     reporting: ReportingConfig | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
+
+    def get_model_paths(self) -> dict[str, str]:
+        """Get model paths, supporting both 'models' and 'model_paths' fields."""
+        return self.models or self.model_paths or {}
 
 
 # ============================================================================

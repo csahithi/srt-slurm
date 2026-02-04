@@ -114,11 +114,11 @@ def resolve_config_with_defaults(user_config: dict[str, Any], cluster_config: di
         slurm["time_limit"] = cluster_config["default_time_limit"]
         logger.debug(f"Applied default time_limit: {slurm['time_limit']}")
 
-    # Resolve model path alias
+    # Resolve model path alias (support both 'models' and 'model_paths' keys)
     model = config.get("model", {})
     model_path = model.get("path", "")
 
-    model_paths = cluster_config.get("model_paths")
+    model_paths = cluster_config.get("models") or cluster_config.get("model_paths")
     if model_paths and model_path in model_paths:
         resolved_path = model_paths[model_path]
         model["path"] = resolved_path

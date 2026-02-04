@@ -43,8 +43,8 @@ containers:
 # Use `srtctl container-pull --force` to re-download existing containers.
 # Use `srtctl container-pull --local` to run directly on login node.
 
-# Model path aliases
-model_paths:
+# Model path aliases (both 'models' and 'model_paths' work)
+models:
   deepseek-r1: "/shared/models/deepseek/DeepSeek-R1"
   deepseek-r1-distill: "/shared/models/deepseek/DeepSeek-R1-Distill-Qwen-32B"
   llama-3-70b: "/shared/models/meta/llama-3-70b"
