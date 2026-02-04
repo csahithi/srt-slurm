@@ -1,10 +1,17 @@
-# 4P1D, with 12 Decode Nodes. Uses single batch overlap
+name: "gb200-fp4-1k1k-max-tpt"
 
-name: "gb200-fp4-max-tpt"
+dynamo:
+  version: 0.8.1
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  num_additional_frontends: 9
+  nginx_container: nginx
 
 model:
   path: "dsfp4"
-  container: "0.5.5.post2"
+  container: "lmsysorg/sglang:v0.5.8-cu130-runtime"
   precision: "fp4"
 
 resources:
@@ -27,7 +34,6 @@ backend:
     SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
     SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
-    SGLANG_HACK_SEQ_BOOTSTRAP_ROOM: "1"
     MC_TE_METRIC: "true"
     MC_FORCE_MNNVL: "1"
     NCCL_MNNVL_ENABLE: "1"
@@ -46,7 +52,6 @@ backend:
     SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
     SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
-    SGLANG_HACK_SEQ_BOOTSTRAP_ROOM: "1"
     MC_TE_METRIC: "true"
     MC_FORCE_MNNVL: "1"
     NCCL_MNNVL_ENABLE: "1"
@@ -56,8 +61,6 @@ backend:
     SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
     SGLANG_MOE_NVFP4_DISPATCH: "1"
-    SGLANG_CUTEDSL_MOE_NVFP4_DISPATCH: "1" # Used in older sglang versions
-    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
 
   sglang_config:
     prefill:
@@ -103,6 +106,8 @@ backend:
       # Performance optimizations
       disable-cuda-graph: true
       enable-dp-attention: true
+      fp4-gemm-backend: "flashinfer_cutlass"
+      disaggregation-transfer-backend: nixl
 
       # Parallelism
       tp-size: 4
@@ -162,6 +167,8 @@ backend:
       enable-dp-lm-head: true
       prefill-round-robin-balance: true
       enable-dp-attention: true
+      disaggregation-transfer-backend: nixl
+      fp4-gemm-backend: "flashinfer_cutlass"
 
       # Parallelism
       tp-size: 48
@@ -172,5 +179,5 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: "1x128x512x2048x4096x8192x12000x15000"
+  concurrencies: "512x2048x4096"
   req_rate: "inf"

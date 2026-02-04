@@ -1,8 +1,17 @@
-name: "gb200-8k1k-fp4-low-latency-1p_tp4/4d_tp4"
+name: "gb200-fp4-8k1k-low-latency"
+
+dynamo:
+  version: 0.8.1
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  num_additional_frontends: 4
+  nginx_container: nginx
 
 model:
   path: "dsfp4"
-  container: "0.5.5.post2"
+  container: "lmsysorg/sglang:v0.5.8-cu130-runtime"
   precision: "fp4"
 
 resources:
@@ -25,14 +34,11 @@ backend:
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
     SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
     SGLANG_DECODE_BOOTSTRAP_TIMEOUT: "1000"
-    #SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1"
-    #SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2: "1"
     MC_FORCE_MNNVL: "1"
     NCCL_MNNVL_ENABLE: "1"
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-    SGLANG_ENABLE_FLASHINFER_GEMM: "true" 
 
   decode_environment:
     TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
@@ -44,14 +50,11 @@ backend:
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
     SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
     SGLANG_DECODE_BOOTSTRAP_TIMEOUT: "1000"
-    # SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1"
-    # SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2: "1"
     MC_FORCE_MNNVL: "1"
     NCCL_MNNVL_ENABLE: "1"
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
     SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-    SGLANG_ENABLE_FLASHINFER_GEMM: "true" 
 
   sglang_config:
     prefill:
@@ -77,6 +80,8 @@ backend:
       load-balance-method: "round_robin"
       disaggregation-bootstrap-port: 30001
       data-parallel-size: 1
+      disaggregation-transfer-backend: nixl
+      fp4-gemm-backend: "flashinfer_trtllm"
       tensor-parallel-size: 4
       expert-parallel-size: 1
       enable-dp-attention: false
@@ -101,12 +106,15 @@ backend:
       scheduler-recv-interval: 10
       enable-symm-mem: true
       moe-dense-tp-size: 1
+      disaggregation-transfer-backend: nixl
+      fp4-gemm-backend: "flashinfer_trtllm"
       tensor-parallel-size: 4
       expert-parallel-size: 1
       enable-dp-attention: false
+
 benchmark:
   type: "sa-bench"
   isl: 8192 
   osl: 1024
-  concurrencies: "4x8x32x64"
+  concurrencies: "4x8"
   req_rate: 300 
