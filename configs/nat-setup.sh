@@ -31,11 +31,16 @@ else
     echo "Custom Dynamo components already linked at $CUSTOM_DYNAMO_DIR"
 fi
 
-# Fix Dynamo 0.8.0 API compatibility (static= parameter was removed)
+# Fix Dynamo 0.8.0 API compatibility
 echo "Patching Dynamo API compatibility..."
+# Remove static= parameter (was removed in 0.8.0)
 sed -i 's/@dynamo_worker(static=False)/@dynamo_worker()/g' "$NAT_DIR/external/dynamo/generalized/router.py"
 sed -i 's/@dynamo_worker(static=False)/@dynamo_worker()/g' "$NAT_DIR/external/dynamo/generalized/processor.py"
 sed -i 's/@dynamo_worker(static=False)/@dynamo_worker()/g' "$NAT_DIR/external/dynamo/generalized/frontend.py"
+# Remove create_service() calls (method was removed in 0.8.0)
+sed -i '/await component.create_service()/d' "$NAT_DIR/external/dynamo/generalized/router.py"
+sed -i '/await component.create_service()/d' "$NAT_DIR/external/dynamo/generalized/processor.py"
+sed -i '/await component.create_service()/d' "$NAT_DIR/external/dynamo/generalized/frontend.py"
 
 # Download agent leaderboard data if not present
 DATA_DIR="$NAT_DIR/examples/dynamo_integration/data"
