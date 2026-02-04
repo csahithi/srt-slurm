@@ -192,3 +192,320 @@ class TestCustomFrontendValidation:
         )
         assert config.frontend.type == "dynamo"
         assert config.frontend.command is None
+
+
+class TestWorkerPreambleDynamoInstall:
+    """Tests for worker preamble dynamo installation logic."""
+
+    def test_worker_preamble_installs_dynamo_for_dynamo_frontend(self):
+        """Test that worker preamble includes dynamo install for frontend.type=dynamo."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.worker_stage import WorkerStageMixin
+
+        # Create a mock mixin with required attributes
+        mixin = MagicMock(spec=WorkerStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            frontend=FrontendConfig(type="dynamo"),
+        )
+
+        # Call the actual method
+        preamble = WorkerStageMixin._build_worker_preamble(mixin)
+
+        assert preamble is not None
+        assert "pip install" in preamble
+        assert "dynamo" in preamble.lower()
+
+    def test_worker_preamble_installs_dynamo_for_custom_frontend(self):
+        """Test that worker preamble includes dynamo install for frontend.type=custom."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.worker_stage import WorkerStageMixin
+
+        mixin = MagicMock(spec=WorkerStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            frontend=FrontendConfig(type="custom", command="python3 /workspace/frontend.py"),
+        )
+
+        preamble = WorkerStageMixin._build_worker_preamble(mixin)
+
+        assert preamble is not None
+        assert "pip install" in preamble
+        assert "dynamo" in preamble.lower()
+
+    def test_worker_preamble_skips_dynamo_for_sglang_frontend(self):
+        """Test that worker preamble does NOT install dynamo for frontend.type=sglang."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.worker_stage import WorkerStageMixin
+
+        mixin = MagicMock(spec=WorkerStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            frontend=FrontendConfig(type="sglang"),
+        )
+
+        preamble = WorkerStageMixin._build_worker_preamble(mixin)
+
+        # Should be None since sglang frontend doesn't need dynamo
+        assert preamble is None
+
+    def test_worker_preamble_skips_dynamo_when_profiling_enabled(self):
+        """Test that worker preamble skips dynamo when profiling is enabled."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.worker_stage import WorkerStageMixin
+        from srtctl.core.schema import ProfilingConfig, ProfilingPhaseConfig
+
+        mixin = MagicMock(spec=WorkerStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(
+                gpu_type="h100",
+                agg_nodes=1,
+                agg_workers=1,
+            ),
+            frontend=FrontendConfig(type="dynamo"),
+            profiling=ProfilingConfig(
+                type="nsys",
+                isl=1024,
+                osl=128,
+                concurrency=1,
+                aggregated=ProfilingPhaseConfig(start_step=5, stop_step=10),
+            ),
+        )
+
+        preamble = WorkerStageMixin._build_worker_preamble(mixin)
+
+        # Should be None - profiling skips dynamo install
+        assert preamble is None
+
+    def test_worker_preamble_skips_dynamo_when_install_false(self):
+        """Test that worker preamble skips dynamo when dynamo.install=False."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.worker_stage import WorkerStageMixin
+        from srtctl.core.schema import DynamoConfig
+
+        mixin = MagicMock(spec=WorkerStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            frontend=FrontendConfig(type="dynamo"),
+            dynamo=DynamoConfig(install=False),
+        )
+
+        preamble = WorkerStageMixin._build_worker_preamble(mixin)
+
+        # Should be None - dynamo install disabled
+        assert preamble is None
+
+    def test_worker_preamble_includes_setup_script(self):
+        """Test that worker preamble includes setup_script when configured."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.worker_stage import WorkerStageMixin
+
+        mixin = MagicMock(spec=WorkerStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            frontend=FrontendConfig(type="dynamo"),
+            setup_script="nat-setup.sh",
+        )
+
+        preamble = WorkerStageMixin._build_worker_preamble(mixin)
+
+        assert preamble is not None
+        assert "nat-setup.sh" in preamble
+        assert "/configs/nat-setup.sh" in preamble
+
+
+class TestSidecarCommandPreamble:
+    """Tests for sidecar command preamble logic."""
+
+    def test_sidecar_command_includes_setup_script(self):
+        """Test that sidecar command includes setup_script when configured."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.sidecar_stage import SidecarStageMixin
+
+        mixin = MagicMock(spec=SidecarStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            setup_script="nat-setup.sh",
+        )
+
+        cmd = SidecarStageMixin._build_sidecar_command(mixin, "python3 /workspace/router.py")
+
+        assert cmd == ["bash", "-c", cmd[2]]  # Should be bash -c wrapped
+        assert "nat-setup.sh" in cmd[2]
+        assert "/configs/nat-setup.sh" in cmd[2]
+        assert "python3 /workspace/router.py" in cmd[2]
+
+    def test_sidecar_command_includes_dynamo_install(self):
+        """Test that sidecar command includes dynamo install when enabled."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.sidecar_stage import SidecarStageMixin
+
+        mixin = MagicMock(spec=SidecarStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+        )
+
+        cmd = SidecarStageMixin._build_sidecar_command(mixin, "python3 /workspace/router.py")
+
+        # Default dynamo.install is True
+        assert "pip install" in cmd[2]
+        assert "dynamo" in cmd[2].lower()
+
+    def test_sidecar_command_skips_dynamo_when_install_false(self):
+        """Test that sidecar command skips dynamo when dynamo.install=False."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.sidecar_stage import SidecarStageMixin
+        from srtctl.core.schema import DynamoConfig
+
+        mixin = MagicMock(spec=SidecarStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            dynamo=DynamoConfig(install=False),
+        )
+
+        cmd = SidecarStageMixin._build_sidecar_command(mixin, "python3 /workspace/router.py")
+
+        # Should NOT include pip install
+        assert "pip install" not in cmd[2]
+        # But should still include the user command
+        assert "python3 /workspace/router.py" in cmd[2]
+
+    def test_sidecar_command_order_setup_then_dynamo_then_command(self):
+        """Test that sidecar command runs setup_script, then dynamo, then user command."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.sidecar_stage import SidecarStageMixin
+
+        mixin = MagicMock(spec=SidecarStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            setup_script="nat-setup.sh",
+        )
+
+        cmd = SidecarStageMixin._build_sidecar_command(mixin, "python3 /workspace/router.py")
+        full_cmd = cmd[2]
+
+        # Find positions to verify order
+        setup_pos = full_cmd.find("nat-setup.sh")
+        dynamo_pos = full_cmd.find("pip install")
+        user_cmd_pos = full_cmd.find("python3 /workspace/router.py")
+
+        assert setup_pos < dynamo_pos < user_cmd_pos, "Order should be: setup_script, dynamo install, user command"
+
+
+class TestCustomFrontendCommandPreamble:
+    """Tests for custom frontend command preamble logic."""
+
+    def test_custom_frontend_command_includes_setup_script(self):
+        """Test that custom frontend command includes setup_script when configured."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.frontend_stage import FrontendStageMixin
+
+        mixin = MagicMock(spec=FrontendStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            frontend=FrontendConfig(type="custom", command="python3 /workspace/frontend.py"),
+            setup_script="nat-setup.sh",
+        )
+
+        cmd = FrontendStageMixin._build_custom_frontend_command(mixin, "python3 /workspace/frontend.py")
+
+        assert cmd == ["bash", "-c", cmd[2]]
+        assert "nat-setup.sh" in cmd[2]
+        assert "/configs/nat-setup.sh" in cmd[2]
+
+    def test_custom_frontend_command_includes_dynamo_install(self):
+        """Test that custom frontend command includes dynamo install when enabled."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.frontend_stage import FrontendStageMixin
+
+        mixin = MagicMock(spec=FrontendStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            frontend=FrontendConfig(type="custom", command="python3 /workspace/frontend.py"),
+        )
+
+        cmd = FrontendStageMixin._build_custom_frontend_command(mixin, "python3 /workspace/frontend.py")
+
+        assert "pip install" in cmd[2]
+        assert "dynamo" in cmd[2].lower()
+
+    def test_custom_frontend_command_skips_dynamo_when_install_false(self):
+        """Test that custom frontend command skips dynamo when dynamo.install=False."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.frontend_stage import FrontendStageMixin
+        from srtctl.core.schema import DynamoConfig
+
+        mixin = MagicMock(spec=FrontendStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            frontend=FrontendConfig(type="custom", command="python3 /workspace/frontend.py"),
+            dynamo=DynamoConfig(install=False),
+        )
+
+        cmd = FrontendStageMixin._build_custom_frontend_command(mixin, "python3 /workspace/frontend.py")
+
+        assert "pip install" not in cmd[2]
+        assert "python3 /workspace/frontend.py" in cmd[2]
+
+    def test_custom_frontend_command_order(self):
+        """Test that custom frontend command runs in correct order."""
+        from unittest.mock import MagicMock
+
+        from srtctl.cli.mixins.frontend_stage import FrontendStageMixin
+
+        mixin = MagicMock(spec=FrontendStageMixin)
+        mixin.config = SrtConfig(
+            name="test-job",
+            model=ModelConfig(path="/models/test", container="/containers/test.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", agg_nodes=1, agg_workers=1),
+            frontend=FrontendConfig(type="custom", command="python3 /workspace/frontend.py"),
+            setup_script="nat-setup.sh",
+        )
+
+        cmd = FrontendStageMixin._build_custom_frontend_command(mixin, "python3 /workspace/frontend.py")
+        full_cmd = cmd[2]
+
+        setup_pos = full_cmd.find("nat-setup.sh")
+        dynamo_pos = full_cmd.find("pip install")
+        user_cmd_pos = full_cmd.find("python3 /workspace/frontend.py")
+
+        assert setup_pos < dynamo_pos < user_cmd_pos, "Order should be: setup_script, dynamo install, user command"

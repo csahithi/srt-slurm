@@ -2,10 +2,9 @@
 # Uses custom Dynamo frontend, router, and processor for KV-aware routing.
 #
 # Prerequisites:
-#   - NAT container with nvidia-nat installed (see configs/nat-setup.sh)
-#   - Network access to clone NeMo-Agent-Toolkit repo
+#   - Network access to clone NeMo-Agent-Toolkit repo (setup script handles this)
 #
-# The setup script clones NeMo-Agent-Toolkit and links custom Dynamo components.
+# The setup script clones NeMo-Agent-Toolkit, installs NAT, and links custom Dynamo components.
 name: "nemo-dynamo-thompson"
 
 model:
@@ -58,11 +57,15 @@ backend:
       tp: 4
       served-model-name: "qwen32b"
       trust-remote-code: true
+      json-model-override-args: '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768},"max_position_embeddings":131072}'
+      context-length: 131072
+      page-size: 64
       mem-fraction-static: 0.9
       enable-metrics: true
 
 benchmark:
   type: custom
-  container_image: "nemo-nat"
+  # NAT is installed by the benchmark command itself (no separate container needed)
   command: |
+    pip install --root-user-action=ignore -e /workspace/NeMo-Agent-Toolkit/packages/nvidia_nat_core && \
     nat eval --config_file /workspace/NeMo-Agent-Toolkit/examples/dynamo_integration/react_benchmark_agent/configs/eval_config_no_rethinking_minimal_test_srtslurm.yml

@@ -41,6 +41,8 @@ sed -i 's/@dynamo_worker(static=False)/@dynamo_worker()/g' "$NAT_DIR/external/dy
 sed -i '/await component.create_service()/d' "$NAT_DIR/external/dynamo/generalized/router.py"
 sed -i '/await component.create_service()/d' "$NAT_DIR/external/dynamo/generalized/processor.py"
 sed -i '/await component.create_service()/d' "$NAT_DIR/external/dynamo/generalized/frontend.py"
+# Change frontend port from 8099 to 8000 (srtslurm health checks use 8000)
+sed -i 's/port: int = 8099/port: int = 8000/g' "$NAT_DIR/external/dynamo/generalized/frontend.py"
 
 # Download agent leaderboard data if not present
 DATA_DIR="$NAT_DIR/examples/dynamo_integration/data"
