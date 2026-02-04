@@ -39,6 +39,8 @@ from srtctl.backends import (
 from srtctl.core.formatting import (
     FormattablePath,
     FormattablePathField,
+    FormattableString,
+    FormattableStringField,
 )
 
 if TYPE_CHECKING:
@@ -173,6 +175,84 @@ class S3Config:
     Schema: ClassVar[type[Schema]] = Schema
 
 
+@dataclass(frozen=True)
+class ContainerEntry:
+    """Container entry with optional source for pulling.
+
+    Supports two formats in srtslurm.yaml:
+      - Old format (string): "sglang: /path/to/sglang.sqsh"
+      - New format (dict): "sglang: {path: /path/to/sglang.sqsh, source: docker://...}"
+
+    The source field enables `srtctl container-pull` to download containers.
+    """
+
+    path: str  # Local path to the .sqsh file
+    source: str | None = None  # Docker URL for pulling (e.g., "docker://nvcr.io/nvidia/sglang:0.4.1")
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+class ContainersField(fields.Field):
+    """Marshmallow field for containers that accepts both string and dict formats.
+
+    Handles both:
+      - Old format: {"sglang": "/path/to/sglang.sqsh"}
+      - New format: {"sglang": {"path": "/path/to/sglang.sqsh", "source": "docker://..."}}
+
+    Always deserializes to dict[str, ContainerEntry] internally.
+    """
+
+    def _deserialize(
+        self,
+        value: Any,
+        attr: str | None,
+        data: Mapping[str, Any] | None,
+        **kwargs,
+    ) -> dict[str, ContainerEntry] | None:
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            raise ValidationError(f"Expected dict for containers, got {type(value).__name__}")
+
+        result: dict[str, ContainerEntry] = {}
+        for name, entry in value.items():
+            if isinstance(entry, str):
+                # Old format: just a path string
+                result[name] = ContainerEntry(path=entry, source=None)
+            elif isinstance(entry, dict):
+                # New format: dict with path and optional source
+                if "path" not in entry:
+                    raise ValidationError(f"Container '{name}' dict format requires 'path' field")
+                result[name] = ContainerEntry(
+                    path=entry["path"],
+                    source=entry.get("source"),
+                )
+            else:
+                raise ValidationError(
+                    f"Container '{name}' must be a string path or dict with 'path' field, got {type(entry).__name__}"
+                )
+        return result
+
+    def _serialize(
+        self,
+        value: dict[str, ContainerEntry] | None,
+        attr: str | None,
+        obj: Any,
+        **kwargs,
+    ) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        result: dict[str, Any] = {}
+        for name, entry in value.items():
+            if entry.source is None:
+                # Serialize as simple string if no source
+                result[name] = entry.path
+            else:
+                # Serialize as dict if has source
+                result[name] = {"path": entry.path, "source": entry.source}
+        return result
+
+
 @dataclass
 class ClusterConfig:
     """Cluster configuration from srtslurm.yaml."""
@@ -189,7 +269,9 @@ class ClusterConfig:
     srtctl_root: str | None = None
     output_dir: str | None = None  # Custom output directory for job logs
     model_paths: dict[str, str] | None = None
-    containers: dict[str, str] | None = None
+    # Containers mapping: name -> path (string) or {path, source} (dict)
+    # Both formats supported for backwards compatibility
+    containers: Annotated[dict[str, ContainerEntry], ContainersField()] | None = None
     cloud: dict[str, str] | None = None
     # Cluster-level container mounts (host_path -> container_path)
     # Applied to all jobs on this cluster, useful for cluster-specific paths
@@ -225,6 +307,7 @@ class BenchmarkType(str, Enum):
     MMLU = "mmlu"
     GPQA = "gpqa"
     LONGBENCHV2 = "longbenchv2"
+    CUSTOM = "custom"
 
 
 class ProfilingType(str, Enum):
@@ -510,7 +593,19 @@ class SlurmConfig:
 
 @dataclass(frozen=True)
 class BenchmarkConfig:
-    """Benchmark configuration."""
+    """Benchmark configuration.
+
+    For custom benchmarks (type: "custom"), you can specify:
+      - container_image: Custom container to run the benchmark in
+      - command: Command template with placeholders like {nginx_url}, {log_dir}, etc.
+
+    Example:
+        benchmark:
+          type: "custom"
+          container_image: "/containers/aiperf.sqsh"
+          command: |
+            uvx aiperf profile --url {nginx_url} --concurrency 128 --artifact-dir {log_dir}/results
+    """
 
     type: str = "manual"
     isl: int | None = None
@@ -533,6 +628,12 @@ class BenchmarkConfig:
     mooncake_workload: str | None = None  # "mooncake", "conversation", "synthetic", "toolagent"
     ttft_threshold_ms: int | None = None  # Goodput TTFT threshold in ms (default: 2000)
     itl_threshold_ms: int | None = None  # Goodput ITL threshold in ms (default: 25)
+
+    # Custom benchmark fields (type: "custom")
+    # container_image: Custom container to run the benchmark (optional, defaults to worker container)
+    container_image: Annotated[FormattablePath, FormattablePathField(allow_none=True)] | None = None
+    # command: Command template with placeholders ({nginx_url}, {log_dir}, {job_id}, {run_name}, {model_path})
+    command: Annotated[FormattableString, FormattableStringField(allow_none=True)] | None = None
 
     def get_concurrency_list(self) -> list[int]:
         if self.concurrencies is None:
