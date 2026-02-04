@@ -10,7 +10,7 @@ frontend:
 
 model:
   path: "dsr1-fp8"
-  container: "dynamo-sglang"
+  container: "lmsysorg/sglang:v0.5.8-cu130"
   precision: "fp8"
 
 resources:
