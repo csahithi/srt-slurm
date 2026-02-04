@@ -13,6 +13,9 @@ resources:
   decode_workers: 2
   gpus_per_node: 8
 
+frontend:
+  nginx_container: nginx
+
 backend:
 
   # Prefill-specific environment variables
