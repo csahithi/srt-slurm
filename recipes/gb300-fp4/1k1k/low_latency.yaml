@@ -8,6 +8,7 @@ frontend:
   enable_multiple_frontends: true
   num_additional_frontends: 4
   nginx_container: nginx-sqsh
+  http-port: 8000
 
 model:
   path: "dsr1"
