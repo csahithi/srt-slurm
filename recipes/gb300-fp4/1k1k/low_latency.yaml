@@ -5,8 +5,8 @@ dynamo:
 
 frontend:
   type: dynamo
-  enable_multiple_frontends: true
-  num_additional_frontends: 4
+  enable_multiple_frontends: false
+  num_additional_frontends: 0
   nginx_container: nginx-sqsh
 
 model:
