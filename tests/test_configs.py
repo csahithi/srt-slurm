@@ -1341,14 +1341,16 @@ debug:
         mixin.runtime = MagicMock()
         mixin.runtime.job_id = "12345"
 
-        # Build the preamble
-        preamble = mixin._build_worker_preamble()
+        # Build the preamble with worker info
+        preamble = mixin._build_worker_preamble(node="node0", mode="decode", index=0)
 
         # Verify debug script is in the preamble
         assert preamble is not None
         assert "collect_backtraces.sh" in preamble
         assert "60" in preamble  # wait_seconds
-        assert "12345" in preamble  # job_id
+        assert "node0" in preamble  # node
+        assert "decode" in preamble  # mode
         assert "/logs/backtraces" in preamble  # output_dir
         assert "nohup" in preamble  # runs in background
         assert "&" in preamble  # background process
+        assert "node0_hang_debug.log" in preamble  # log file name

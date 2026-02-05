@@ -52,13 +52,20 @@ class WorkerStageMixin:
         """Endpoint allocation topology."""
         ...
 
-    def _build_worker_preamble(self) -> str | None:
+    def _build_worker_preamble(
+        self, node: str | None = None, mode: str | None = None, index: int | None = None
+    ) -> str | None:
         """Build bash preamble for worker processes.
 
         Runs (in order):
         1. Custom setup script from /configs/ (if config.setup_script set)
         2. Dynamo installation (if frontend type is dynamo and not profiling)
         3. Hang debugger script in background (if debug.enabled)
+
+        Args:
+            node: Worker node name (for debug log naming)
+            mode: Worker mode - prefill/decode/agg (for debug log naming)
+            index: Worker index (for debug log naming)
         """
         parts = []
 
@@ -78,14 +85,15 @@ class WorkerStageMixin:
 
         # 3. Hang debugger (runs in background, waits then collects backtraces)
         # Use subshell so the & doesn't break && chaining
-        if self.config.debug.enabled:
+        if self.config.debug.enabled and node and mode is not None and index is not None:
             debug_script = "/srtctl-benchmarks/debug/collect_backtraces.sh"
             wait_seconds = self.config.debug.wait_seconds
             output_dir = "/logs/backtraces"
-            job_id = self.runtime.job_id
+            # Pass node/mode/index for consistent backtrace file naming
+            log_file = f"/logs/{node}_hang_debug.log"
             parts.append(
                 f"mkdir -p {output_dir} && "
-                f"(nohup bash {debug_script} {wait_seconds} {output_dir} {job_id} > /logs/hang_debug_$(hostname).log 2>&1 &)"
+                f"(nohup bash {debug_script} {wait_seconds} {output_dir} {node} {mode} {index} > {log_file} 2>&1 &)"
             )
 
         if not parts:
@@ -170,8 +178,8 @@ class WorkerStageMixin:
         if profiling.enabled:
             logger.info("Profiling: %s mode", profiling.type)
 
-        # Build bash preamble (setup script + dynamo install)
-        bash_preamble = self._build_worker_preamble()
+        # Build bash preamble (setup script + dynamo install + hang debugger)
+        bash_preamble = self._build_worker_preamble(node=process.node, mode=mode, index=index)
 
         # Use named container so debug scripts can attach to it later
         container_name = f"sglang_{self.runtime.job_id}_{process.node}"
@@ -273,8 +281,8 @@ class WorkerStageMixin:
         if profiling.enabled:
             logger.info("Profiling: %s mode", profiling.type)
 
-        # Build bash preamble (setup script + dynamo install)
-        bash_preamble = self._build_worker_preamble()
+        # Build bash preamble (setup script + dynamo install + hang debugger)
+        bash_preamble = self._build_worker_preamble(node=leader.node, mode=mode, index=index)
 
         # Get srun config from backend
         srun_config = self.backend.get_srun_config()

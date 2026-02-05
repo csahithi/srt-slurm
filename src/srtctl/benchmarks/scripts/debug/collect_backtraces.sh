@@ -5,18 +5,23 @@
 # Hang debugging script: Waits for a configurable time, then collects
 # cuda-gdb backtraces from all worker processes.
 #
-# Usage: collect_backtraces.sh <wait_seconds> <output_dir> <job_id>
+# Usage: collect_backtraces.sh <wait_seconds> <output_dir> <node> <mode> <index>
 
 set -euo pipefail
 
 WAIT_SECONDS="${1:-600}"
 OUTPUT_DIR="${2:-/tmp/backtraces}"
-JOB_ID="${3:-unknown}"
+NODE="${3:-$(hostname)}"
+MODE="${4:-unknown}"
+INDEX="${5:-0}"
+
+# File prefix matching worker log convention: {node}_{mode}_w{index}
+FILE_PREFIX="${NODE}_${MODE}_w${INDEX}"
 
 echo "[$(date)] Hang debug: Starting backtrace collector"
+echo "[$(date)] Worker: ${FILE_PREFIX}"
 echo "[$(date)] Will collect backtraces after ${WAIT_SECONDS} seconds"
 echo "[$(date)] Output directory: ${OUTPUT_DIR}"
-echo "[$(date)] Job ID: ${JOB_ID}"
 
 # Wait for the configured time
 echo "[$(date)] Waiting ${WAIT_SECONDS} seconds before collecting backtraces..."
@@ -60,6 +65,7 @@ for PID in ${PIDS}; do
 done
 
 # Collect backtrace from each process
+PROC_NUM=0
 for PID in ${PIDS}; do
     echo "[$(date)] Collecting backtraces from PID ${PID}..."
 
@@ -69,10 +75,15 @@ for PID in ${PIDS}; do
         continue
     fi
 
-    # Get hostname for output filename
-    HOSTNAME=$(hostname)
-    PYSPY_FILE="${OUTPUT_DIR}/pyspy_${HOSTNAME}_${PID}.txt"
-    CUDAGDB_FILE="${OUTPUT_DIR}/cudagdb_${HOSTNAME}_${PID}.txt"
+    # Output filenames matching worker log convention
+    # Add process number suffix if multiple processes found
+    if [ "${NUM_PROCS}" -gt 1 ]; then
+        PYSPY_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_pyspy_p${PROC_NUM}.txt"
+        CUDAGDB_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_cudagdb_p${PROC_NUM}.txt"
+    else
+        PYSPY_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_pyspy.txt"
+        CUDAGDB_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_cudagdb.txt"
+    fi
 
     # 1. Collect Python stack trace using py-spy (non-invasive, doesn't pause process)
     echo "[$(date)] Collecting py-spy dump for PID ${PID}..."
@@ -109,6 +120,8 @@ for PID in ${PIDS}; do
     else
         echo "[$(date)] WARNING: cuda-gdb not found, skipping CUDA backtrace"
     fi
+
+    PROC_NUM=$((PROC_NUM + 1))
 done
 
 echo "[$(date)] Backtrace collection complete"
