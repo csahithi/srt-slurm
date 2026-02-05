@@ -96,23 +96,6 @@ class BenchmarkStageMixin:
         if reporter:
             reporter.report(JobStatus.BENCHMARK, JobStage.BENCHMARK, "Running benchmark")
 
-        # Launch hang debugger now that workers are healthy and containers are ready
-        if self.config.debug.enabled:
-            from srtctl.debug import launch_hang_debugger
-
-            # Get unique list of worker nodes
-            worker_nodes = list(dict.fromkeys(p.node for p in self.backend_processes))
-
-            debug_processes = launch_hang_debugger(
-                debug_config=self.config.debug,
-                runtime=self.runtime,
-                worker_nodes=worker_nodes,
-            )
-
-            # Register debug processes (non-critical, won't stop job on failure)
-            for managed in debug_processes:
-                registry.register(managed.name, managed)
-
         # Auto-select profiling benchmark when profiling is enabled
         benchmark_type = self.config.benchmark.type
         if self.config.profiling.enabled:

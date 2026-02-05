@@ -58,6 +58,7 @@ class WorkerStageMixin:
         Runs (in order):
         1. Custom setup script from /configs/ (if config.setup_script set)
         2. Dynamo installation (if frontend type is dynamo and not profiling)
+        3. Hang debugger script in background (if debug.enabled)
         """
         parts = []
 
@@ -74,6 +75,17 @@ class WorkerStageMixin:
         # Skip if dynamo.install is False (container already has dynamo installed)
         if self.config.frontend.type == "dynamo" and not self.config.profiling.enabled and self.config.dynamo.install:
             parts.append(self.config.dynamo.get_install_commands())
+
+        # 3. Hang debugger (runs in background, waits then collects backtraces)
+        if self.config.debug.enabled:
+            debug_script = "/srtctl-benchmarks/debug/collect_backtraces.sh"
+            wait_seconds = self.config.debug.wait_seconds
+            output_dir = "/logs/backtraces"
+            job_id = self.runtime.job_id
+            parts.append(
+                f"mkdir -p {output_dir} && "
+                f"nohup bash {debug_script} {wait_seconds} {output_dir} {job_id} > /logs/hang_debug_$(hostname).log 2>&1 &"
+            )
 
         if not parts:
             return None

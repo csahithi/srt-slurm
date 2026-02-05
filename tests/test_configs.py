@@ -1317,16 +1317,12 @@ debug:
         finally:
             config_path.unlink()
 
-    def test_debug_launcher_integration(self, tmp_path):
-        """Test that debug launcher can be called when enabled."""
-        from unittest.mock import MagicMock, patch
+    def test_debug_preamble_integration(self, tmp_path):
+        """Test that debug script is added to worker preamble when enabled."""
+        from unittest.mock import MagicMock
 
+        from srtctl.cli.mixins.worker_stage import WorkerStageMixin
         from srtctl.core.schema import DebugConfig, ModelConfig, ResourceConfig, SrtConfig
-        from srtctl.debug import launch_hang_debugger
-
-        # Create temporary paths
-        log_dir = tmp_path / "logs"
-        log_dir.mkdir()
 
         # Create config with debug enabled
         config = SrtConfig(
@@ -1336,34 +1332,23 @@ debug:
             debug=DebugConfig(enabled=True, wait_seconds=60),
         )
 
-        # Mock runtime context
-        mock_runtime = MagicMock()
-        mock_runtime.log_dir = log_dir
-        mock_runtime.job_id = "12345"
+        # Create a minimal mixin instance with mocked dependencies
+        class TestMixin(WorkerStageMixin):
+            pass
 
-        # Mock subprocess.Popen to avoid actually launching srun
-        with patch("srtctl.debug.launcher.subprocess.Popen") as mock_popen:
-            mock_popen.return_value = MagicMock()
+        mixin = TestMixin()
+        mixin.config = config
+        mixin.runtime = MagicMock()
+        mixin.runtime.job_id = "12345"
 
-            worker_nodes = ["node0", "node1", "node2"]
-            processes = launch_hang_debugger(
-                debug_config=config.debug,
-                runtime=mock_runtime,
-                worker_nodes=worker_nodes,
-            )
+        # Build the preamble
+        preamble = mixin._build_worker_preamble()
 
-            # Should create one process per worker node
-            assert len(processes) == 3
-            assert mock_popen.call_count == 3
-
-            # Check that processes are marked as non-critical
-            for proc in processes:
-                assert proc.critical is False
-
-            # Verify srun command structure
-            for call in mock_popen.call_args_list:
-                args = call[0][0]  # First positional argument is the command list
-                assert args[0] == "srun"
-                assert "--nodes=1" in args
-                assert any("--nodelist=" in arg for arg in args)
-                assert str(config.debug.wait_seconds) in args
+        # Verify debug script is in the preamble
+        assert preamble is not None
+        assert "collect_backtraces.sh" in preamble
+        assert "60" in preamble  # wait_seconds
+        assert "12345" in preamble  # job_id
+        assert "/logs/backtraces" in preamble  # output_dir
+        assert "nohup" in preamble  # runs in background
+        assert "&" in preamble  # background process
