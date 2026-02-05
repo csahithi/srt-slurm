@@ -53,7 +53,8 @@ backend:
 
       # Other flags
       # stream-interval: 50
-      max-running-requests: 512
+      # used to be 512
+      max-running-requests: 64
       
 
       # Prefill-specific mode
@@ -62,9 +63,11 @@ backend:
       disaggregation-transfer-backend: nixl
 
       # Memory and token limits
-      mem-fraction-static: 0.75
+      # usd to be 0.75
+      mem-fraction-static: 0.82
       max-prefill-tokens: 65536
-      chunked-prefill-size: 262144
+      # used to be 262144
+      chunked-prefill-size: 65536
 
       # Request handling
       load-balance-method: "round_robin"

@@ -93,8 +93,8 @@ backend:
       disaggregation-mode: "decode"
       disaggregation-transfer-backend: nixl
 
-      context-length: 72000
-      max-total-tokens: 128000 
+      #context-length: 72000
+      # max-total-tokens: 128000 
       # Memory and token limits
       mem-fraction-static: 0.82
       max-running-requests: 128
