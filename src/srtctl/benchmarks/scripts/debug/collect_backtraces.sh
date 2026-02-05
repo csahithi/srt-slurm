@@ -64,65 +64,93 @@ for PID in ${PIDS}; do
     fi
 done
 
-# Collect backtrace from each process
-PROC_NUM=0
-for PID in ${PIDS}; do
-    echo "[$(date)] Collecting backtraces from PID ${PID}..."
-
-    # Check if process still exists
-    if ! kill -0 "${PID}" 2>/dev/null; then
-        echo "[$(date)] WARNING: Process ${PID} no longer exists, skipping"
-        continue
-    fi
-
-    # Output filenames matching worker log convention
-    # Add process number suffix if multiple processes found
-    if [ "${NUM_PROCS}" -gt 1 ]; then
-        PYSPY_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_pyspy_p${PROC_NUM}.txt"
-        CUDAGDB_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_cudagdb_p${PROC_NUM}.txt"
-    else
-        PYSPY_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_pyspy.txt"
-        CUDAGDB_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_cudagdb.txt"
-    fi
-
-    # 1. Collect Python stack trace using py-spy (non-invasive, doesn't pause process)
-    echo "[$(date)] Collecting py-spy dump for PID ${PID}..."
-    if command -v py-spy &> /dev/null; then
-        timeout 30 py-spy dump --pid "${PID}" > "${PYSPY_FILE}" 2>&1 || {
-            echo "[$(date)] WARNING: py-spy failed for PID ${PID}"
-            echo "ERROR: py-spy failed or timed out" >> "${PYSPY_FILE}"
-        }
-        if [ -f "${PYSPY_FILE}" ] && [ -s "${PYSPY_FILE}" ]; then
-            echo "[$(date)] py-spy output saved to ${PYSPY_FILE}"
+# Phase 1: Collect Python stack traces using py-spy (non-invasive, doesn't pause process)
+echo "[$(date)] Phase 1: Collecting py-spy dumps..."
+if command -v py-spy &> /dev/null; then
+    PROC_NUM=0
+    for PID in ${PIDS}; do
+        # Check if process still exists
+        if ! kill -0 "${PID}" 2>/dev/null; then
+            echo "[$(date)] WARNING: Process ${PID} no longer exists, skipping"
+            PROC_NUM=$((PROC_NUM + 1))
+            continue
         fi
-    else
-        echo "[$(date)] WARNING: py-spy not found, skipping Python stack trace"
-    fi
 
-    # 2. Collect CUDA backtrace using cuda-gdb (more invasive, pauses process briefly)
-    echo "[$(date)] Collecting cuda-gdb backtrace for PID ${PID}..."
-    if command -v cuda-gdb &> /dev/null; then
-        cuda-gdb \
-            -batch \
-            -ex "set logging redirect on" \
-            -ex "set logging file ${CUDAGDB_FILE}" \
-            -ex "set logging enabled on" \
-            -ex "info cuda kernels" \
-            -ex "thread apply all bt" \
-            -ex quit \
-            -p "${PID}" 2>&1 || {
-                echo "[$(date)] WARNING: cuda-gdb failed for PID ${PID}"
-                echo "ERROR: cuda-gdb failed or timed out" >> "${CUDAGDB_FILE}"
+        # Output filename matching worker log convention
+        if [ "${NUM_PROCS}" -gt 1 ]; then
+            PYSPY_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_pyspy_p${PROC_NUM}.txt"
+        else
+            PYSPY_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_pyspy.txt"
+        fi
+
+        (
+            echo "[$(date)] Collecting py-spy dump for PID ${PID}..."
+            py-spy dump --pid "${PID}" > "${PYSPY_FILE}" 2>&1 || {
+                echo "[$(date)] WARNING: py-spy failed for PID ${PID}"
+                echo "ERROR: py-spy failed" >> "${PYSPY_FILE}"
             }
-        if [ -f "${CUDAGDB_FILE}" ] && [ -s "${CUDAGDB_FILE}" ]; then
-            echo "[$(date)] cuda-gdb output saved to ${CUDAGDB_FILE}"
-        fi
-    else
-        echo "[$(date)] WARNING: cuda-gdb not found, skipping CUDA backtrace"
-    fi
+            if [ -f "${PYSPY_FILE}" ] && [ -s "${PYSPY_FILE}" ]; then
+                echo "[$(date)] py-spy output saved to ${PYSPY_FILE}"
+            fi
+        ) &
 
-    PROC_NUM=$((PROC_NUM + 1))
-done
+        PROC_NUM=$((PROC_NUM + 1))
+    done
+
+    echo "[$(date)] Waiting for py-spy jobs to complete..."
+    wait
+    echo "[$(date)] py-spy collection complete"
+else
+    echo "[$(date)] WARNING: py-spy not found, skipping Python stack traces"
+fi
+
+# Phase 2: Collect CUDA backtraces using cuda-gdb (more invasive, pauses process briefly)
+echo "[$(date)] Phase 2: Collecting cuda-gdb backtraces..."
+if command -v cuda-gdb &> /dev/null; then
+    PROC_NUM=0
+    for PID in ${PIDS}; do
+        # Check if process still exists
+        if ! kill -0 "${PID}" 2>/dev/null; then
+            echo "[$(date)] WARNING: Process ${PID} no longer exists, skipping"
+            PROC_NUM=$((PROC_NUM + 1))
+            continue
+        fi
+
+        # Output filename matching worker log convention
+        if [ "${NUM_PROCS}" -gt 1 ]; then
+            CUDAGDB_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_cudagdb_p${PROC_NUM}.txt"
+        else
+            CUDAGDB_FILE="${OUTPUT_DIR}/${FILE_PREFIX}_cudagdb.txt"
+        fi
+
+        (
+            echo "[$(date)] Collecting cuda-gdb backtrace for PID ${PID}..."
+            cuda-gdb \
+                -batch \
+                -ex "set logging redirect on" \
+                -ex "set logging file ${CUDAGDB_FILE}" \
+                -ex "set logging enabled on" \
+                -ex "info cuda kernels" \
+                -ex "thread apply all bt" \
+                -ex quit \
+                -p "${PID}" 2>&1 || {
+                    echo "[$(date)] WARNING: cuda-gdb failed for PID ${PID}"
+                    echo "ERROR: cuda-gdb failed" >> "${CUDAGDB_FILE}"
+                }
+            if [ -f "${CUDAGDB_FILE}" ] && [ -s "${CUDAGDB_FILE}" ]; then
+                echo "[$(date)] cuda-gdb output saved to ${CUDAGDB_FILE}"
+            fi
+        ) &
+
+        PROC_NUM=$((PROC_NUM + 1))
+    done
+
+    echo "[$(date)] Waiting for cuda-gdb jobs to complete..."
+    wait
+    echo "[$(date)] cuda-gdb collection complete"
+else
+    echo "[$(date)] WARNING: cuda-gdb not found, skipping CUDA backtraces"
+fi
 
 echo "[$(date)] Backtrace collection complete"
 echo "[$(date)] All backtraces saved to: ${OUTPUT_DIR}"
