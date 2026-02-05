@@ -63,7 +63,7 @@ class TestFrontendTopologyDataclass:
         topology = FrontendTopology(
             nginx_node="node0",
             frontend_nodes=["node1"],
-            frontend_port=8080,
+            frontend_port=8180,
             public_port=8000,
         )
         assert topology.uses_nginx is True
@@ -119,7 +119,7 @@ class TestComputeFrontendTopology:
 
         assert topology.nginx_node == "node0"
         assert topology.frontend_nodes == ["node1"]
-        assert topology.frontend_port == 8080  # Behind nginx
+        assert topology.frontend_port == 8180  # Behind nginx
         assert topology.public_port == 8000
         assert topology.uses_nginx is True
 
@@ -133,7 +133,7 @@ class TestComputeFrontendTopology:
 
         assert topology.nginx_node == "node0"
         assert topology.frontend_nodes == ["node1", "node2"]
-        assert topology.frontend_port == 8080
+        assert topology.frontend_port == 8180
         assert topology.public_port == 8000
         assert topology.uses_nginx is True
 
@@ -187,7 +187,7 @@ class TestNginxConfigGeneration:
         topology = FrontendTopology(
             nginx_node="node0",
             frontend_nodes=["node1"],
-            frontend_port=8080,
+            frontend_port=8180,
             public_port=8000,
         )
 
@@ -195,7 +195,7 @@ class TestNginxConfigGeneration:
             with patch("srtctl.cli.mixins.frontend_stage.get_hostname_ip", side_effect=lambda x: f"10.0.0.{x[-1]}"):
                 nginx_config = orchestrator._generate_nginx_config(topology)
 
-        assert "server 10.0.0.1:8080" in nginx_config
+        assert "server 10.0.0.1:8180" in nginx_config
         assert "listen 8000" in nginx_config
 
     def test_nginx_config_multiple_frontends(self):
@@ -207,7 +207,7 @@ class TestNginxConfigGeneration:
         topology = FrontendTopology(
             nginx_node="node0",
             frontend_nodes=["node1", "node2", "node3"],
-            frontend_port=8080,
+            frontend_port=8180,
             public_port=8000,
         )
 
@@ -215,9 +215,9 @@ class TestNginxConfigGeneration:
             nginx_config = orchestrator._generate_nginx_config(topology)
 
         # All three frontends should be in the upstream
-        assert "server 10.0.0.1:8080" in nginx_config
-        assert "server 10.0.0.2:8080" in nginx_config
-        assert "server 10.0.0.3:8080" in nginx_config
+        assert "server 10.0.0.1:8180" in nginx_config
+        assert "server 10.0.0.2:8180" in nginx_config
+        assert "server 10.0.0.3:8180" in nginx_config
         assert "listen 8000" in nginx_config
 
 

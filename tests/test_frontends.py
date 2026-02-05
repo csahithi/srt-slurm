@@ -183,7 +183,7 @@ class MockTopology:
     """Mock FrontendTopology for testing."""
 
     frontend_nodes: list[str]
-    frontend_port: int = 8080
+    frontend_port: int = 8180
 
 
 @dataclass
