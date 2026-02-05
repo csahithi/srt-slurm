@@ -1,4 +1,4 @@
-name: h100_1k1k_ctx1dep16_gen3tep16_batch32_eplb0_mtp3_chunked_false
+name: h100_1k1k_ctx1dep16_gen3tep16_batch128_eplb0_mtp3_chunked_false
 model:
   path: DeepSeek-R1-0528
   container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post1"
@@ -60,8 +60,8 @@ backend:
       enable_attention_dp: false
       enable_lm_head_tp_in_adp: false
       pipeline_parallel_size: 1
-      max_batch_size: 32
-      max_num_tokens: 256
+      max_batch_size: 128
+      max_num_tokens: 512
       max_seq_len: 2088
       cuda_graph_config:
         enable_padding: true
@@ -73,6 +73,18 @@ backend:
         - 16
         - 24
         - 32
+        - 40
+        - 48
+        - 56
+        - 64
+        - 72
+        - 80
+        - 88
+        - 96
+        - 104
+        - 112
+        - 120
+        - 128
       print_iter_log: true
       kv_cache_config:
         enable_block_reuse: false
@@ -93,7 +105,7 @@ benchmark:
   type: sa-bench
   isl: 1024
   osl: 1024
-  concurrencies: '117'
+  concurrencies: '462'
   req_rate: inf
 frontend:
   type: dynamo

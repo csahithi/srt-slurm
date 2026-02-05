@@ -44,7 +44,7 @@ backend:
       print_iter_log: true
       cuda_graph_config: null
       disable_overlap_scheduler: true
-      enable_chunked_prefill: true
+      enable_chunked_prefill: false
       moe_config:
         backend: WIDEEP
       kv_cache_config:
