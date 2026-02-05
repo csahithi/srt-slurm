@@ -5,6 +5,9 @@ model:
   container: "lmsysorg/sglang:v0.5.8-cu130"
   precision: "fp8"
 
+frontend:
+  nginx_container: nginx
+
 resources:
   gpu_type: "h200"
   prefill_nodes: 2
