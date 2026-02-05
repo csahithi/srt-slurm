@@ -77,6 +77,7 @@ class WorkerStageMixin:
             parts.append(self.config.dynamo.get_install_commands())
 
         # 3. Hang debugger (runs in background, waits then collects backtraces)
+        # Use subshell so the & doesn't break && chaining
         if self.config.debug.enabled:
             debug_script = "/srtctl-benchmarks/debug/collect_backtraces.sh"
             wait_seconds = self.config.debug.wait_seconds
@@ -84,7 +85,7 @@ class WorkerStageMixin:
             job_id = self.runtime.job_id
             parts.append(
                 f"mkdir -p {output_dir} && "
-                f"nohup bash {debug_script} {wait_seconds} {output_dir} {job_id} > /logs/hang_debug_$(hostname).log 2>&1 &"
+                f"(nohup bash {debug_script} {wait_seconds} {output_dir} {job_id} > /logs/hang_debug_$(hostname).log 2>&1 &)"
             )
 
         if not parts:
