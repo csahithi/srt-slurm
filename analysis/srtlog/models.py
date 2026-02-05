@@ -48,6 +48,12 @@ class RunMetadata:
         Returns:
             RunMetadata instance
         """
+        import os
+
+        # Extract job_id from directory name as fallback (e.g., "12345_1P_2D_..." -> "12345")
+        dirname = os.path.basename(run_path)
+        dir_job_id = dirname.split("_")[0] if "_" in dirname else dirname
+
         # Check if this is the old format (with run_metadata key) or new format (flat)
         if "run_metadata" in json_data:
             # Old format
@@ -55,7 +61,7 @@ class RunMetadata:
             mode = run_meta.get("mode", "disaggregated")
 
             return cls(
-                job_id=run_meta.get("slurm_job_id", ""),
+                job_id=run_meta.get("slurm_job_id") or dir_job_id,
                 path=run_path,
                 run_date=run_meta.get("run_date", ""),
                 container=run_meta.get("container", ""),
@@ -84,7 +90,7 @@ class RunMetadata:
             mode = "aggregated" if agg_workers > 0 else "disaggregated"
 
             return cls(
-                job_id=json_data.get("job_id", ""),
+                job_id=json_data.get("job_id") or dir_job_id,
                 path=run_path,
                 run_date=json_data.get("generated_at", ""),
                 container=model_data.get("container", ""),
