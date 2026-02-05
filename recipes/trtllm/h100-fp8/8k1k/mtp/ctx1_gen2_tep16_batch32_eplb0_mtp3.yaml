@@ -1,7 +1,7 @@
 name: h100_8k1k_ctx1dep16_gen2tep16_batch32_eplb0_mtp3
 model:
   path: DeepSeek-R1-0528
-  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post1"
+  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post3"
   precision: fp8
 resources:
   gpu_type: h100
