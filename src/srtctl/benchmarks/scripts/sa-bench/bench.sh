@@ -42,7 +42,7 @@ curl -s "${ENDPOINT}/v1/chat/completions" \
     }" | head -c 200
 echo ""
 
-ulimit -n 65536
+ulimit -n 65536 2>/dev/null || true  # May fail in containers without CAP_SYS_RESOURCE
 
 # Benchmark
 result_dir="/logs/sa-bench_isl_${ISL}_osl_${OSL}"
