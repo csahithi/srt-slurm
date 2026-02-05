@@ -28,6 +28,9 @@ def launch_hang_debugger(
     --container-name, so it shares the same namespace as the worker processes
     and can access py-spy and cuda-gdb to collect backtraces.
 
+    IMPORTANT: This should only be called AFTER workers are healthy to ensure
+    the worker containers are fully created and ready for attachment.
+
     Args:
         debug_config: Debug configuration
         runtime: Runtime context with paths and node info

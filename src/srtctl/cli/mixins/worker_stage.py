@@ -318,21 +318,4 @@ class WorkerStageMixin:
 
         logger.info("Started %d worker processes", len(result))
 
-        # Launch hang debugger if enabled
-        if self.config.debug.enabled:
-            from srtctl.debug import launch_hang_debugger
-
-            # Get unique list of worker nodes
-            worker_nodes = list(dict.fromkeys(p.node for p in self.backend_processes))
-
-            debug_processes = launch_hang_debugger(
-                debug_config=self.config.debug,
-                runtime=self.runtime,
-                worker_nodes=worker_nodes,
-            )
-
-            # Add debug processes to result (non-critical)
-            for managed in debug_processes:
-                result[managed.name] = managed
-
         return result
