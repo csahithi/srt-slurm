@@ -88,7 +88,7 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
         --num-prompts "$num_prompts" \
         --random-input-len "$ISL" \
         --random-output-len "$OSL" \
-        --random-range-ratio 0.8 \
+        --random-range-ratio 1.0 \
         --ignore-eos \
         --request-rate "${REQ_RATE}" \
         --percentile-metrics ttft,tpot,itl,e2el \

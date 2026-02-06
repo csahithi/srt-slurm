@@ -62,9 +62,7 @@ backend:
         decoding_type: Eagle
         max_draft_len: 3
         eagle3_one_model: 'true'
-        speculative_model_dir: /lustre/fsw/coreai_comparch_infbench/yaoyangz/Kimi-K2-Thinking-Eagle3-MLA+MLP-20151202_eagle_layers
-
-
+        speculative_model_dir: /model/eagle
 
     decode:
       tensor_parallel_size: 32
@@ -110,8 +108,7 @@ backend:
         decoding_type: Eagle
         max_draft_len: 3
         eagle3_one_model: 'true'
-        speculative_model_dir: /lustre/fsw/coreai_comparch_infbench/yaoyangz/Kimi-K2-Thinking-Eagle3-MLA+MLP-20151202_eagle_layers
-
+        speculative_model_dir: /model/eagle
 
 benchmark:
   type: "sa-bench"
