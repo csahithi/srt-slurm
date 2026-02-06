@@ -1,7 +1,7 @@
 name: "gb300-1k1k-fp8-low-latency"
 
 model:
-  path: "dsfp8"
+  path: "dsr1-fp8"
   container: "lmsysorg/sglang:v0.5.8-cu130"
   precision: "fp8"
 
