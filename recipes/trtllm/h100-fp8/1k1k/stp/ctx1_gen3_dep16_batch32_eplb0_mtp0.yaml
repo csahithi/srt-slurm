@@ -1,4 +1,4 @@
-name: ctx1dep16_gen3tep16_batch8_eplb0_mtp0
+name: ctx1dep16_gen3dep16_batch32_eplb0_mtp0
 model:
   path: DeepSeek-R1-0528
   container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post3"
@@ -13,7 +13,7 @@ resources:
 backend:
   type: trtllm
   prefill_environment:
-    UCX_CUDA_IPC_ENABLE_MNNVL: n
+    UCX_TLS: rc,dc,ud,cuda_copy,cuda_ipc,tcp
     TRTLLM_ENABLE_PDL: '1'
     TRTLLM_SERVER_DISABLE_GC: '1'
     TRTLLM_WORKER_DISABLE_GC: '1'
@@ -21,13 +21,16 @@ backend:
     TLLM_LOG_LEVEL: INFO
     TRTLLM_DISABLE_KV_CACHE_TRANSFER_OVERLAP: '1'
     TRTLLM_FORCE_ALLTOALL_METHOD: DeepEP
+    UCX_CUDA_IPC_ENABLE_MNNVL: n
   decode_environment:
-    NCCL_NVLS_ENABLE: '0'
+    UCX_TLS: rc,dc,ud,cuda_copy,cuda_ipc,tcp
     TRTLLM_ENABLE_PDL: '1'
     TRTLLM_SERVER_DISABLE_GC: '1'
     TRTLLM_WORKER_DISABLE_GC: '1'
     NCCL_GRAPH_MIXING_SUPPORT: '0'
     TLLM_LOG_LEVEL: INFO
+    TRTLLM_DISABLE_KV_CACHE_TRANSFER_OVERLAP: '1'
+    TRTLLM_FORCE_ALLTOALL_METHOD: DeepEP
     UCX_CUDA_IPC_ENABLE_MNNVL: n
   trtllm_config:
     prefill:
@@ -41,7 +44,7 @@ backend:
       print_iter_log: true
       cuda_graph_config: null
       disable_overlap_scheduler: true
-      enable_chunked_prefill: true
+      enable_chunked_prefill: false
       moe_config:
         backend: WIDEEP
       kv_cache_config:
@@ -54,10 +57,10 @@ backend:
     decode:
       tensor_parallel_size: 16
       moe_expert_parallel_size: 16
-      enable_attention_dp: false
+      enable_attention_dp: true
       enable_lm_head_tp_in_adp: false
       pipeline_parallel_size: 1
-      max_batch_size: 8
+      max_batch_size: 32
       max_num_tokens: 256
       max_seq_len: 2088
       cuda_graph_config:
@@ -67,13 +70,16 @@ backend:
         - 2
         - 4
         - 8
+        - 16
+        - 24
+        - 32
       print_iter_log: true
       kv_cache_config:
         enable_block_reuse: false
         free_gpu_memory_fraction: 0.9
         dtype: fp8
       moe_config:
-        backend: CUTLASS
+        backend: WIDEEP
         use_low_precision_moe_combine: true
       cache_transceiver_config:
         max_tokens_in_buffer: 8192
@@ -84,7 +90,7 @@ benchmark:
   type: sa-bench
   isl: 1024
   osl: 1024
-  concurrencies: '30'
+  concurrencies: '1845'
   req_rate: inf
 frontend:
   type: dynamo
