@@ -95,6 +95,12 @@ class WorkerStageMixin:
                 f"mkdir -p {output_dir} && "
                 f"(nohup bash {debug_script} {wait_seconds} {output_dir} {node} {mode} {index} > {log_file} 2>&1 &)"
             )
+        
+        # 4. Monitor NVIDIA SMI (runs in background, logs to /logs/{node}_nvidia_smi.log)
+        if self.config.nvidia_smi.enabled and node is not None:
+            interval = self.config.nvidia_smi.interval
+            smi_log = f"/logs/{node}_nvidia_smi.log"
+            parts.append(f"(nohup nvidia-smi -l {interval} > {smi_log} 2>&1 &)")
 
         if not parts:
             return None

@@ -19,6 +19,7 @@ Complete reference for job configuration YAML files.
 - [health_check](#health_check)
 - [infra](#infra)
 - [debug](#debug)
+- [nvidia_smi](#nvidia_smi)
 - [sweep](#sweep)
 - [FormattablePath Template System](#formattablepath-template-system)
 - [container_mounts](#container_mounts)
@@ -804,6 +805,30 @@ debug:
 - Diagnosing synchronization deadlocks
 
 See [Debugging Hangs](debugging.md) for detailed usage guide.
+
+---
+
+## nvidia_smi
+
+Configuration for periodic nvidia-smi monitoring during job execution.
+
+```yaml
+nvidia_smi:
+  enabled: true
+  interval: 5
+```
+
+| Field      | Type | Default | Description                                      |
+| ---------- | ---- | ------- | ------------------------------------------------ |
+| `enabled`  | bool | `false` | Enable nvidia-smi monitoring                     |
+| `interval` | int  | `30`    | Interval in seconds between nvidia-smi calls     |
+
+**Use cases**:
+
+- Monitoring GPU utilization during benchmarks
+- Tracking memory usage over time
+- Debugging GPU thermal throttling
+- Verifying GPU clock speeds
 
 ---
 

@@ -1354,3 +1354,71 @@ debug:
         assert "nohup" in preamble  # runs in background
         assert "&" in preamble  # background process
         assert "node0_hang_debug.log" in preamble  # log file name
+
+
+class TestNvidiaSmiConfig:
+    """Tests for NvidiaSmiConfig GPU monitoring."""
+
+    def test_nvidia_smi_config_defaults(self):
+        """Test NvidiaSmiConfig has correct defaults."""
+        from srtctl.core.schema import ModelConfig, NvidiaSmiConfig, ResourceConfig, SrtConfig
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+        )
+
+        # nvidia_smi config should exist with default values
+        assert config.nvidia_smi is not None
+        assert config.nvidia_smi.enabled is False
+        assert config.nvidia_smi.interval == 30
+
+    def test_nvidia_smi_config_enabled(self):
+        """Test NvidiaSmiConfig with monitoring enabled."""
+        from srtctl.core.schema import ModelConfig, NvidiaSmiConfig, ResourceConfig, SrtConfig
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp8"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=8, agg_nodes=1),
+            nvidia_smi=NvidiaSmiConfig(enabled=True, interval=5),
+        )
+
+        assert config.nvidia_smi.enabled is True
+        assert config.nvidia_smi.interval == 5
+
+    def test_nvidia_smi_config_from_yaml(self):
+        """Test NvidiaSmiConfig can be loaded from YAML."""
+        from pathlib import Path
+        from tempfile import NamedTemporaryFile
+
+        from srtctl.core.schema import SrtConfig
+
+        yaml_content = """
+name: nvidia-smi-test
+model:
+  path: /model
+  container: /container.sqsh
+  precision: fp8
+resources:
+  gpu_type: h100
+  gpus_per_node: 8
+  agg_nodes: 1
+nvidia_smi:
+  enabled: true
+  interval: 15
+"""
+
+        with NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            f.flush()
+            config_path = Path(f.name)
+
+        try:
+            config = SrtConfig.from_yaml(config_path)
+
+            assert config.nvidia_smi.enabled is True
+            assert config.nvidia_smi.interval == 15
+        finally:
+            config_path.unlink()

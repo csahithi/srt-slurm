@@ -792,7 +792,7 @@ class DebugConfig:
 
     When enabled, launches a background script that waits for a configurable
     amount of time, then collects CUDA kernel info and backtraces from all
-    worker processes using cuda-gdb.
+    worker processes using cuda-gdb and py-spy.
 
     Attributes:
         enabled: If True, enable hang debugging
@@ -818,6 +818,25 @@ class InfraConfig:
     """
 
     etcd_nats_dedicated_node: bool = False
+
+    Schema: ClassVar[type[Schema]] = Schema
+
+
+@dataclass(frozen=True)
+class NvidiaSmiConfig:
+    """Configuration for nvidia-smi monitoring during job execution.
+
+    When enabled, periodically runs nvidia-smi on worker nodes to collect
+    GPU metrics (utilization, memory, temperature, etc.) for debugging
+    and performance analysis.
+
+    Attributes:
+        enabled: If True, enable nvidia-smi monitoring
+        interval: Interval in seconds between nvidia-smi calls (default: 30)
+    """
+
+    enabled: bool = False
+    interval: int = 30
 
     Schema: ClassVar[type[Schema]] = Schema
 
@@ -851,6 +870,7 @@ class SrtConfig:
     health_check: HealthCheckConfig = field(default_factory=HealthCheckConfig)
     infra: InfraConfig = field(default_factory=InfraConfig)
     debug: DebugConfig = field(default_factory=DebugConfig)
+    nvidia_smi: NvidiaSmiConfig = field(default_factory=NvidiaSmiConfig)
 
     environment: dict[str, str] = field(default_factory=dict)
     container_mounts: dict[
