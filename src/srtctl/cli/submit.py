@@ -41,7 +41,7 @@ console = Console()
 
 
 def get_job_name(config: SrtConfig) -> str:
-    """Get job name, optionally prepending RUNNER_NAME if available.
+    """Get job name, using RUNNER_NAME if available, otherwise config name.
 
     This allows multi-runner setups to have unique job names for cleanup.
 
@@ -49,13 +49,12 @@ def get_job_name(config: SrtConfig) -> str:
         config: SrtConfig with the base job name
 
     Returns:
-        Job name, optionally prefixed with RUNNER_NAME
+        Job name: RUNNER_NAME if set, otherwise config.name
     """
-    job_name = config.name
     runner_name = os.environ.get("RUNNER_NAME")
     if runner_name:
-        job_name = f"{runner_name}_{config.name}"
-    return job_name
+        return runner_name
+    return config.name
 
 
 def setup_logging(level: int = logging.INFO) -> None:
