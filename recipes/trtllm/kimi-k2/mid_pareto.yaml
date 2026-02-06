@@ -2,7 +2,7 @@ name: "ctx4_gen1_dep32_batch8_eplb0_mtp3"
 
 model:
   path: "kimi-k2"
-  container: "nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post3"
+  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post3"
   precision: "fp4"
 
 resources:

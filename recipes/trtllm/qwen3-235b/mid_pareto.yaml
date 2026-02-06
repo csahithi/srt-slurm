@@ -2,7 +2,7 @@ name: "ctx1_gen1_tep4_batch64_eplb0_mtp0"
 
 model:
   path: "qwen3-235b"
-  container: "nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post3"
+  container: "nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.8.1.post3"
   precision: "fp4"
 
 resources:
