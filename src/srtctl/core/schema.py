@@ -57,6 +57,7 @@ class ReportingStatusConfig:
     """Status reporting configuration."""
 
     endpoint: str | None = None
+    endpoints: list[str] | None = None
 
     Schema: ClassVar[type[Schema]] = Schema
 
