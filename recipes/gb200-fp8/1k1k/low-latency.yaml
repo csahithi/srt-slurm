@@ -81,7 +81,6 @@ backend:
       scheduler-recv-interval: 10
       fp8-gemm-backend: "flashinfer_trtllm"
       enable-symm-mem: true
-      moe-dense-tp-size: 1
       tensor-parallel-size: 4
       data-parallel-size: 1
       expert-parallel-size: 1
@@ -106,7 +105,6 @@ backend:
       max-running-requests: 128
       scheduler-recv-interval: 10
       enable-symm-mem: true
-      moe-dense-tp-size: 1
       prefill-round-robin-balance: true
       tensor-parallel-size: 4
       data-parallel-size: 1

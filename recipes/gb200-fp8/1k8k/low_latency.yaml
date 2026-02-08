@@ -81,7 +81,6 @@ backend:
       enable-flashinfer-allreduce-fusion: false
       fp8-gemm-backend: "flashinfer_trtllm"
       enable-symm-mem: true
-      moe-dense-tp-size: 1
       disaggregation-bootstrap-port: 30001
       tensor-parallel-size: 8
       data-parallel-size: 1
@@ -107,7 +106,6 @@ backend:
       scheduler-recv-interval: 10
       enable-flashinfer-allreduce-fusion: false
       enable-symm-mem: false #true
-      moe-dense-tp-size: 1
       disaggregation-bootstrap-port: 30001
       prefill-round-robin-balance: true
       tensor-parallel-size: 8
