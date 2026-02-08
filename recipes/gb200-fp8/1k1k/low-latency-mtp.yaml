@@ -82,7 +82,6 @@ backend:
       scheduler-recv-interval: 10
       enable-flashinfer-allreduce-fusion: true
       enable-symm-mem: true
-      moe-dense-tp-size: 1
       tensor-parallel-size: 4
       data-parallel-size: 1
       expert-parallel-size: 1
@@ -111,7 +110,6 @@ backend:
       max-running-requests: 512
       scheduler-recv-interval: 10
       enable-symm-mem: true
-      moe-dense-tp-size: 1
       prefill-round-robin-balance: true
       tensor-parallel-size: 8
       data-parallel-size: 1

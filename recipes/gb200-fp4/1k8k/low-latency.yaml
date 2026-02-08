@@ -74,7 +74,6 @@ backend:
       disable-cuda-graph: true
       max-running-requests: 512
       scheduler-recv-interval: 10
-      moe-dense-tp-size: 1
       load-balance-method: "round_robin"
       disaggregation-bootstrap-port: 30001
       data-parallel-size: 1
@@ -101,7 +100,6 @@ backend:
       chunked-prefill-size: 8192
       cuda-graph-max-bs: 256
       scheduler-recv-interval: 10
-      moe-dense-tp-size: 1
       tensor-parallel-size: 4
       expert-parallel-size: 1
       fp4-gemm-backend: "flashinfer_trtllm"
