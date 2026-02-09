@@ -33,6 +33,7 @@ backend:
       model-path: "/model/"
       skip-tokenizer-init: true
       trust-remote-code: true
+      watchdog-timeout: 1000000
 
       # Parallelism
       tp-size: 16
@@ -68,6 +69,7 @@ backend:
       model-path: "/model/"
       skip-tokenizer-init: true
       trust-remote-code: true
+      watchdog-timeout: 1000000
 
       # Parallelism
       tp-size: 16
@@ -89,8 +91,9 @@ backend:
 
       # Memory and token limits
       mem-fraction-static: 0.9
-      max-running-requests: 8
-      cuda-graph-max-bs: 8
+      # keeping this at 8 avoids max_running_request is zero
+      max-running-requests: 16
+      cuda-graph-max-bs: 16
 
 benchmark:
   type: "sa-bench"
