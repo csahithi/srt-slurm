@@ -1,7 +1,7 @@
 name: "b200-fp4-max-tpt-dep4-1p-dep8-1d"
 
 model:
-  path: "dsr1-fp4"
+  path: "dsr1"
   container: "dynamo-sglang"
   precision: "fp4"
 
@@ -139,5 +139,5 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: "512x1024"
+  concurrencies: "512"
   req_rate: "inf"
