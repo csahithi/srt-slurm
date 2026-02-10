@@ -1,8 +1,8 @@
 name: "b200-fp4-low-latency-dep4-1p-tep8-6d"
 
 model:
-  path: "dsfp4"
-  container: "lmsysorg/sglang:v0.5.8.post1-cu130"
+  path: "dsr1"
+  container: "dynamo-sglang"
   precision: "fp4"
 
 resources:
