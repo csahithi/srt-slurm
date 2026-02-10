@@ -9,8 +9,8 @@ frontend:
   num_additional_frontends: 4
 
 model:
-  path: "dsfp4"
-  container: "lmsysorg/sglang:v0.5.8.post1-cu130"
+  path: "dsr1"
+  container: "dynamo-sglang"
   precision: "fp4"
 
 resources:
