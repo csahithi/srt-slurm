@@ -1,7 +1,7 @@
 name: "b200-fp4-low-latency-dep4-1p-tep8-6d"
 
 model:
-  path: "dsr1-fp4"
+  path: "dsr1"
   container: "dynamo-sglang"
   precision: "fp4"
 
@@ -135,5 +135,5 @@ benchmark:
   type: "sa-bench"
   isl: 1024
   osl: 1024
-  concurrencies: "32x64x256x512"
+  concurrencies: "32x64x256"
   req_rate: "inf"

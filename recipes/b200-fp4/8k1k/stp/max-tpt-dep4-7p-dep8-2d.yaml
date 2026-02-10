@@ -1,7 +1,15 @@
 name: "b200-fp4-max-tpt-dep4-7p-dep8-2d"
 
+dynamo:
+  version: 0.8.1
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  num_additional_frontends: 4
+
 model:
-  path: "dsr1-fp4"
+  path: "dsr1"
   container: "dynamo-sglang"
   precision: "fp4"
 
@@ -49,7 +57,6 @@ backend:
     NCCL_CUMEM_ENABLE: "1"
     SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2: "1"
     SGLANG_MOE_NVFP4_DISPATCH: "1"
-    SGLANG_FLASHINFER_FP4_GEMM_BACKEND: "cutlass"
     DYN_REQUEST_PLANE: nats
 
   sglang_config:
@@ -65,8 +72,8 @@ backend:
 
       # Memory and token limits
       mem-fraction-static: 0.85
-      max-prefill-tokens: 32768
-      chunked-prefill-size: 32768
+      max-prefill-tokens: 65536
+      chunked-prefill-size: 65536
       context-length: 9600
       max-running-requests: 1024
       disable-cuda-graph: true
@@ -91,6 +98,7 @@ backend:
       watchdog-timeout: 1000000
       enable-flashinfer-allreduce-fusion: true
       disable-radix-cache: true
+      fp4-gemm-backend: "flashinfer_cutlass"
 
     decode:
       # Model configuration
@@ -107,7 +115,7 @@ backend:
       max-prefill-tokens: 32768
       chunked-prefill-size: 32768
       context-length: 9600
-      max-running-requests: 1024
+      max-running-requests: 2048
       cuda-graph-max-bs: 1024
 
       # Parallelism
@@ -130,6 +138,7 @@ backend:
       watchdog-timeout: 1000000
       enable-flashinfer-allreduce-fusion: true
       disable-radix-cache: true
+      fp4-gemm-backend: "flashinfer_cutlass"
 
 health_check:
   max_attempts: 360
@@ -139,5 +148,5 @@ benchmark:
   type: "sa-bench"
   isl: 8192
   osl: 1024
-  concurrencies: "1024"
+  concurrencies: "1024x2048"
   req_rate: "inf"

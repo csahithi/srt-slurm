@@ -1,7 +1,7 @@
 name: "b200-fp4-max-tpt-dep4-1p-dep8-2d"
 
 model:
-  path: "dsr1-fp4"
+  path: "dsr1"
   container: "dynamo-sglang"
   precision: "fp4"
 
