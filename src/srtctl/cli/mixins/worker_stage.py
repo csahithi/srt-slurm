@@ -10,6 +10,7 @@ Handles starting backend worker processes (prefill/decode/agg).
 import logging
 import shlex
 from collections import defaultdict
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from srtctl.core.processes import ManagedProcess, NamedProcesses
@@ -57,7 +58,7 @@ class WorkerStageMixin:
 
         Runs (in order):
         1. Custom setup script from /configs/ (if config.setup_script set)
-        2. Dynamo installation (if frontend type is dynamo and not profiling)
+        2. Dynamo installation (if frontend type is dynamo)
         """
         parts = []
 
@@ -72,7 +73,7 @@ class WorkerStageMixin:
         # 2. Dynamo installation (required for dynamo.sglang when using dynamo frontend and not profiling)
         # When profiling is enabled, we use sglang.launch_server directly (no dynamo)
         # Skip if dynamo.install is False (container already has dynamo installed)
-        if self.config.frontend.type == "dynamo" and not self.config.profiling.enabled and self.config.dynamo.install:
+        if self.config.frontend.type == "dynamo" and self.config.dynamo.install:
             parts.append(self.config.dynamo.get_install_commands())
 
         if not parts:
@@ -87,16 +88,19 @@ class WorkerStageMixin:
 
         logger.info("Starting %s worker %d on %s", mode, index, process.node)
 
+        container_log_dir = Path("/logs")
+        container_profiles_dir = container_log_dir / "profiles"
+
         # Log and config files
         worker_log = self.runtime.log_dir / f"{process.node}_{mode}_w{index}.out"
-        config_dump = self.runtime.log_dir / f"{process.node}_config.json"
+        config_dump = container_log_dir / f"{process.node}_config.json"
 
         # Profiling setup
         profiling = self.config.profiling
         nsys_prefix = None
         if profiling.is_nsys:
-            nsys_output = str(self.runtime.log_dir / f"{process.node}_{mode}_w{index}_profile")
-            nsys_prefix = profiling.get_nsys_prefix(nsys_output)
+            nsys_output = str(container_profiles_dir / f"{process.node}_{mode}_w{index}_profile")
+            nsys_prefix = profiling.get_nsys_prefix(nsys_output, frontend_type=self.config.frontend.type)
 
         # Build command using backend's method
         cmd = self.backend.build_worker_command(
@@ -104,7 +108,6 @@ class WorkerStageMixin:
             endpoint_processes=endpoint_processes,
             runtime=self.runtime,
             frontend_type=self.config.frontend.type,
-            profiling_enabled=profiling.enabled,
             nsys_prefix=nsys_prefix,
             dump_config_path=config_dump,
         )
@@ -139,8 +142,11 @@ class WorkerStageMixin:
 
         # Add profiling environment variables
         if profiling.enabled:
-            profile_dir = str(self.runtime.log_dir / "profiles")
-            env_to_set.update(profiling.get_env_vars(mode, profile_dir))
+            host_profiles_dir = self.runtime.log_dir / "profiles"
+            host_profiles_dir.mkdir(parents=True, exist_ok=True)
+            if profiling.is_torch:
+                (host_profiles_dir / mode).mkdir(parents=True, exist_ok=True)
+            env_to_set.update(profiling.get_env_vars(mode, str(container_profiles_dir)))
 
         # Set CUDA_VISIBLE_DEVICES if not using all GPUs
         if len(process.gpu_indices) < self.runtime.gpus_per_node:
@@ -205,14 +211,16 @@ class WorkerStageMixin:
 
         # Log and config files (use leader node in name)
         worker_log = self.runtime.log_dir / f"{leader.node}_{mode}_w{index}.out"
-        config_dump = self.runtime.log_dir / f"{leader.node}_config.json"
+        container_log_dir = Path("/logs")
+        container_profiles_dir = container_log_dir / "profiles"
+        config_dump = container_log_dir / f"{leader.node}_config.json"
 
         # Profiling setup
         profiling = self.config.profiling
         nsys_prefix = None
         if profiling.is_nsys:
-            nsys_output = str(self.runtime.log_dir / f"{leader.node}_{mode}_w{index}_profile")
-            nsys_prefix = profiling.get_nsys_prefix(nsys_output)
+            nsys_output = str(container_profiles_dir / f"{leader.node}_{mode}_w{index}_profile")
+            nsys_prefix = profiling.get_nsys_prefix(nsys_output, frontend_type=self.config.frontend.type)
 
         # Build command using backend's method
         cmd = self.backend.build_worker_command(
@@ -220,7 +228,6 @@ class WorkerStageMixin:
             endpoint_processes=endpoint_processes,
             runtime=self.runtime,
             frontend_type=self.config.frontend.type,
-            profiling_enabled=profiling.enabled,
             nsys_prefix=nsys_prefix,
             dump_config_path=config_dump,
         )
@@ -241,8 +248,11 @@ class WorkerStageMixin:
 
         # Add profiling environment variables
         if profiling.enabled:
-            profile_dir = str(self.runtime.log_dir / "profiles")
-            env_to_set.update(profiling.get_env_vars(mode, profile_dir))
+            host_profiles_dir = self.runtime.log_dir / "profiles"
+            host_profiles_dir.mkdir(parents=True, exist_ok=True)
+            if profiling.is_torch:
+                (host_profiles_dir / mode).mkdir(parents=True, exist_ok=True)
+            env_to_set.update(profiling.get_env_vars(mode, str(container_profiles_dir)))
 
         # Set CUDA_VISIBLE_DEVICES if not using all GPUs on the node
         if len(leader.gpu_indices) < self.runtime.gpus_per_node:
@@ -275,6 +285,7 @@ class WorkerStageMixin:
             mpi=srun_config.mpi,
             oversubscribe=srun_config.oversubscribe,
             cpu_bind=srun_config.cpu_bind,
+            srun_options=self.runtime.srun_options,
         )
 
         return ManagedProcess(

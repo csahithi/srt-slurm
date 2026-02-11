@@ -16,11 +16,11 @@ class TestBenchmarkRegistry:
         """All expected benchmarks are registered."""
         benchmarks = list_benchmarks()
         assert "sa-bench" in benchmarks
+        assert "sglang-bench" in benchmarks
         assert "mmlu" in benchmarks
         assert "gpqa" in benchmarks
         assert "longbenchv2" in benchmarks
         assert "router" in benchmarks
-        assert "profiling" in benchmarks
 
     def test_get_runner_valid(self):
         """Can get runner for valid benchmark type."""

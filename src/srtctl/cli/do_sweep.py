@@ -193,13 +193,7 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
         logger.info("Head node: %s", self.runtime.nodes.head)
         logger.info("Worker nodes: %s", ", ".join(self.runtime.nodes.worker))
         if self.config.profiling.enabled:
-            logger.info(
-                "Profiling: %s (isl=%s, osl=%s, concurrency=%s)",
-                self.config.profiling.type,
-                self.config.profiling.isl,
-                self.config.profiling.osl,
-                self.config.profiling.concurrency,
-            )
+            logger.info("Profiling: %s", self.config.profiling.type)
 
         registry = ProcessRegistry(job_id=self.runtime.job_id)
         stop_event = threading.Event()

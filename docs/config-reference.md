@@ -422,7 +422,6 @@ Benchmark configuration. The `type` field determines which benchmark runner is u
 | `longbenchv2`     | Long-context evaluation benchmark              |
 | `router`          | Router performance with prefix caching         |
 | `mooncake-router` | KV-aware routing with Mooncake trace           |
-| `profiling`       | Profiling benchmark (auto-selected)            |
 
 ### manual
 
@@ -566,16 +565,6 @@ Dataset characteristics (conversation trace):
 - Avg input: 12,035 tokens, Avg output: 343 tokens
 - 36.64% cache efficiency potential
 
-### profiling
-
-Auto-selected when `profiling.type` is "torch" or "nsys". Configuration is in the `profiling` section, not here.
-
-```yaml
-benchmark:
-  type: "profiling"
-# See profiling section for configuration
-```
-
 ---
 
 ## dynamo
@@ -615,9 +604,6 @@ Profiling configuration for nsys or torch profiler.
 ```yaml
 profiling:
   type: "nsys"                       # "none", "nsys", or "torch"
-  isl: 1024                          # Input sequence length for profiling
-  osl: 128                           # Output sequence length for profiling
-  concurrency: 32                    # Batch size / concurrency
 
   # Phase-specific profiling step configs
   prefill:
@@ -635,9 +621,6 @@ profiling:
 | Field         | Type   | Required | Default | Description                              |
 | ------------- | ------ | -------- | ------- | ---------------------------------------- |
 | `type`        | string | No       | "none"  | Profiling type: "none", "nsys", "torch"  |
-| `isl`         | int    | When enabled | null | Input sequence length for profiling      |
-| `osl`         | int    | When enabled | null | Output sequence length for profiling     |
-| `concurrency` | int    | When enabled | null | Batch size / concurrency                 |
 | `prefill`     | object | Disaggregated | null | Prefill phase config                   |
 | `decode`      | object | Disaggregated | null | Decode phase config                    |
 | `aggregated`  | object | Aggregated | null | Aggregated phase config                  |
@@ -658,10 +641,8 @@ Each phase config has:
 
 ### Validation Rules
 
-1. When profiling is enabled (`type != "none"`), `isl`, `osl`, and `concurrency` are required.
-2. Disaggregated mode requires both `prefill` and `decode` phase configs.
-3. Aggregated mode requires `aggregated` phase config.
-4. Profiling mode requires exactly 1 worker per role (1 prefill + 1 decode, or 1 aggregated).
+1. Disaggregated mode requires both `prefill` and `decode` phase configs when profiling is enabled.
+2. Aggregated mode requires `aggregated` phase config when profiling is enabled.
 
 ### Example: Torch Profiling (Disaggregated)
 
@@ -675,9 +656,6 @@ resources:
 
 profiling:
   type: "torch"
-  isl: 2048
-  osl: 256
-  concurrency: 64
   prefill:
     start_step: 5
     stop_step: 15
@@ -696,9 +674,6 @@ resources:
 
 profiling:
   type: "nsys"
-  isl: 1024
-  osl: 128
-  concurrency: 32
   aggregated:
     start_step: 10
     stop_step: 25
@@ -1224,9 +1199,6 @@ slurm:
 
 profiling:
   type: "torch"
-  isl: 2048
-  osl: 256
-  concurrency: 32
   prefill:
     start_step: 5
     stop_step: 15
@@ -1243,7 +1215,11 @@ backend:
       tensor-parallel-size: 8
 
 benchmark:
-  type: "profiling"
+  type: "sa-bench"
+  isl: 2048
+  osl: 256
+  concurrencies: "32x64"
+  req_rate: "inf"
 ```
 
 ### Parameter Sweep Example
