@@ -193,6 +193,7 @@ class BenchmarkStageMixin:
 
         # Profiling type (nsys, torch)
         env["PROFILE_TYPE"] = p.type
+        env["SRTCTL_FRONTEND_TYPE"] = self.config.frontend.type
 
         # Phase-specific step configs
         if p.prefill:
@@ -223,11 +224,13 @@ class BenchmarkStageMixin:
         decode_endpoints = []
         agg_endpoints = []
 
+        use_sys_port = self.config.frontend.type == "dynamo"
         for process in self.backend_processes:
             if not process.is_leader:
                 continue
             leader_ip = get_hostname_ip(process.node)
-            leader_endpoint = f"{leader_ip}:{process.sys_port}"
+            port = process.sys_port if use_sys_port else process.http_port
+            leader_endpoint = f"{leader_ip}:{port}"
             if process.endpoint_mode == "prefill":
                 prefill_ips.append(leader_ip)
                 prefill_endpoints.append(leader_endpoint)
