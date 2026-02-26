@@ -286,6 +286,9 @@ srtctl dry-run -f sweep-config.yaml
 
 Dry-run output includes:
 - Syntax-highlighted sbatch script
+- Container mounts table (labeled by source: built-in, srtslurm.yaml, recipe)
+- Environment variables table (grouped by scope: global, prefill, decode, aggregated)
+- srun options (if configured)
 - For sweeps: table of all jobs with parameters
 - Generated configs saved to `dry-runs/` folder
 
@@ -311,6 +314,18 @@ sweep:
 ```
 
 This creates 4 jobs (2 × 2 Cartesian product). See [Parameter Sweeps](sweeps.md) for details.
+
+## Debugging Running Jobs
+
+The full srun command (with all container mounts, environment variables, and flags) is logged at INFO level in the sweep log:
+
+```bash
+# Find the full srun commands for a running job
+grep "srun command" outputs/<job_id>/logs/sweep_<job_id>.log
+
+# Per-worker env vars and inner commands are also logged
+grep -E "Env:|Command:" outputs/<job_id>/logs/sweep_<job_id>.log
+```
 
 ## Tips
 

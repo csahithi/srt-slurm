@@ -236,3 +236,13 @@ Config sources that feed into dry-run display:
 srtctl dry-run -f config.yaml
 ```
 
+### Find Full srun Commands at Runtime
+
+The full srun command (with all mounts, env vars, and flags) is logged at INFO level in the sweep log:
+
+```bash
+tail -f outputs/<job_id>/logs/sweep_<job_id>.log | grep "srun command"
+```
+
+Per-worker env vars and commands are also logged individually (search for `Env:` and `Command:` lines).
+
