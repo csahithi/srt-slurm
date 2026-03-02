@@ -33,11 +33,18 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 # Import from srtctl modules
-from srtctl.core.config import get_srtslurm_setting, load_config
+from srtctl.core.config import (
+    generate_override_configs,
+    get_srtslurm_setting,
+    load_cluster_config,
+    load_config,
+    resolve_config_with_defaults,
+)
 from srtctl.core.schema import SrtConfig
 from srtctl.core.status import create_job_record
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 def setup_logging(level: int = logging.INFO) -> None:
@@ -547,7 +554,12 @@ def submit_directory(
 
     for i, yaml_file in enumerate(yaml_files, 1):
         relative_path = yaml_file.relative_to(directory)
-        config_type = "sweep" if (force_sweep or is_sweep_config(yaml_file)) else "single"
+        if is_override_config(yaml_file):
+            config_type = "override"
+        elif force_sweep or is_sweep_config(yaml_file):
+            config_type = "sweep"
+        else:
+            config_type = "single"
         table.add_row(str(i), str(relative_path), config_type)
 
     console.print(table)
@@ -562,8 +574,9 @@ def submit_directory(
         console.print(f"[bold]({i}/{len(yaml_files)})[/] Processing: {relative_path}")
 
         try:
-            is_sweep = force_sweep or is_sweep_config(yaml_file)
-            if is_sweep:
+            if is_override_config(yaml_file):
+                submit_override(yaml_file, dry_run=dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir)
+            elif force_sweep or is_sweep_config(yaml_file):
                 submit_sweep(yaml_file, dry_run=dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir)
             else:
                 submit_single(
@@ -587,6 +600,109 @@ def submit_directory(
         console.print(f" [bold red]({error_count} failed)[/]")
     else:
         console.print()
+
+
+def parse_config_arg(arg: str) -> tuple[Path, str | None]:
+    """Parse -f argument, supporting path:selector format.
+
+    Args:
+        arg: CLI argument value, e.g. "config.yaml" or "config.yaml:override_tp64"
+
+    Returns:
+        (config_path, selector) — selector is None when submitting all variants
+    """
+    if ":" in arg:
+        path_str, selector = arg.rsplit(":", 1)
+        if selector != "base" and not selector.startswith("override_"):
+            raise ValueError(f"Invalid selector '{selector}'. Must be 'base' or 'override_<name>'")
+        return Path(path_str), selector
+    return Path(arg), None
+
+
+def is_override_config(config_path: Path) -> bool:
+    """Check if a YAML file uses override format (has a 'base' top-level key)."""
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    if not isinstance(config, dict):
+        return False
+    return "base" in config
+
+
+def submit_override(
+    config_path: Path,
+    selector: str | None = None,
+    dry_run: bool = False,
+    setup_script: str | None = None,
+    tags: list[str] | None = None,
+    output_dir: Path | None = None,
+) -> None:
+    """Expand an override config file and submit each variant.
+
+    Loads the raw YAML, expands base + override_* via generate_override_configs(),
+    then routes each variant through submit_sweep or submit_single.
+
+    Args:
+        config_path: Path to override YAML file
+        selector: Optional selector ("base", "override_xxx", or None for all)
+        dry_run: If True, print config but don't submit
+        setup_script: Optional custom setup script name
+        tags: Optional list of tags
+        output_dir: Custom output directory
+    """
+    with open(config_path) as f:
+        raw_config = yaml.safe_load(f)
+
+    override_configs = generate_override_configs(raw_config, selector=selector)
+
+    if dry_run:
+        base_name = raw_config["base"].get("name", "unnamed")
+        selector_info = f", selector: {selector}" if selector else ""
+        console.print()
+        console.print(
+            Panel(
+                f"[bold]Override Config:[/] {base_name} ({len(override_configs)} variant{'s' if len(override_configs) != 1 else ''}{selector_info})",
+                border_style="cyan",
+            )
+        )
+        console.print()
+
+    cluster_config = load_cluster_config()
+
+    for i, (suffix, config_dict) in enumerate(override_configs, 1):
+        variant_label = "base" if suffix == "base" else f"override_{suffix}"
+        job_name = config_dict.get("name", "unnamed")
+
+        if dry_run:
+            console.print(f"[bold cyan][{i}/{len(override_configs)}][/] {variant_label}: {job_name}")
+
+        resolved = resolve_config_with_defaults(config_dict, cluster_config)
+
+        if "sweep" in resolved:
+            # Write merged config to temp file and route through submit_sweep
+            fd, temp_path = tempfile.mkstemp(suffix=".yaml", prefix="srtctl_override_", text=True)
+            try:
+                with os.fdopen(fd, "w") as f:
+                    yaml.dump(resolved, f, default_flow_style=False)
+                submit_sweep(
+                    config_path=Path(temp_path),
+                    dry_run=dry_run,
+                    setup_script=setup_script,
+                    tags=tags,
+                    output_dir=output_dir,
+                )
+            finally:
+                with contextlib.suppress(OSError):
+                    os.remove(temp_path)
+        else:
+            config = SrtConfig.Schema().load(resolved)
+            submit_single(
+                config_path=config_path,
+                config=config,
+                dry_run=dry_run,
+                setup_script=setup_script,
+                tags=tags,
+                output_dir=output_dir,
+            )
 
 
 def main():
@@ -613,7 +729,14 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     def add_common_args(p):
-        p.add_argument("-f", "--file", type=Path, required=True, dest="config", help="YAML config file or directory")
+        p.add_argument(
+            "-f",
+            "--file",
+            type=str,
+            required=True,
+            dest="config",
+            help="YAML config file, directory, or file:selector for overrides",
+        )
         p.add_argument("-o", "--output", type=Path, dest="output_dir", help="Custom output directory for job logs")
         p.add_argument("--sweep", action="store_true", help="Force sweep mode")
         p.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompts")
@@ -628,8 +751,11 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.config.exists():
-        console.print(f"[bold red]Config not found:[/] {args.config}")
+    # Parse config arg: supports path:selector format for overrides
+    config_path, selector = parse_config_arg(args.config)
+
+    if not config_path.exists():
+        console.print(f"[bold red]Config not found:[/] {config_path}")
         sys.exit(1)
 
     is_dry_run = args.command == "dry-run"
@@ -640,24 +766,37 @@ def main():
         output_dir = getattr(args, "output_dir", None)
 
         # Handle directory input
-        if args.config.is_dir():
+        if config_path.is_dir():
+            if selector:
+                logger.warning(f"Selector ':{selector}' ignored for directory input")
             submit_directory(
-                args.config,
+                config_path,
                 dry_run=is_dry_run,
                 setup_script=setup_script,
                 tags=tags,
                 force_sweep=args.sweep,
                 output_dir=output_dir,
             )
+        elif is_override_config(config_path):
+            submit_override(
+                config_path,
+                selector=selector,
+                dry_run=is_dry_run,
+                setup_script=setup_script,
+                tags=tags,
+                output_dir=output_dir,
+            )
         else:
-            is_sweep = args.sweep or is_sweep_config(args.config)
+            if selector:
+                logger.warning(f"Selector ':{selector}' ignored — config is not an override file")
+            is_sweep = args.sweep or is_sweep_config(config_path)
             if is_sweep:
                 submit_sweep(
-                    args.config, dry_run=is_dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir
+                    config_path, dry_run=is_dry_run, setup_script=setup_script, tags=tags, output_dir=output_dir
                 )
             else:
                 submit_single(
-                    config_path=args.config,
+                    config_path=config_path,
                     dry_run=is_dry_run,
                     setup_script=setup_script,
                     tags=tags,
