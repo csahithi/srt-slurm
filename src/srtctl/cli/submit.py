@@ -216,18 +216,27 @@ def submit_with_orchestrator(
     tags: list[str] | None = None,
     setup_script: str | None = None,
     output_dir: Path | None = None,
-) -> None:
+    variant_suffix: str | None = None,
+    source_config_path: Path | None = None,
+) -> str | None:
     """Submit job using the new Python orchestrator.
 
     This uses the minimal sbatch template that calls srtctl.cli.do_sweep.
 
     Args:
-        config_path: Path to YAML config file
+        config_path: Path to the resolved YAML config passed to do_sweep.
         config: Pre-loaded SrtConfig (or None to load from path)
         dry_run: If True, print script but don't submit
         tags: Optional tags for the run
         setup_script: Optional custom setup script name (overrides config)
         output_dir: Custom output directory (CLI flag, highest priority)
+        variant_suffix: If set (e.g. "base", "lowmem"), also save config_path
+                        as config_{variant_suffix}.yaml in the job output dir.
+        source_config_path: If set, saved as config.yaml instead of config_path.
+                            Used for override jobs to preserve the original file.
+
+    Returns:
+        job_id string on success, None for dry_run.
     """
 
     if config is None:
@@ -290,7 +299,9 @@ def submit_with_orchestrator(
                 job_output_dir = srtctl_source / "outputs" / job_id
         job_output_dir.mkdir(parents=True, exist_ok=True)
 
-        shutil.copy(config_path, job_output_dir / "config.yaml")
+        shutil.copy(source_config_path or config_path, job_output_dir / "config.yaml")
+        if variant_suffix:
+            shutil.copy(config_path, job_output_dir / f"config_{variant_suffix}.yaml")
         shutil.copy(script_path, job_output_dir / "sbatch_script.sh")
 
         # Build comprehensive job metadata
@@ -349,6 +360,7 @@ def submit_with_orchestrator(
         console.print(f"[dim]📁 Logs:[/] {job_output_dir}/logs")
         console.print(f"[dim]📋 Monitor:[/] tail -f {job_output_dir}/logs/sweep_{job_id}.log")
         console.print(f"[dim]📊 Queue:[/] squeue --job {job_id}")
+        return job_id
 
     except subprocess.CalledProcessError as e:
         console.print(f"[bold red]❌ sbatch failed:[/] {e.stderr}")
@@ -358,6 +370,7 @@ def submit_with_orchestrator(
         if not keep_script:
             with contextlib.suppress(OSError):
                 os.remove(script_path)
+    return None
 
 
 def submit_single(
@@ -367,7 +380,9 @@ def submit_single(
     setup_script: str | None = None,
     tags: list[str] | None = None,
     output_dir: Path | None = None,
-):
+    variant_suffix: str | None = None,
+    source_config_path: Path | None = None,
+) -> str | None:
     """Submit a single job from YAML config.
 
     Uses the orchestrator by default. This is the recommended submission method.
@@ -379,6 +394,11 @@ def submit_single(
         setup_script: Optional custom setup script name
         tags: Optional list of tags
         output_dir: Custom output directory (CLI flag, highest priority)
+        variant_suffix: If set, also save config as config_{suffix}.yaml in job output dir.
+        source_config_path: If set, saved as config.yaml (original file for override jobs).
+
+    Returns:
+        job_id string on success, None for dry_run.
     """
     if config is None and config_path:
         config = load_config(config_path)
@@ -387,13 +407,15 @@ def submit_single(
         raise ValueError("Either config_path or config must be provided")
 
     # Always use orchestrator mode
-    submit_with_orchestrator(
+    return submit_with_orchestrator(
         config_path=config_path or Path("./config.yaml"),
         config=config,
         dry_run=dry_run,
         tags=tags,
         setup_script=setup_script,
         output_dir=output_dir,
+        variant_suffix=variant_suffix,
+        source_config_path=source_config_path,
     )
 
 
@@ -613,6 +635,8 @@ def parse_config_arg(arg: str) -> tuple[Path, str | None]:
     """
     if ":" in arg:
         path_str, selector = arg.rsplit(":", 1)
+        if not path_str.strip():
+            raise ValueError("Invalid config path in selector syntax. Use '<path>:base' or '<path>:override_<name>'")
         if selector != "base" and not selector.startswith("override_"):
             raise ValueError(f"Invalid selector '{selector}'. Must be 'base' or 'override_<name>'")
         return Path(path_str), selector
@@ -683,32 +707,43 @@ def submit_override(
 
         logger.info(f"Override variant: {variant_label} -> {job_name}")
 
+        # Write resolved config next to the original override YAML so the
+        # SLURM job can read it when it starts (sbatch script embeds the path).
+        variant_file = config_path.parent / f"{config_path.stem}_{suffix}.yaml"
+        with open(variant_file, "w") as f:
+            yaml.dump(resolved, f, default_flow_style=False)
+
         if "sweep" in resolved:
-            # Write merged config to temp file for sweep expansion
-            fd, temp_path = tempfile.mkstemp(suffix=".yaml", prefix="srtctl_override_", text=True)
             try:
-                with os.fdopen(fd, "w") as f:
-                    yaml.dump(resolved, f, default_flow_style=False)
                 submit_sweep(
-                    config_path=Path(temp_path),
+                    config_path=variant_file,
                     dry_run=dry_run,
                     setup_script=setup_script,
                     tags=tags,
                     output_dir=output_dir,
                 )
             finally:
+                # sweep writes its own per-job configs; pending file is always safe to remove
                 with contextlib.suppress(OSError):
-                    os.remove(temp_path)
+                    variant_file.unlink()
         else:
             config = SrtConfig.Schema().load(resolved)
             submit_single(
-                config_path=config_path,
+                config_path=variant_file,
                 config=config,
                 dry_run=dry_run,
                 setup_script=setup_script,
                 tags=tags,
                 output_dir=output_dir,
+                variant_suffix=suffix,
+                source_config_path=config_path,
             )
+            if dry_run:
+                with contextlib.suppress(OSError):
+                    variant_file.unlink()
+            # NOTE: for real submissions, variant_file must NOT be deleted —
+            # the sbatch script references it via config_path and do_sweep
+            # reads it at job start.
 
 
 def main():
