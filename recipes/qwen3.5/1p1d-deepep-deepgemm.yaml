@@ -68,7 +68,7 @@ backend:
       expert-parallel-size: 1
 
       # Mamba hybrid model settings
-      mamba-scheduler-strategy: "extra_buffer"
+      mamba-scheduler-strategy: "no_buffer"
       mamba-track-interval: 2048
       mamba-ssm-dtype: "bfloat16"
 
@@ -79,7 +79,7 @@ backend:
       # Memory: same as AGG/1p1d configs
       mem-fraction-static: 0.75
       chunked-prefill-size: 16384
-      context-length: 2020
+      # context-length: 2020  # commented out because of accuracy test
 
       # Tell prefill about decode's actual TP/DP sizes for correct KV transfer
       disaggregation-decode-tp: 8
@@ -101,7 +101,7 @@ backend:
       enable-dp-attention: true
 
       # Mamba hybrid model settings
-      mamba-scheduler-strategy: "extra_buffer"
+      mamba-scheduler-strategy: "no_buffer"
       mamba-track-interval: 2048
       mamba-ssm-dtype: "bfloat16"
 
@@ -110,12 +110,6 @@ backend:
       disable-radix-cache: true
       disaggregation-bootstrap-port: 30001
 
-      # Memory + mamba 3x pool
-      # With dp_size=8 + enable_dp_attention, code divides by dp_size:
-      #   max_mamba_cache_size: 3200/8 = 400 per DP worker
-      #   max_running_requests: 640/8 = 80 per DP worker
-      #   extra_buffer needs 3 slots/req: 3*80 = 240, pool=400 → 67% headroom
-      #   Reduced from 800 to 640 to avoid token pool exhaustion triggering retraction
       mem-fraction-static: 0.60
 
       max-mamba-cache-size: 3200
