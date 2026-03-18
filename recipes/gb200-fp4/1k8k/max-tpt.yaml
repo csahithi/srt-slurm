@@ -1,7 +1,7 @@
 name: "gb200-fp4-1k8k-max-tpt"
 
 dynamo:
-  version: 0.8.1
+  version: 1.0.0
 
 frontend:
   type: dynamo

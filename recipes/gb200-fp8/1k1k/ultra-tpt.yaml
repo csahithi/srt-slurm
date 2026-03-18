@@ -1,7 +1,7 @@
 name: "gb200-fp8-1k1k-ultra-tpt"
 
 dynamo:
-  version: 0.8.1
+  version: 1.0.0
 
 frontend:
   type: dynamo
