@@ -1,7 +1,7 @@
 name: "gb200-fp8-1k8k-mid-curve"
 
 dynamo:
-  version: 0.8.1
+  version: 1.0.0
 
 frontend:
   type: dynamo
