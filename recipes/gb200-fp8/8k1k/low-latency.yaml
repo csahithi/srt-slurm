@@ -2,7 +2,7 @@ base:
   name: "gb200-fp8-8k1k-low-latency"
 
 dynamo:
-  version: 1.0.0
+  hash: eed64bf16939fbb726393786d71b03f923f59fc3
 
   frontend:
     type: dynamo
