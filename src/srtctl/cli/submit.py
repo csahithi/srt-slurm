@@ -63,23 +63,6 @@ def get_job_name(config: SrtConfig) -> str:
     return config.name
 
 
-def get_job_name(config: SrtConfig) -> str:
-    """Get job name, using RUNNER_NAME if available, otherwise config name.
-
-    This allows multi-runner setups to have unique job names for cleanup.
-
-    Args:
-        config: SrtConfig with the base job name
-
-    Returns:
-        Job name: RUNNER_NAME if set, otherwise config.name
-    """
-    runner_name = os.environ.get("RUNNER_NAME")
-    if runner_name:
-        return runner_name
-    return config.name
-
-
 def setup_logging(level: int = logging.INFO) -> None:
     logging.basicConfig(
         level=level,
