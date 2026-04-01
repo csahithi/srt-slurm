@@ -400,7 +400,11 @@ async def async_request_dynamo_completions(
                     output.generated_text = generated_text
                     output.latency = most_recent_timestamp - st
                 else:
-                    output.error = response.reason or ""
+                    try:
+                        body = await response.text()
+                    except Exception:
+                        body = ""
+                    output.error = f"{response.reason}: {body}" if body else (response.reason or "")
                     output.success = False
         except Exception:
             output.success = False
