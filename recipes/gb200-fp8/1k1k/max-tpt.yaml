@@ -135,6 +135,7 @@ backend:
 
       # Other flags
       stream-interval: 50
+      incremental-streaming-output: true
       decode-log-interval: 1000
       max-running-requests: 45000
       context-length: 2200
