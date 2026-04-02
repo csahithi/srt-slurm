@@ -555,6 +555,15 @@ async def benchmark(
     if backend != "openai-chat" and test_mm_content is not None:
         # multi-modal benchmark is only available on OpenAI Chat backend.
         raise ValueError("Multi-modal content is only supported on 'openai-chat' backend.")
+
+    # DEBUG: show what the prompt actually looks like (repr reveals garbled/control chars)
+    print(f"[DEBUG] test_prompt_len={test_prompt_len}, prompt repr (first 300 chars): {repr(test_prompt[:300])}")
+    non_printable = [hex(ord(c)) for c in test_prompt if ord(c) < 0x20 or ord(c) == 0x7F or (0x80 <= ord(c) <= 0x9F)]
+    if non_printable:
+        print(f"[DEBUG] Non-printable/control characters found in prompt: {non_printable[:50]}")
+    else:
+        print("[DEBUG] No control characters found in prompt")
+
     test_input = RequestFuncInput(
         model=model_id,
         model_name=model_name,
@@ -569,6 +578,7 @@ async def benchmark(
     )
 
     test_output = await request_func(request_func_input=test_input)
+    print(f"[DEBUG] test response: success={test_output.success}, error={repr(test_output.error)}")
     if not test_output.success:
         raise ValueError(
             "Initial test run failed - Please make sure benchmark arguments "
