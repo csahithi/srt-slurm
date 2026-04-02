@@ -1,7 +1,7 @@
 name: "gb200-fp8-1k1k-max-tpt"
 
 dynamo:
-  hash: eed64bf16939fbb726393786d71b03f923f59fc3
+  hash: 91a8c6affab5d8a9d210cec8282832d8b54594b4
 
 frontend:
   type: dynamo
