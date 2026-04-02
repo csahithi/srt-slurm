@@ -377,8 +377,11 @@ def sample_random_requests(
                 tokenize=False,
             )
             input_lens[i] += chat_template_len
+            prompt_token_ids = None
+        else:
+            prompt_token_ids = re_encoded_sequence
 
-        input_requests.append((prompt, int(prefix_len + input_lens[i]), int(output_lens[i]), None))
+        input_requests.append((prompt, int(prefix_len + input_lens[i]), int(output_lens[i]), None, prompt_token_ids))
 
     return input_requests
 
@@ -551,7 +554,8 @@ async def benchmark(
         raise ValueError(f"Unknown backend: {backend}")
 
     print("Starting initial single prompt test run...")
-    test_prompt, test_prompt_len, test_output_len, test_mm_content = input_requests[0]
+    test_prompt, test_prompt_len, test_output_len, test_mm_content, *_extra = (*input_requests[0], None)
+    test_prompt_token_ids = _extra[0] if _extra else None
     if backend != "openai-chat" and test_mm_content is not None:
         # multi-modal benchmark is only available on OpenAI Chat backend.
         raise ValueError("Multi-modal content is only supported on 'openai-chat' backend.")
@@ -563,6 +567,7 @@ async def benchmark(
         print(f"[DEBUG] Non-printable/control characters found in prompt: {non_printable[:50]}")
     else:
         print("[DEBUG] No control characters found in prompt")
+    print(f"[DEBUG] sending prompt_token_ids: {test_prompt_token_ids is not None}, len={len(test_prompt_token_ids) if test_prompt_token_ids else 'N/A'}")
 
     test_input = RequestFuncInput(
         model=model_id,
@@ -575,6 +580,7 @@ async def benchmark(
         best_of=best_of,
         multi_modal_content=test_mm_content,
         ignore_eos=ignore_eos,
+        prompt_token_ids=test_prompt_token_ids,
     )
 
     test_output = await request_func(request_func_input=test_input)
@@ -635,7 +641,8 @@ async def benchmark(
     benchmark_start_time = time.perf_counter()
     tasks: list[asyncio.Task] = []
     async for request in get_request(input_requests, request_rate, burstiness):
-        prompt, prompt_len, output_len, mm_content = request
+        prompt, prompt_len, output_len, mm_content, *_extra = (*request, None)
+        req_prompt_token_ids = _extra[0] if _extra else None
         req_model_id, req_model_name = model_id, model_name
         if lora_modules:
             req_lora_module = next(lora_modules)
@@ -652,6 +659,7 @@ async def benchmark(
             best_of=best_of,
             multi_modal_content=mm_content,
             ignore_eos=ignore_eos,
+            prompt_token_ids=req_prompt_token_ids,
         )
         tasks.append(asyncio.create_task(limited_request_func(request_func_input=request_func_input, pbar=pbar)))
     outputs: list[RequestFuncOutput] = await asyncio.gather(*tasks)

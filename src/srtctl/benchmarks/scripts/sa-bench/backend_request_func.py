@@ -30,6 +30,7 @@ class RequestFuncInput:
     extra_body: dict | None = None
     multi_modal_content: dict | None = None
     ignore_eos: bool = False
+    prompt_token_ids: list[int] | None = None
 
 
 @dataclass
@@ -327,7 +328,7 @@ async def async_request_dynamo_completions(
     async with aiohttp.ClientSession(trust_env=True, timeout=AIOHTTP_TIMEOUT) as session:
         payload = {
             "model": request_func_input.model_name if request_func_input.model_name else request_func_input.model,
-            "prompt": request_func_input.prompt,
+            "prompt": request_func_input.prompt_token_ids if request_func_input.prompt_token_ids is not None else request_func_input.prompt,
             "temperature": 0.0,
             "best_of": request_func_input.best_of,
             "max_tokens": request_func_input.output_len,
