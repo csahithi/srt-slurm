@@ -377,7 +377,7 @@ def sample_random_requests(
                 tokenize=False,
             )
             input_lens[i] += chat_template_len
-            prompt_token_ids = None
+            prompt_token_ids = tokenizer.encode(prompt, add_special_tokens=False)
         else:
             prompt_token_ids = re_encoded_sequence
 
