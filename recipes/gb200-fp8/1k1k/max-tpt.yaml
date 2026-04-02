@@ -22,6 +22,9 @@ resources:
   decode_workers: 1
   gpus_per_node: 4
 
+sbatch_directives:
+  exclude: "inkwell-copper-cn08"
+
 backend:
 
   # Prefill-specific environment variables
