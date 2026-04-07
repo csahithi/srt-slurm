@@ -1,7 +1,7 @@
 name: "gb200-fp4-1k1k-mid-curve"
 
 dynamo:
-  hash: 07af8dca3ef34aad1c4ef85add4af23482d8a580
+  hash: 3ad7b7c88ac91f18225824fdc8394f066c9607b6
 
 frontend:
   type: dynamo
